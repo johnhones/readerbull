@@ -1,0 +1,188 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/@tabler/icons-webfont@latest/tabler-icons.min.css">
+<link rel="stylesheet" href="style.css">
+<title>Readerbull: Finish your Discoverability Audit</title>
+</head>
+<body>
+
+<!-- NAV -->
+<div class="nav">
+  <div class="nav-inner">
+    <a href="index.html" class="nav-logo">
+      <span class="logo-mark"><img src="readerbull-icon.png" alt="Readerbull"></span>
+      readerbull
+    </a>
+  </div>
+</div>
+
+<div class="form-page">
+  <div class="form-page-inner">
+
+    <div id="loading-state" class="loading-state">
+      Checking your magic link...
+    </div>
+
+    <div id="no-session-state" style="display:none;">
+      <div class="sec-eyebrow">Almost there</div>
+      <h1>Check your email</h1>
+      <p>Click the magic link we sent you to verify your email and continue your audit. You can close this tab once you've clicked it from your inbox.</p>
+      <div style="margin-top:24px;"><a href="index.html" class="btn btn-outline">Back to homepage</a></div>
+    </div>
+
+    <div id="form-state" style="display:none;">
+      <div class="sec-eyebrow">Almost there</div>
+      <h1>A few more details</h1>
+      <p>This is everything Readerbull needs to run your Discoverability Audit automatically, no manuscript, no Amazon login required.</p>
+
+      <div class="audit-form standalone">
+        <form id="audit-details-form">
+          <label for="category">Category</label>
+          <select id="category" required>
+            <option value="" disabled selected>Choose the closest fit</option>
+            <option>Self-Help</option>
+            <option>Business & Money</option>
+            <option>Health & Fitness</option>
+            <option>Non-Fiction</option>
+            <option>Fiction</option>
+            <option>Romance</option>
+            <option>Fantasy</option>
+            <option>Mystery & Thriller</option>
+            <option>Children's Books</option>
+            <option>Other</option>
+          </select>
+
+          <label for="review-count">Roughly how many reviews do you have?</label>
+          <input type="number" id="review-count" min="0" placeholder="e.g. 12" required>
+
+          <label for="keywords">A few keywords that describe your book</label>
+          <input type="text" id="keywords" placeholder="e.g. mindset, habits, self discipline">
+
+          <button type="submit" class="btn btn-primary" id="details-submit">Get My Discoverability Score</button>
+          <div class="fine">Separate keywords with commas, up to 3 count towards your score.</div>
+          <div class="field-error" id="details-error">Something went wrong, please try again.</div>
+        </form>
+      </div>
+    </div>
+
+  </div>
+</div>
+
+<!-- FOOTER -->
+<div class="ftr">
+  <div class="wrap">
+    <div class="ftr-logo"><span class="logo-mark"><img src="readerbull-icon.png" alt="Readerbull"></span>readerbull</div>
+    <small>&copy; 2026 Readerbull. A platform that helps you sell more books.</small>
+  </div>
+</div>
+
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.js"></script>
+<script src="supabase-client.js"></script>
+<script src="scoring.js"></script>
+<script>
+(async function () {
+  var loadingState = document.getElementById('loading-state');
+  var noSessionState = document.getElementById('no-session-state');
+  var formState = document.getElementById('form-state');
+
+  // Give supabase-js a moment to parse the magic-link tokens out of the URL.
+  var user = null;
+  for (var attempt = 0; attempt < 10; attempt++) {
+    var { data } = await readerbull.client.auth.getUser();
+    if (data && data.user) { user = data.user; break; }
+    await new Promise(function (r) { setTimeout(r, 300); });
+  }
+
+  loadingState.style.display = 'none';
+
+  if (!user) {
+    noSessionState.style.display = 'block';
+    return;
+  }
+
+  // Make sure a book row exists for this user, created from the details
+  // captured on the homepage sign-up form (stored as auth user_metadata).
+  var { data: existingBooks } = await readerbull.client
+    .from('books')
+    .select('id')
+    .eq('user_id', user.id)
+    .limit(1);
+
+  var bookId;
+  if (existingBooks && existingBooks.length) {
+    bookId = existingBooks[0].id;
+  } else {
+    var meta = user.user_metadata || {};
+    var { data: inserted, error: insertError } = await readerbull.client
+      .from('books')
+      .insert({
+        user_id: user.id,
+        author_name: meta.author_name || null,
+        book_title: meta.book_title || null,
+        amazon_link: meta.amazon_link || null,
+        email: user.email
+      })
+      .select('id')
+      .single();
+
+    if (insertError) {
+      formState.querySelector('h1').textContent = 'Something went wrong';
+      formState.querySelector('p').textContent = insertError.message;
+      formState.style.display = 'block';
+      return;
+    }
+    bookId = inserted.id;
+  }
+
+  formState.style.display = 'block';
+
+  document.getElementById('audit-details-form').addEventListener('submit', async function (e) {
+    e.preventDefault();
+
+    var submitBtn = document.getElementById('details-submit');
+    var errorEl = document.getElementById('details-error');
+    errorEl.style.display = 'none';
+    submitBtn.disabled = true;
+    submitBtn.textContent = 'Scoring your book...';
+
+    var category = document.getElementById('category').value;
+    var reviewCount = document.getElementById('review-count').value;
+    var keywords = document.getElementById('keywords').value;
+    var amazonLink = (user.user_metadata && user.user_metadata.amazon_link) || '';
+
+    var result = computeDiscoverabilityScore({
+      category: category,
+      reviewCount: reviewCount,
+      keywords: keywords,
+      amazonLink: amazonLink
+    });
+
+    var { error } = await readerbull.client
+      .from('books')
+      .update({
+        category: category,
+        review_count: reviewCount,
+        keywords: keywords,
+        score: result.score,
+        score_breakdown: result.breakdown
+      })
+      .eq('id', bookId);
+
+    if (error) {
+      submitBtn.disabled = false;
+      submitBtn.textContent = 'Get My Discoverability Score';
+      errorEl.textContent = error.message || 'Something went wrong, please try again.';
+      errorEl.style.display = 'block';
+      return;
+    }
+
+    window.location.href = 'dashboard.html';
+  });
+})();
+</script>
+
+</body>
+</html>

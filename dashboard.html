@@ -1,0 +1,178 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/@tabler/icons-webfont@latest/tabler-icons.min.css">
+<link rel="stylesheet" href="style.css">
+<title>Readerbull: Your Dashboard</title>
+</head>
+<body>
+
+<!-- NAV -->
+<div class="nav">
+  <div class="nav-inner">
+    <a href="dashboard.html" class="nav-logo">
+      <span class="logo-mark"><img src="readerbull-icon.png" alt="Readerbull"></span>
+      readerbull
+    </a>
+    <div class="nav-links">
+      <a href="#" id="logout-link">Log out</a>
+    </div>
+  </div>
+</div>
+
+<div id="loading-state" class="loading-state">Loading your dashboard...</div>
+
+<div id="dashboard-content" style="display:none;">
+
+  <!-- HEADER -->
+  <div class="dash-header">
+    <div class="wrap">
+      <div>
+        <h1 id="dash-greeting">Welcome back</h1>
+        <p id="dash-book-title">Your dashboard</p>
+      </div>
+    </div>
+  </div>
+
+  <div class="wrap" style="padding: 40px 32px 80px;">
+
+    <!-- AUDIT NOT COMPLETE -->
+    <div id="audit-incomplete" class="dash-card empty" style="display:none; margin-bottom: 32px;">
+      <div class="empty-badge">Action needed</div>
+      <h3><i class="ti ti-lock locked-icon"></i> Finish your Discoverability Audit</h3>
+      <p>You're one short step away from your Discoverability Score. <a href="onboarding.html" style="color:var(--teal-d); font-weight:700;">Complete the audit form</a> to unlock your dashboard.</p>
+    </div>
+
+    <!-- SCORE + BREAKDOWN -->
+    <div id="audit-complete" class="score-card-wrap" style="display:none;">
+      <div class="split">
+        <div class="score-demo">
+          <div class="eyebrow2">Discoverability Score</div>
+          <div class="num"><span id="score-value">0</span><span>&thinsp;/ 100</span></div>
+          <div class="bars" id="score-bars"></div>
+        </div>
+        <div class="breakdown-card">
+          <h2>What's holding your book back</h2>
+          <p id="score-summary">Here's exactly where your points came from.</p>
+          <div id="score-detail-list"></div>
+        </div>
+      </div>
+    </div>
+
+    <!-- FUTURE FEATURE AREAS -->
+    <div style="margin-top:48px;">
+      <div class="sec-eyebrow">Coming to your dashboard</div>
+      <h2 style="font-size:22px;font-weight:800;color:var(--navy);margin-bottom:20px;">The rest of Readerbull, unlocking as you go.</h2>
+      <div class="dash-grid">
+        <div class="dash-card empty">
+          <h3><i class="ti ti-lock locked-icon"></i> Competitive Analysis</h3>
+          <p>See which books are competing for your keywords and where you have a realistic chance to rank. Unlocks once your first audit is complete.</p>
+        </div>
+        <div class="dash-card empty">
+          <h3><i class="ti ti-lock locked-icon"></i> Marketing Strategy</h3>
+          <p>A clear action plan built from your audit results, not a generic report. Unlocks once your first audit is complete.</p>
+        </div>
+        <div class="dash-card empty">
+          <h3><i class="ti ti-lock locked-icon"></i> Review Campaigns</h3>
+          <p>Launch a time-limited campaign to build genuine reader reviews. Available once you're ready to take action.</p>
+        </div>
+        <div class="dash-card empty">
+          <h3><i class="ti ti-lock locked-icon"></i> Marketing Hub</h3>
+          <p>Discover which marketing channels are driving your book sales. Unlocks as you use more of Readerbull.</p>
+        </div>
+        <div class="dash-card empty">
+          <h3><i class="ti ti-lock locked-icon"></i> PPC &amp; Advertising</h3>
+          <p>Guided Amazon Ads with budget safeguards, so you scale spend safely once your foundations are in place.</p>
+        </div>
+        <div class="dash-card empty">
+          <h3><i class="ti ti-lock locked-icon"></i> Reports</h3>
+          <p>Ongoing reporting on your book's performance and marketing activity. Unlocks as your data builds up.</p>
+        </div>
+        <div class="dash-card empty">
+          <h3><i class="ti ti-lock locked-icon"></i> Book Performance</h3>
+          <p>Track how your Discoverability Score and sales opportunity change over time. Unlocks once your first audit is complete.</p>
+        </div>
+      </div>
+    </div>
+
+  </div>
+</div>
+
+<!-- FOOTER -->
+<div class="ftr">
+  <div class="wrap">
+    <div class="ftr-logo"><span class="logo-mark"><img src="readerbull-icon.png" alt="Readerbull"></span>readerbull</div>
+    <small>&copy; 2026 Readerbull. A platform that helps you sell more books.</small>
+  </div>
+</div>
+
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.js"></script>
+<script src="supabase-client.js"></script>
+<script>
+(async function () {
+  var user = await readerbull.requireUser('index.html');
+  if (!user) return;
+
+  document.getElementById('logout-link').addEventListener('click', function (e) {
+    e.preventDefault();
+    readerbull.signOut();
+  });
+
+  var { data: books } = await readerbull.client
+    .from('books')
+    .select('*')
+    .eq('user_id', user.id)
+    .limit(1);
+
+  var book = books && books.length ? books[0] : null;
+
+  document.getElementById('loading-state').style.display = 'none';
+  document.getElementById('dashboard-content').style.display = 'block';
+
+  var greeting = document.getElementById('dash-greeting');
+  var bookTitleEl = document.getElementById('dash-book-title');
+
+  if (book && book.author_name) {
+    greeting.textContent = 'Welcome back, ' + book.author_name;
+  }
+  if (book && book.book_title) {
+    bookTitleEl.textContent = book.book_title;
+  }
+
+  if (!book || book.score === null || book.score === undefined) {
+    document.getElementById('audit-incomplete').style.display = 'block';
+    return;
+  }
+
+  document.getElementById('audit-complete').style.display = 'block';
+  document.getElementById('score-value').textContent = book.score;
+
+  var breakdown = book.score_breakdown || {};
+  var barsEl = document.getElementById('score-bars');
+  var listEl = document.getElementById('score-detail-list');
+
+  Object.keys(breakdown).forEach(function (key) {
+    var item = breakdown[key];
+    var pct = item.max ? Math.round((item.points / item.max) * 100) : 0;
+
+    var barRow = document.createElement('div');
+    barRow.className = 'bar-row';
+    barRow.innerHTML =
+      '<div class="bar-meta"><span>' + item.label + '</span><span>' + item.points + ' / ' + item.max + '</span></div>' +
+      '<div class="bar-track"><div class="bar-fill" style="width:' + pct + '%;"></div></div>';
+    barsEl.appendChild(barRow);
+
+    var detailRow = document.createElement('div');
+    detailRow.style.cssText = 'display:flex;justify-content:space-between;padding:10px 0;border-bottom:1px solid var(--border);font-size:14px;';
+    detailRow.innerHTML =
+      '<span style="color:var(--navy);font-weight:600;">' + item.label + '</span>' +
+      '<span style="color:var(--mid);">' + item.points + ' / ' + item.max + ' pts</span>';
+    listEl.appendChild(detailRow);
+  });
+})();
+</script>
+
+</body>
+</html>
