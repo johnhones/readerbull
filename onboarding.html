@@ -107,13 +107,23 @@
   // captured on the homepage sign-up form (stored as auth user_metadata).
   var { data: existingBooks } = await readerbull.client
     .from('books')
-    .select('id')
+    .select('id, score, dashboard_url')
     .eq('user_id', user.id)
     .limit(1);
 
   var bookId;
   if (existingBooks && existingBooks.length) {
-    bookId = existingBooks[0].id;
+    var existing = existingBooks[0];
+
+    // Returning user who has already finished the audit (or has a legacy
+    // dashboard on file): skip straight to the dashboard instead of asking
+    // them to redo the second form.
+    if (existing.dashboard_url || existing.score !== null) {
+      window.location.href = 'dashboard.html';
+      return;
+    }
+
+    bookId = existing.id;
   } else {
     var meta = user.user_metadata || {};
     var { data: inserted, error: insertError } = await readerbull.client
