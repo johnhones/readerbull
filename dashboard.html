@@ -9,102 +9,82 @@
 </head>
 <body>
 
-<!-- NAV -->
-<div class="nav">
-  <div class="nav-inner">
-    <a href="dashboard.html" class="nav-logo">
-      <span class="logo-mark"><img src="readerbull-icon.png" alt="Readerbull"></span>
-      readerbull
-    </a>
-    <div class="nav-links">
-      <a href="#" id="logout-link">Log out</a>
-    </div>
-  </div>
-</div>
-
 <div id="loading-state" class="loading-state">Loading your dashboard...</div>
 
-<div id="dashboard-content" style="display:none;">
+<div id="shell" class="shell" style="display:none;">
 
-  <!-- HEADER -->
-  <div class="dash-header">
-    <div class="wrap">
+  <!-- SIDEBAR -->
+  <div class="shell-sidebar">
+    <a href="dashboard.html" class="shell-logo">
+      <img src="readerbull-icon.png" alt="Readerbull">
+      readerbull
+    </a>
+
+    <div class="shell-section-label">Navigate</div>
+    <button class="shell-nav-item active" data-panel="overview"><i class="ti ti-layout-dashboard"></i> Overview</button>
+    <button class="shell-nav-item" data-panel="market-analysis" data-navigate-extra><i class="ti ti-users"></i> Market Analysis</button>
+    <button class="shell-nav-item" data-panel="marketing-strategy" data-navigate-extra><i class="ti ti-speakerphone"></i> Marketing Strategy</button>
+    <button class="shell-nav-item" data-panel="keywords" data-navigate-extra><i class="ti ti-search"></i> Keywords</button>
+    <button class="shell-nav-item" data-panel="quick-wins" data-navigate-extra><i class="ti ti-bolt"></i> Quick Wins</button>
+
+    <div class="shell-section-label">Tools</div>
+    <div class="shell-nav-item locked"><i class="ti ti-star"></i> Get Reviews <i class="ti ti-lock"></i></div>
+    <div class="shell-nav-item locked"><i class="ti ti-book-2"></i> Build Your ARC <i class="ti ti-lock"></i></div>
+    <div class="shell-nav-item locked"><i class="ti ti-ad-2"></i> Ad Campaigns <i class="ti ti-lock"></i></div>
+
+    <div class="shell-section-label">Marketplaces</div>
+    <div class="shell-nav-item locked"><i class="ti ti-shopping-cart"></i> Amazon KDP <i class="ti ti-lock"></i></div>
+    <div class="shell-nav-item locked"><i class="ti ti-brand-tiktok"></i> TikTok Shop <i class="ti ti-lock"></i></div>
+    <div class="shell-nav-item locked"><i class="ti ti-building-store"></i> Barnes &amp; Noble <i class="ti ti-lock"></i></div>
+    <div class="shell-nav-item locked"><i class="ti ti-device-tablet"></i> Apple Books <i class="ti ti-lock"></i></div>
+    <div class="shell-nav-item locked"><i class="ti ti-headphones"></i> Audible / ACX <i class="ti ti-lock"></i></div>
+
+    <div style="margin-top:auto;padding-top:16px;">
+      <a href="#" id="logout-link" class="shell-nav-item"><i class="ti ti-logout"></i> Log out</a>
+    </div>
+  </div>
+
+  <!-- MAIN -->
+  <div class="shell-main">
+    <div class="shell-topbar">
       <div>
         <h1 id="dash-greeting">Welcome back</h1>
         <p id="dash-book-title">Your dashboard</p>
       </div>
     </div>
-  </div>
 
-  <div class="wrap" style="padding: 40px 32px 80px;">
+    <!-- OVERVIEW: populated by JS, either the embedded legacy dashboard or the auto score -->
+    <div id="panel-overview" class="shell-panel-container"></div>
 
-    <!-- AUDIT NOT COMPLETE -->
-    <div id="audit-incomplete" class="dash-card empty" style="display:none; margin-bottom: 32px;">
-      <div class="empty-badge">Action needed</div>
-      <h3><i class="ti ti-lock locked-icon"></i> Finish your Discoverability Audit</h3>
-      <p>You're one short step away from your Discoverability Score. <a href="onboarding.html" style="color:var(--teal-d); font-weight:700;">Complete the audit form</a> to unlock your dashboard.</p>
+    <div id="panel-market-analysis" class="shell-panel" style="display:none;">
+      <div class="shell-empty">
+        <i class="ti ti-users"></i>
+        <h3>Market Analysis is on its way</h3>
+        <p>See which books are competing for your keywords and where you have a realistic chance to rank. This unlocks as your audit deepens.</p>
+      </div>
     </div>
-
-    <!-- SCORE + BREAKDOWN -->
-    <div id="audit-complete" class="score-card-wrap" style="display:none;">
-      <div class="split">
-        <div class="score-demo">
-          <div class="eyebrow2">Discoverability Score</div>
-          <div class="num"><span id="score-value">0</span><span>&thinsp;/ 100</span></div>
-          <div class="bars" id="score-bars"></div>
-        </div>
-        <div class="breakdown-card">
-          <h2>What's holding your book back</h2>
-          <p id="score-summary">Here's exactly where your points came from.</p>
-          <div id="score-detail-list"></div>
-        </div>
+    <div id="panel-marketing-strategy" class="shell-panel" style="display:none;">
+      <div class="shell-empty">
+        <i class="ti ti-speakerphone"></i>
+        <h3>Marketing Strategy is on its way</h3>
+        <p>A clear action plan built from your audit results, not a generic report. This unlocks as your audit deepens.</p>
+      </div>
+    </div>
+    <div id="panel-keywords" class="shell-panel" style="display:none;">
+      <div class="shell-empty">
+        <i class="ti ti-search"></i>
+        <h3>Keywords is on its way</h3>
+        <p>Full keyword coverage and gaps based on your book and category. This unlocks as your audit deepens.</p>
+      </div>
+    </div>
+    <div id="panel-quick-wins" class="shell-panel" style="display:none;">
+      <div class="shell-empty">
+        <i class="ti ti-bolt"></i>
+        <h3>Quick Wins is on its way</h3>
+        <p>The single highest-leverage change to make next. This unlocks as your audit deepens.</p>
       </div>
     </div>
 
-    <!-- FUTURE FEATURE AREAS -->
-    <div style="margin-top:48px;">
-      <div class="sec-eyebrow">Coming to your dashboard</div>
-      <h2 style="font-size:22px;font-weight:800;color:var(--navy);margin-bottom:20px;">The rest of Readerbull, unlocking as you go.</h2>
-      <div class="dash-grid">
-        <div class="dash-card empty">
-          <h3><i class="ti ti-lock locked-icon"></i> Competitive Analysis</h3>
-          <p>See which books are competing for your keywords and where you have a realistic chance to rank. Unlocks once your first audit is complete.</p>
-        </div>
-        <div class="dash-card empty">
-          <h3><i class="ti ti-lock locked-icon"></i> Marketing Strategy</h3>
-          <p>A clear action plan built from your audit results, not a generic report. Unlocks once your first audit is complete.</p>
-        </div>
-        <div class="dash-card empty">
-          <h3><i class="ti ti-lock locked-icon"></i> Review Campaigns</h3>
-          <p>Launch a time-limited campaign to build genuine reader reviews. Available once you're ready to take action.</p>
-        </div>
-        <div class="dash-card empty">
-          <h3><i class="ti ti-lock locked-icon"></i> Marketing Hub</h3>
-          <p>Discover which marketing channels are driving your book sales. Unlocks as you use more of Readerbull.</p>
-        </div>
-        <div class="dash-card empty">
-          <h3><i class="ti ti-lock locked-icon"></i> PPC &amp; Advertising</h3>
-          <p>Guided Amazon Ads with budget safeguards, so you scale spend safely once your foundations are in place.</p>
-        </div>
-        <div class="dash-card empty">
-          <h3><i class="ti ti-lock locked-icon"></i> Reports</h3>
-          <p>Ongoing reporting on your book's performance and marketing activity. Unlocks as your data builds up.</p>
-        </div>
-        <div class="dash-card empty">
-          <h3><i class="ti ti-lock locked-icon"></i> Book Performance</h3>
-          <p>Track how your Discoverability Score and sales opportunity change over time. Unlocks once your first audit is complete.</p>
-        </div>
-      </div>
-    </div>
-
-  </div>
-</div>
-
-<!-- FOOTER -->
-<div class="ftr">
-  <div class="wrap">
-    <div class="ftr-logo"><span class="logo-mark"><img src="readerbull-icon.png" alt="Readerbull"></span>readerbull</div>
-    <small>&copy; 2026 Readerbull. A platform that helps you sell more books.</small>
   </div>
 </div>
 
@@ -129,7 +109,7 @@
   var book = books && books.length ? books[0] : null;
 
   document.getElementById('loading-state').style.display = 'none';
-  document.getElementById('dashboard-content').style.display = 'block';
+  document.getElementById('shell').style.display = 'flex';
 
   var greeting = document.getElementById('dash-greeting');
   var bookTitleEl = document.getElementById('dash-book-title');
@@ -141,35 +121,91 @@
     bookTitleEl.textContent = book.book_title;
   }
 
-  if (!book || book.score === null || book.score === undefined) {
-    document.getElementById('audit-incomplete').style.display = 'block';
-    return;
+  var overviewPanel = document.getElementById('panel-overview');
+
+  if (book && book.dashboard_url) {
+    // Legacy, hand-built dashboard: embed it as-is, hide the redundant Navigate
+    // sub-items since that content already lives inside the embedded site.
+    document.querySelectorAll('[data-navigate-extra]').forEach(function (el) {
+      el.style.display = 'none';
+    });
+
+    var frameWrap = document.createElement('div');
+    frameWrap.className = 'legacy-frame-wrap';
+    var iframe = document.createElement('iframe');
+    iframe.src = book.dashboard_url;
+    iframe.title = 'Your Readerbull audit';
+    frameWrap.appendChild(iframe);
+    overviewPanel.appendChild(frameWrap);
+
+  } else if (book && book.score !== null && book.score !== undefined) {
+    // Automated audit: show the real score and breakdown.
+    var panel = document.createElement('div');
+    panel.className = 'shell-panel';
+
+    var barsHtml = '';
+    var listHtml = '';
+    var breakdown = book.score_breakdown || {};
+    Object.keys(breakdown).forEach(function (key) {
+      var item = breakdown[key];
+      var pct = item.max ? Math.round((item.points / item.max) * 100) : 0;
+      barsHtml +=
+        '<div class="bar-row">' +
+          '<div class="bar-meta"><span>' + item.label + '</span><span>' + item.points + ' / ' + item.max + '</span></div>' +
+          '<div class="bar-track"><div class="bar-fill" style="width:' + pct + '%;"></div></div>' +
+        '</div>';
+      listHtml +=
+        '<div style="display:flex;justify-content:space-between;padding:10px 0;border-bottom:1px solid var(--border);font-size:14px;">' +
+          '<span style="color:var(--navy);font-weight:600;">' + item.label + '</span>' +
+          '<span style="color:var(--mid);">' + item.points + ' / ' + item.max + ' pts</span>' +
+        '</div>';
+    });
+
+    panel.innerHTML =
+      '<div class="split">' +
+        '<div class="score-demo">' +
+          '<div class="eyebrow2">Discoverability Score</div>' +
+          '<div class="num">' + book.score + '<span>&thinsp;/ 100</span></div>' +
+          '<div class="bars">' + barsHtml + '</div>' +
+        '</div>' +
+        '<div class="breakdown-card">' +
+          '<h2>What\'s holding your book back</h2>' +
+          '<p>Here\'s exactly where your points came from.</p>' +
+          '<div>' + listHtml + '</div>' +
+        '</div>' +
+      '</div>';
+    overviewPanel.appendChild(panel);
+
+  } else {
+    // Signed up, but haven't finished the second form yet.
+    var panel2 = document.createElement('div');
+    panel2.className = 'shell-panel';
+    panel2.innerHTML =
+      '<div class="shell-empty">' +
+        '<i class="ti ti-lock"></i>' +
+        '<h3>Finish your Discoverability Audit</h3>' +
+        '<p>You\'re one short step away from your Discoverability Score. ' +
+        '<a href="onboarding.html" style="color:var(--teal-d);font-weight:700;">Complete the audit form</a> to unlock your dashboard.</p>' +
+      '</div>';
+    overviewPanel.appendChild(panel2);
   }
 
-  document.getElementById('audit-complete').style.display = 'block';
-  document.getElementById('score-value').textContent = book.score;
+  // Tab switching between Navigate items (locked items have no data-panel, so
+  // they simply do nothing when clicked).
+  document.querySelectorAll('.shell-nav-item[data-panel]').forEach(function (btn) {
+    btn.addEventListener('click', function () {
+      document.querySelectorAll('.shell-nav-item[data-panel]').forEach(function (b) {
+        b.classList.remove('active');
+      });
+      btn.classList.add('active');
 
-  var breakdown = book.score_breakdown || {};
-  var barsEl = document.getElementById('score-bars');
-  var listEl = document.getElementById('score-detail-list');
-
-  Object.keys(breakdown).forEach(function (key) {
-    var item = breakdown[key];
-    var pct = item.max ? Math.round((item.points / item.max) * 100) : 0;
-
-    var barRow = document.createElement('div');
-    barRow.className = 'bar-row';
-    barRow.innerHTML =
-      '<div class="bar-meta"><span>' + item.label + '</span><span>' + item.points + ' / ' + item.max + '</span></div>' +
-      '<div class="bar-track"><div class="bar-fill" style="width:' + pct + '%;"></div></div>';
-    barsEl.appendChild(barRow);
-
-    var detailRow = document.createElement('div');
-    detailRow.style.cssText = 'display:flex;justify-content:space-between;padding:10px 0;border-bottom:1px solid var(--border);font-size:14px;';
-    detailRow.innerHTML =
-      '<span style="color:var(--navy);font-weight:600;">' + item.label + '</span>' +
-      '<span style="color:var(--mid);">' + item.points + ' / ' + item.max + ' pts</span>';
-    listEl.appendChild(detailRow);
+      var target = btn.getAttribute('data-panel');
+      document.getElementById('panel-overview').style.display = (target === 'overview') ? 'block' : 'none';
+      ['market-analysis', 'marketing-strategy', 'keywords', 'quick-wins'].forEach(function (name) {
+        var el = document.getElementById('panel-' + name);
+        if (el) el.style.display = (target === name) ? 'block' : 'none';
+      });
+    });
   });
 })();
 </script>

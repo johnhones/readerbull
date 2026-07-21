@@ -169,6 +169,45 @@ img { max-width: 100%; display: block; }
 .breakdown-card > p { font-size: 14px; color: var(--mid); margin-bottom: 20px; }
 .loading-state { text-align: center; padding: 80px 0; color: var(--mid); font-size: 14px; }
 
+/* ---------- DASHBOARD SHELL (sidebar nav) ---------- */
+.shell { display: flex; min-height: 100vh; }
+.shell-sidebar { width: 240px; flex-shrink: 0; background: var(--navy); padding: 24px 16px; display: flex; flex-direction: column; }
+.shell-logo { display: flex; align-items: center; gap: 10px; color: var(--orange); font-weight: 800; font-size: 18px; text-decoration: none; padding: 0 8px 24px; }
+.shell-logo img { width: 34px; height: 34px; object-fit: contain; }
+.shell-section-label { color: rgba(255,255,255,.4); font-size: 11px; font-weight: 700; letter-spacing: 1.5px; text-transform: uppercase; padding: 16px 8px 8px; }
+.shell-section-label:first-of-type { padding-top: 0; }
+.shell-nav-item { display: flex; align-items: center; gap: 10px; padding: 10px 8px; border-radius: 8px; color: rgba(255,255,255,.7); font-size: 14px; font-weight: 600; text-decoration: none; cursor: pointer; border: none; background: none; width: 100%; text-align: left; font-family: inherit; }
+.shell-nav-item i { font-size: 16px; width: 18px; text-align: center; flex-shrink: 0; }
+.shell-nav-item:hover { background: rgba(255,255,255,.06); color: #fff; }
+.shell-nav-item.active { background: rgba(0,181,173,.18); color: var(--teal); }
+.shell-nav-item.locked { color: rgba(255,255,255,.32); cursor: not-allowed; }
+.shell-nav-item.locked:hover { background: none; color: rgba(255,255,255,.32); }
+.shell-nav-item.locked i.ti-lock { margin-left: auto; font-size: 13px; }
+.shell-main { flex: 1; min-width: 0; background: var(--light); }
+.shell-topbar { display: flex; align-items: center; justify-content: space-between; padding: 16px 32px; background: var(--white); border-bottom: 1px solid var(--border); }
+.shell-topbar h1 { font-size: 18px; font-weight: 800; color: var(--navy); }
+.shell-topbar p { font-size: 13px; color: var(--mid); margin-top: 2px; }
+.shell-topbar a { font-size: 13px; font-weight: 600; color: var(--mid); text-decoration: none; }
+.shell-topbar a:hover { color: var(--teal-d); }
+.shell-panel { padding: 32px; }
+.shell-panel .split { align-items: stretch; }
+.shell-panel .score-demo { height: 100%; }
+.shell-empty { background: var(--white); border: 1.5px dashed var(--border); border-radius: 10px; padding: 60px 32px; text-align: center; max-width: 520px; margin: 40px auto; }
+.shell-empty i { font-size: 28px; color: var(--muted); margin-bottom: 16px; }
+.shell-empty h3 { font-size: 17px; font-weight: 800; color: var(--navy); margin-bottom: 8px; }
+.shell-empty p { font-size: 14px; color: var(--mid); line-height: 1.6; }
+.legacy-frame-wrap { height: calc(100vh - 61px); }
+.legacy-frame-wrap iframe { width: 100%; height: 100%; border: none; display: block; }
+
+@media(max-width: 900px) {
+  .shell { flex-direction: column; }
+  .shell-sidebar { width: 100%; flex-direction: row; flex-wrap: wrap; padding: 16px; }
+  .shell-logo { padding: 0 8px; margin-right: auto; }
+  .shell-section-label { display: none; }
+  .shell-nav-item { width: auto; padding: 8px 12px; }
+  .legacy-frame-wrap { height: 80vh; }
+}
+
 @media(max-width: 900px) {
   .nav-links a:not(.btn) { display: none; }
   .nav-inner { padding-left: 16px; padding-right: 16px; }
