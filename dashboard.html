@@ -28,25 +28,25 @@
     <button class="shell-nav-item" data-panel="quick-wins" data-navigate-extra><i class="ti ti-bolt"></i> Quick Wins</button>
 
     <div class="shell-section-label">Tools</div>
-    <div class="shell-nav-item locked"><i class="ti ti-star"></i> Get Reviews <i class="ti ti-lock"></i></div>
-    <div class="shell-nav-item locked"><i class="ti ti-book-2"></i> Build Your ARC <i class="ti ti-lock"></i></div>
-    <div class="shell-nav-item locked"><i class="ti ti-ad-2"></i> Ad Campaigns <i class="ti ti-lock"></i></div>
+    <button class="shell-nav-item locked" data-panel="get-reviews"><i class="ti ti-star"></i> Get Reviews <i class="ti ti-lock"></i></button>
+    <button class="shell-nav-item locked" data-panel="build-arc"><i class="ti ti-book-2"></i> Build Your ARC <i class="ti ti-lock"></i></button>
+    <button class="shell-nav-item locked" data-panel="ad-campaigns"><i class="ti ti-ad-2"></i> Ad Campaigns <i class="ti ti-lock"></i></button>
 
     <div class="shell-section-label">Marketplaces</div>
-    <div class="shell-nav-item locked"><i class="ti ti-shopping-cart"></i> Amazon KDP <i class="ti ti-lock"></i></div>
-    <div class="shell-nav-item locked"><i class="ti ti-brand-tiktok"></i> TikTok Shop <i class="ti ti-lock"></i></div>
-    <div class="shell-nav-item locked"><i class="ti ti-building-store"></i> Barnes &amp; Noble <i class="ti ti-lock"></i></div>
-    <div class="shell-nav-item locked"><i class="ti ti-device-tablet"></i> Apple Books <i class="ti ti-lock"></i></div>
-    <div class="shell-nav-item locked"><i class="ti ti-headphones"></i> Audible / ACX <i class="ti ti-lock"></i></div>
+    <button class="shell-nav-item locked" data-panel="amazon-kdp"><i class="ti ti-shopping-cart"></i> Amazon KDP <i class="ti ti-lock"></i></button>
+    <button class="shell-nav-item locked" data-panel="tiktok-shop"><i class="ti ti-brand-tiktok"></i> TikTok Shop <i class="ti ti-lock"></i></button>
+    <button class="shell-nav-item locked" data-panel="barnes-noble"><i class="ti ti-building-store"></i> Barnes &amp; Noble <i class="ti ti-lock"></i></button>
+    <button class="shell-nav-item locked" data-panel="apple-books"><i class="ti ti-device-tablet"></i> Apple Books <i class="ti ti-lock"></i></button>
+    <button class="shell-nav-item locked" data-panel="audible-acx"><i class="ti ti-headphones"></i> Audible / ACX <i class="ti ti-lock"></i></button>
   </div>
 
   <!-- MAIN -->
   <div class="shell-main">
     <div class="shell-topbar">
-      <div>
-        <h1 id="dash-greeting">Welcome back</h1>
-        <p id="dash-book-title">Your dashboard</p>
-      </div>
+      <a href="dashboard.html" class="shell-topbar-logo">
+        <img src="readerbull-icon.png" alt="Readerbull">
+        readerbull
+      </a>
       <a href="#" id="logout-link"><i class="ti ti-logout"></i> Log out</a>
     </div>
 
@@ -82,6 +82,71 @@
       </div>
     </div>
 
+    <div id="panel-get-reviews" class="shell-panel" style="display:none;">
+      <div class="shell-empty">
+        <div class="soon-badge">Coming Soon</div>
+        <i class="ti ti-star"></i>
+        <h3>Get Reviews</h3>
+        <p>We'll show your book here next to how many reviews you need to be competitive in your category, plus safe ways to get there.</p>
+      </div>
+    </div>
+    <div id="panel-build-arc" class="shell-panel" style="display:none;">
+      <div class="shell-empty">
+        <div class="soon-badge">Coming Soon</div>
+        <i class="ti ti-book-2"></i>
+        <h3>Build Your ARC</h3>
+        <p>A guided way to launch an Advance Reader Copy campaign and recruit real, opted-in readers for honest reviews.</p>
+      </div>
+    </div>
+    <div id="panel-ad-campaigns" class="shell-panel" style="display:none;">
+      <div class="shell-empty">
+        <div class="soon-badge">Coming Soon</div>
+        <i class="ti ti-ad-2"></i>
+        <h3>Ad Campaigns</h3>
+        <p>Guided Amazon Ads with budget guardrails, so you can scale spend safely once your foundations are in place.</p>
+      </div>
+    </div>
+    <div id="panel-amazon-kdp" class="shell-panel" style="display:none;">
+      <div class="shell-empty">
+        <div class="soon-badge">Coming Soon</div>
+        <i class="ti ti-shopping-cart"></i>
+        <h3>Amazon KDP</h3>
+        <p>Connect your KDP account to pull live sales and ranking data straight into your dashboard.</p>
+      </div>
+    </div>
+    <div id="panel-tiktok-shop" class="shell-panel" style="display:none;">
+      <div class="shell-empty">
+        <div class="soon-badge">Coming Soon</div>
+        <i class="ti ti-brand-tiktok"></i>
+        <h3>TikTok Shop</h3>
+        <p>Sell directly to readers discovering your book on TikTok.</p>
+      </div>
+    </div>
+    <div id="panel-barnes-noble" class="shell-panel" style="display:none;">
+      <div class="shell-empty">
+        <div class="soon-badge">Coming Soon</div>
+        <i class="ti ti-building-store"></i>
+        <h3>Barnes &amp; Noble</h3>
+        <p>Track and grow your listing on Barnes &amp; Noble.</p>
+      </div>
+    </div>
+    <div id="panel-apple-books" class="shell-panel" style="display:none;">
+      <div class="shell-empty">
+        <div class="soon-badge">Coming Soon</div>
+        <i class="ti ti-device-tablet"></i>
+        <h3>Apple Books</h3>
+        <p>Track and grow your listing on Apple Books.</p>
+      </div>
+    </div>
+    <div id="panel-audible-acx" class="shell-panel" style="display:none;">
+      <div class="shell-empty">
+        <div class="soon-badge">Coming Soon</div>
+        <i class="ti ti-headphones"></i>
+        <h3>Audible / ACX</h3>
+        <p>Track your audiobook performance on Audible and ACX.</p>
+      </div>
+    </div>
+
   </div>
 </div>
 
@@ -107,16 +172,6 @@
 
   document.getElementById('loading-state').style.display = 'none';
   document.getElementById('shell').style.display = 'flex';
-
-  var greeting = document.getElementById('dash-greeting');
-  var bookTitleEl = document.getElementById('dash-book-title');
-
-  if (book && book.author_name) {
-    greeting.textContent = 'Welcome back, ' + book.author_name;
-  }
-  if (book && book.book_title) {
-    bookTitleEl.textContent = book.book_title;
-  }
 
   var overviewPanel = document.getElementById('panel-overview');
 
@@ -197,7 +252,11 @@
 
       var target = btn.getAttribute('data-panel');
       document.getElementById('panel-overview').style.display = (target === 'overview') ? 'block' : 'none';
-      ['market-analysis', 'marketing-strategy', 'keywords', 'quick-wins'].forEach(function (name) {
+      [
+        'market-analysis', 'marketing-strategy', 'keywords', 'quick-wins',
+        'get-reviews', 'build-arc', 'ad-campaigns',
+        'amazon-kdp', 'tiktok-shop', 'barnes-noble', 'apple-books', 'audible-acx'
+      ].forEach(function (name) {
         var el = document.getElementById('panel-' + name);
         if (el) el.style.display = (target === name) ? 'block' : 'none';
       });
