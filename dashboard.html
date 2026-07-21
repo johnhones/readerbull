@@ -38,10 +38,6 @@
     <div class="shell-nav-item locked"><i class="ti ti-building-store"></i> Barnes &amp; Noble <i class="ti ti-lock"></i></div>
     <div class="shell-nav-item locked"><i class="ti ti-device-tablet"></i> Apple Books <i class="ti ti-lock"></i></div>
     <div class="shell-nav-item locked"><i class="ti ti-headphones"></i> Audible / ACX <i class="ti ti-lock"></i></div>
-
-    <div style="margin-top:auto;padding-top:16px;">
-      <a href="#" id="logout-link" class="shell-nav-item"><i class="ti ti-logout"></i> Log out</a>
-    </div>
   </div>
 
   <!-- MAIN -->
@@ -51,6 +47,7 @@
         <h1 id="dash-greeting">Welcome back</h1>
         <p id="dash-book-title">Your dashboard</p>
       </div>
+      <a href="#" id="logout-link"><i class="ti ti-logout"></i> Log out</a>
     </div>
 
     <!-- OVERVIEW: populated by JS, either the embedded legacy dashboard or the auto score -->
@@ -124,11 +121,10 @@
   var overviewPanel = document.getElementById('panel-overview');
 
   if (book && book.dashboard_url) {
-    // Legacy, hand-built dashboard: embed it as-is, hide the redundant Navigate
-    // sub-items since that content already lives inside the embedded site.
-    document.querySelectorAll('[data-navigate-extra]').forEach(function (el) {
-      el.style.display = 'none';
-    });
+    // Legacy, hand-built dashboard: it ships its own full navigation inside
+    // the embedded page, so hide our sidebar entirely to avoid a duplicate
+    // nav on the left. The embedded site's nav is the only nav shown.
+    document.querySelector('.shell-sidebar').style.display = 'none';
 
     var frameWrap = document.createElement('div');
     frameWrap.className = 'legacy-frame-wrap';
