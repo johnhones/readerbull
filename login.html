@@ -1,0 +1,99 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/@tabler/icons-webfont@latest/tabler-icons.min.css">
+<link rel="stylesheet" href="style.css">
+<title>Readerbull: Log in</title>
+</head>
+<body>
+
+<!-- NAV -->
+<div class="nav">
+  <div class="nav-inner">
+    <a href="index.html" class="nav-logo">
+      <span class="logo-mark"><img src="readerbull-icon.png" alt="Readerbull"></span>
+      readerbull
+    </a>
+  </div>
+</div>
+
+<div class="form-page">
+  <div class="form-page-inner">
+
+    <div id="form-state">
+      <div class="sec-eyebrow">Welcome back</div>
+      <h1>Log in to your dashboard</h1>
+      <p>No password, ever. We'll email you a one-time link to log straight in.</p>
+
+      <div class="audit-form standalone">
+        <form id="login-form">
+          <label for="email">Your email</label>
+          <input type="email" id="email" placeholder="you@example.com" required>
+          <button type="submit" class="btn btn-primary" id="login-submit">Send my login link</button>
+          <div class="fine">Don't have an account yet? <a href="index.html#start" style="color:var(--teal-d);font-weight:700;">Get your free audit</a> instead.</div>
+          <div class="field-error" id="login-error">Something went wrong, please try again.</div>
+        </form>
+      </div>
+    </div>
+
+    <div id="success-state" style="display:none;">
+      <div class="sec-eyebrow">Almost there</div>
+      <h1>Check your email</h1>
+      <p>We've sent a login link to your inbox. Click it to go straight to your dashboard.</p>
+    </div>
+
+  </div>
+</div>
+
+<!-- FOOTER -->
+<div class="ftr">
+  <div class="wrap">
+    <div class="ftr-logo"><span class="logo-mark"><img src="readerbull-icon.png" alt="Readerbull"></span>readerbull</div>
+    <small>&copy; 2026 Readerbull. A platform that helps you sell more books.</small>
+  </div>
+</div>
+
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.js"></script>
+<script src="supabase-client.js"></script>
+<script>
+document.getElementById('login-form').addEventListener('submit', async function (e) {
+  e.preventDefault();
+
+  var submitBtn = document.getElementById('login-submit');
+  var errorEl = document.getElementById('login-error');
+  errorEl.style.display = 'none';
+
+  var email = document.getElementById('email').value.trim();
+
+  submitBtn.disabled = true;
+  submitBtn.textContent = 'Sending...';
+
+  var redirectTo = window.location.origin + window.location.pathname.replace(/login\.html$/, '').replace(/\/$/, '') + '/onboarding.html';
+
+  var { error } = await readerbull.client.auth.signInWithOtp({
+    email: email,
+    options: {
+      emailRedirectTo: redirectTo,
+      shouldCreateUser: false
+    }
+  });
+
+  if (error) {
+    submitBtn.disabled = false;
+    submitBtn.textContent = 'Send my login link';
+    errorEl.textContent = /signup|not.*found|not.*allowed/i.test(error.message)
+      ? "We couldn't find an account with that email. Try the free audit instead."
+      : (error.message || 'Something went wrong, please try again.');
+    errorEl.style.display = 'block';
+    return;
+  }
+
+  document.getElementById('form-state').style.display = 'none';
+  document.getElementById('success-state').style.display = 'block';
+});
+</script>
+
+</body>
+</html>
