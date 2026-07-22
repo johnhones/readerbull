@@ -5,7 +5,7 @@
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/@tabler/icons-webfont@latest/tabler-icons.min.css">
 <link rel="stylesheet" href="style.css">
-<title>Readerbull: Finish your Discoverability Audit</title>
+<title>Readerbull: Add Your Books</title>
 </head>
 <body>
 
@@ -19,63 +19,85 @@
   </div>
 </div>
 
-<div class="form-page">
-  <div class="form-page-inner">
+<div id="loading-state" class="loading-state">Checking your magic link...</div>
 
-    <div id="loading-state" class="loading-state">
-      Checking your magic link...
-    </div>
-
-    <div id="no-session-state" style="display:none;">
+<div id="no-session-state" style="display:none;">
+  <div class="form-page">
+    <div class="form-page-inner">
       <div class="sec-eyebrow">Almost there</div>
       <h1>Check your email</h1>
-      <p>Click the magic link we sent you to verify your email and continue your audit. You can close this tab once you've clicked it from your inbox.</p>
+      <p>Click the magic link we sent you to verify your email and continue. You can close this tab once you've clicked it from your inbox.</p>
       <div style="margin-top:24px;"><a href="index.html" class="btn btn-outline">Back to homepage</a></div>
     </div>
-
-    <div id="form-state" style="display:none;">
-      <div class="sec-eyebrow">Almost there</div>
-      <h1>A few more details</h1>
-      <p>This is everything Readerbull needs to run your Discoverability Audit automatically, no manuscript, no Amazon login required.</p>
-
-      <div class="audit-form standalone">
-        <form id="audit-details-form">
-          <label for="category">Category</label>
-          <select id="category" required>
-            <option value="" disabled selected>Choose the closest fit</option>
-            <option>Self-Help</option>
-            <option>Business & Money</option>
-            <option>Health & Fitness</option>
-            <option>Non-Fiction</option>
-            <option>Fiction</option>
-            <option>Romance</option>
-            <option>Fantasy</option>
-            <option>Mystery & Thriller</option>
-            <option>Children's Books</option>
-            <option>Other</option>
-          </select>
-
-          <label for="review-count">Roughly how many reviews do you have?</label>
-          <input type="number" id="review-count" min="0" placeholder="e.g. 12" required>
-
-          <label for="keywords">A few keywords that describe your book</label>
-          <input type="text" id="keywords" placeholder="e.g. mindset, habits, self discipline">
-
-          <button type="submit" class="btn btn-primary" id="details-submit">Get My Discoverability Score</button>
-          <div class="fine">Separate keywords with commas, up to 3 count towards your score.</div>
-          <div class="field-error" id="details-error">Something went wrong, please try again.</div>
-        </form>
-      </div>
-    </div>
-
   </div>
 </div>
 
-<!-- FOOTER -->
-<div class="ftr">
-  <div class="wrap">
-    <div class="ftr-logo"><span class="logo-mark"><img src="readerbull-icon.png" alt="Readerbull"></span>readerbull</div>
-    <small>&copy; 2026 Readerbull. A platform that helps you sell more books.</small>
+<!-- STEP 1: ADD BOOKS -->
+<section id="section-paste" style="display:none;">
+  <div class="sec" style="padding:40px 0 60px;background:var(--light);">
+    <div class="wrap" style="max-width:560px;text-align:center;">
+      <div class="sec-eyebrow" style="justify-content:center;display:flex;">Almost there</div>
+      <h1 style="font-size:28px;font-weight:800;color:var(--navy);margin-bottom:10px;">Add your books</h1>
+      <p style="font-size:15px;color:var(--mid);margin-bottom:8px;">Paste one or more Amazon ASINs or listing URLs below, one per line. We'll pull the real listing data for each, no manuscript needed for this step.</p>
+
+      <div class="audit-form standalone" style="max-width:none;text-align:left;">
+        <label class="field-label" style="margin-top:0;">ASINs or Amazon URLs</label>
+        <textarea class="paste-box" id="paste-input" placeholder="B0H2CZYD6R&#10;https://www.amazon.com/dp/B0XYZRN201"></textarea>
+        <div class="paste-meta">
+          <span>Accepts ASIN or full listing URL, one per line</span>
+          <span class="detected" id="detected-count">0 entries detected</span>
+        </div>
+        <button class="btn btn-primary" id="start-import-btn" style="width:100%;justify-content:center;margin-top:20px;">Start Import</button>
+        <div class="fine">Each entry costs one lookup against our Amazon data provider.</div>
+        <div class="field-error" id="paste-error" style="display:none;"></div>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- STEP 2: IMPORT QUEUE -->
+<section id="section-queue" style="display:none;">
+  <div class="sec" style="padding:48px 0;">
+    <div class="wrap" style="max-width:760px;">
+      <div class="sec-eyebrow">Step 2 of 3</div>
+      <h2 style="font-size:26px;color:var(--navy);margin-bottom:8px;">Pulling your listing data</h2>
+      <p style="color:var(--mid);font-size:14px;margin-bottom:8px;">This usually takes a few seconds per book.</p>
+
+      <div class="import-list" id="import-list"></div>
+
+      <div style="margin-top:28px;text-align:right;">
+        <button class="btn btn-primary" id="continue-to-details-btn" style="display:none;">Continue</button>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- STEP 3: BOOK DETAILS -->
+<section id="section-details" style="display:none;">
+  <div class="sec" style="padding:48px 0;">
+    <div class="wrap" style="max-width:760px;">
+      <div class="sec-eyebrow">Step 3 of 3</div>
+      <h2 style="font-size:26px;color:var(--navy);margin-bottom:8px;">Finish each book</h2>
+      <p style="color:var(--mid);font-size:14px;margin-bottom:8px;">Confirm the language, polish your description and upload the full reader copy.</p>
+
+      <div id="detail-panels"></div>
+
+      <div style="margin-top:12px;text-align:right;">
+        <button class="btn btn-primary" id="finish-btn" style="display:none;">Go to my dashboard</button>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- SUBMIT CONFIRM MODAL -->
+<div class="modal-overlay" id="submit-modal">
+  <div class="modal-card">
+    <h3>Submit book?</h3>
+    <p>Are you sure you want to submit <strong id="submit-modal-title"></strong>? This locks in the description and manuscript for this book.</p>
+    <div class="modal-actions">
+      <button class="btn btn-outline" id="submit-cancel">Cancel</button>
+      <button class="btn btn-primary" id="submit-confirm">Yes, submit</button>
+    </div>
   </div>
 </div>
 
@@ -86,7 +108,7 @@
 (async function () {
   var loadingState = document.getElementById('loading-state');
   var noSessionState = document.getElementById('no-session-state');
-  var formState = document.getElementById('form-state');
+  var LANGUAGES = ['English', 'Spanish', 'French', 'German', 'Italian', 'Portuguese'];
 
   // Give supabase-js a moment to parse the magic-link tokens out of the URL.
   var user = null;
@@ -103,94 +125,416 @@
     return;
   }
 
-  // Make sure a book row exists for this user, created from the details
-  // captured on the homepage sign-up form (stored as auth user_metadata).
-  var { data: existingBooks } = await readerbull.client
-    .from('books')
-    .select('id, score, dashboard_url')
-    .eq('user_id', user.id)
-    .limit(1);
+  var meta = user.user_metadata || {};
 
-  var bookId;
-  if (existingBooks && existingBooks.length) {
-    var existing = existingBooks[0];
+  // BOOKS holds only the entries added in *this* import run, so the user
+  // sees a focused queue rather than every book they've ever added.
+  var BOOKS = [];
 
-    // Returning user who has already finished the audit (or has a legacy
-    // dashboard on file): skip straight to the dashboard instead of asking
-    // them to redo the second form.
-    if (existing.dashboard_url || existing.score !== null) {
-      window.location.href = 'dashboard.html';
-      return;
-    }
+  function byId(id) { return BOOKS.filter(function (b) { return b.tempId === id; })[0]; }
 
-    bookId = existing.id;
-  } else {
-    var meta = user.user_metadata || {};
-    var { data: inserted, error: insertError } = await readerbull.client
-      .from('books')
-      .insert({
-        user_id: user.id,
-        author_name: meta.author_name || null,
-        book_title: meta.book_title || null,
-        amazon_link: meta.amazon_link || null,
-        email: user.email
-      })
-      .select('id')
-      .single();
-
-    if (insertError) {
-      formState.querySelector('h1').textContent = 'Something went wrong';
-      formState.querySelector('p').textContent = insertError.message;
-      formState.style.display = 'block';
-      return;
-    }
-    bookId = inserted.id;
+  function goToSection(name) {
+    ['paste', 'queue', 'details'].forEach(function (s) {
+      document.getElementById('section-' + s).style.display = (s === name) ? 'block' : 'none';
+    });
+    window.scrollTo({ top: 0, behavior: 'smooth' });
   }
 
-  formState.style.display = 'block';
+  // ---------- STEP 1: paste ----------
+  var pasteInput = document.getElementById('paste-input');
+  var detectedCount = document.getElementById('detected-count');
+  var pasteError = document.getElementById('paste-error');
 
-  document.getElementById('audit-details-form').addEventListener('submit', async function (e) {
-    e.preventDefault();
+  // Nice touch for a first-time signup: prefill with the Amazon link they
+  // already gave us on the homepage form, if they have no books yet.
+  var { data: existingBooksCheck } = await readerbull.client
+    .from('books').select('id').eq('user_id', user.id).limit(1);
+  if ((!existingBooksCheck || !existingBooksCheck.length) && meta.amazon_link) {
+    pasteInput.value = meta.amazon_link;
+  }
 
-    var submitBtn = document.getElementById('details-submit');
-    var errorEl = document.getElementById('details-error');
-    errorEl.style.display = 'none';
-    submitBtn.disabled = true;
-    submitBtn.textContent = 'Scoring your book...';
+  function parsedEntries() {
+    return pasteInput.value.split('\n').map(function (l) { return l.trim(); }).filter(Boolean);
+  }
+  function updateDetected() {
+    var n = parsedEntries().length;
+    detectedCount.textContent = n + ' ' + (n === 1 ? 'entry' : 'entries') + ' detected';
+  }
+  pasteInput.addEventListener('input', updateDetected);
+  updateDetected();
 
-    var category = document.getElementById('category').value;
-    var reviewCount = document.getElementById('review-count').value;
-    var keywords = document.getElementById('keywords').value;
-    var amazonLink = (user.user_metadata && user.user_metadata.amazon_link) || '';
+  document.getElementById('start-import-btn').addEventListener('click', function () {
+    var entries = parsedEntries();
+    if (!entries.length) {
+      pasteError.textContent = 'Add at least one ASIN or Amazon URL.';
+      pasteError.style.display = 'block';
+      return;
+    }
+    pasteError.style.display = 'none';
 
-    var result = computeDiscoverabilityScore({
-      category: category,
-      reviewCount: reviewCount,
-      keywords: keywords,
-      amazonLink: amazonLink
+    // de-dupe identical pasted lines
+    var seen = {};
+    entries = entries.filter(function (e) {
+      var key = e.toLowerCase();
+      if (seen[key]) return false;
+      seen[key] = true;
+      return true;
     });
 
-    var { error } = await readerbull.client
-      .from('books')
-      .update({
-        category: category,
-        review_count: reviewCount,
-        keywords: keywords,
-        score: result.score,
-        score_breakdown: result.breakdown
-      })
-      .eq('id', bookId);
+    BOOKS = entries.map(function (input, i) {
+      return { tempId: 't' + i + '-' + Date.now(), input: input, status: 'importing' };
+    });
 
-    if (error) {
-      submitBtn.disabled = false;
-      submitBtn.textContent = 'Get My Discoverability Score';
-      errorEl.textContent = error.message || 'Something went wrong, please try again.';
-      errorEl.style.display = 'block';
+    goToSection('queue');
+    runImportQueue();
+  });
+
+  loadingState.style.display = 'none';
+  goToSection('paste');
+
+  // ---------- STEP 2: import queue ----------
+  function renderImportList() {
+    var list = document.getElementById('import-list');
+    list.innerHTML = BOOKS.map(function (b) {
+      return '<div class="import-card" id="import-card-' + b.tempId + '"></div>';
+    }).join('');
+    BOOKS.forEach(renderImportCard);
+  }
+
+  function renderImportCard(b) {
+    var el = document.getElementById('import-card-' + b.tempId);
+    if (!el) return;
+
+    if (b.status === 'importing') {
+      el.innerHTML =
+        '<div class="cover-ph">' + escapeHtml(b.input.slice(0, 12)) + '</div>' +
+        '<div class="import-card-body">' +
+          '<h4>' + escapeHtml(b.input) + '</h4>' +
+          '<p style="font-size:13px;color:var(--mid);"><span class="spinner"></span>Pulling listing data from Amazon&hellip;</p>' +
+        '</div>' +
+        '<div class="status-pill importing">Importing</div>';
       return;
     }
 
+    if (b.status === 'error') {
+      el.innerHTML =
+        '<div class="cover-ph" style="background:var(--muted);">?</div>' +
+        '<div class="import-card-body">' +
+          '<h4>' + escapeHtml(b.input) + '</h4>' +
+          '<p style="font-size:13px;color:var(--orange-d);">' + escapeHtml(b.error || 'Could not import this one.') + '</p>' +
+        '</div>' +
+        '<div class="status-pill error">Failed</div>';
+      return;
+    }
+
+    var chip = function (t) { return '<span class="tag">' + t + '</span>'; };
+    var chips = '';
+    if (b.rating) chips += chip('&#9733; ' + b.rating + (b.reviewCount ? ' (' + b.reviewCount + ')' : ''));
+    if (b.price) chips += chip(escapeHtml(b.price));
+    if (b.category) chips += chip('Category: ' + escapeHtml(b.category));
+
+    el.innerHTML =
+      '<div class="cover-ph">' + (b.coverImage ? '<img src="' + escapeHtml(b.coverImage) + '" alt="">' : escapeHtml((b.title || b.asin || '').slice(0, 10))) + '</div>' +
+      '<div class="import-card-body">' +
+        '<h4>' + escapeHtml(b.title || b.asin) + '</h4>' +
+        '<div class="asin" style="font-size:12px;color:var(--muted);margin-bottom:8px;">ASIN: ' + escapeHtml(b.asin) + '</div>' +
+        '<div class="tag-grid" style="margin-top:0;">' + chips + '</div>' +
+      '</div>' +
+      '<div><span class="status-pill imported">Imported</span></div>';
+  }
+
+  async function runImportQueue() {
+    renderImportList();
+
+    for (var i = 0; i < BOOKS.length; i++) {
+      var b = BOOKS[i];
+      try {
+        var resp = await fetch('/api/import-book', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ input: b.input })
+        });
+        var payload = await resp.json();
+
+        if (!resp.ok) {
+          b.status = 'error';
+          b.error = payload.error || 'Import failed.';
+          renderImportCard(b);
+          continue;
+        }
+
+        // Create the books row now, while we have the pulled data, so a
+        // failure in step 3 never loses the import work already done.
+        var { data: inserted, error: insertError } = await readerbull.client
+          .from('books')
+          .insert({
+            user_id: user.id,
+            author_name: meta.author_name || null,
+            book_title: payload.title || meta.book_title || null,
+            amazon_link: payload.amazonUrl || b.input,
+            email: user.email,
+            asin: payload.asin,
+            cover_image_url: payload.coverImage,
+            live_price: payload.price,
+            live_rating: payload.rating,
+            live_review_count: payload.reviewCount,
+            amazon_category: payload.category,
+            bestseller_rank: payload.bestsellerRankText,
+            bestseller_rank_number: payload.bestsellerRank
+          })
+          .select('id')
+          .single();
+
+        if (insertError) {
+          b.status = 'error';
+          b.error = insertError.message;
+          renderImportCard(b);
+          continue;
+        }
+
+        b.rowId = inserted.id;
+        b.asin = payload.asin;
+        b.title = payload.title;
+        b.description = payload.description || '';
+        b.rating = payload.rating;
+        b.reviewCount = payload.reviewCount;
+        b.price = payload.price;
+        b.coverImage = payload.coverImage;
+        b.category = payload.category;
+        b.bestsellerRank = payload.bestsellerRank;
+        b.status = 'imported';
+        renderImportCard(b);
+      } catch (err) {
+        b.status = 'error';
+        b.error = 'Import failed, please try again.';
+        renderImportCard(b);
+      }
+    }
+
+    if (BOOKS.some(function (b) { return b.status === 'imported'; })) {
+      document.getElementById('continue-to-details-btn').style.display = 'inline-flex';
+    }
+  }
+
+  document.getElementById('continue-to-details-btn').addEventListener('click', function () {
+    goToSection('details');
+    renderDetailPanels();
+  });
+
+  // ---------- STEP 3: details ----------
+  function renderDetailPanels() {
+    var wrap = document.getElementById('detail-panels');
+    var imported = BOOKS.filter(function (b) { return b.status === 'imported' || b.status === 'submitted'; });
+    wrap.innerHTML = imported.map(renderDetailPanel).join('');
+    imported.forEach(wireDetailPanel);
+    updateFinishButton();
+  }
+
+  function renderDetailPanel(b) {
+    var submitted = b.status === 'submitted';
+    var langOptions = LANGUAGES.map(function (l) { return '<option' + (l === 'English' ? ' selected' : '') + '>' + l + '</option>'; }).join('');
+    var chip = function (t) { return '<span class="tag">' + t + '</span>'; };
+    var chips = '';
+    if (b.rating) chips += chip('&#9733; ' + b.rating + (b.reviewCount ? ' (' + b.reviewCount + ')' : ''));
+    if (b.price) chips += chip(escapeHtml(b.price));
+    if (b.category) chips += chip('Category: ' + escapeHtml(b.category) + ' (auto-detected)');
+
+    return (
+      '<div class="detail-panel" id="detail-panel-' + b.tempId + '" style="' + (submitted ? 'opacity:.6;' : '') + '">' +
+        '<div class="detail-head">' +
+          '<div class="cover-ph" style="width:56px;height:80px;">' + (b.coverImage ? '<img src="' + escapeHtml(b.coverImage) + '" alt="">' : '') + '</div>' +
+          '<div>' +
+            '<h3>' + escapeHtml(b.title || b.asin) + '</h3>' +
+            '<div class="asin">ASIN: ' + escapeHtml(b.asin) + '</div>' +
+          '</div>' +
+          '<div style="margin-left:auto;"><span class="status-pill ' + (submitted ? 'submitted' : 'needs-details') + '">' + (submitted ? 'Submitted' : 'Needs details') + '</span></div>' +
+        '</div>' +
+
+        '<div class="tag-grid" style="margin-top:0;margin-bottom:4px;">' + chips + '</div>' +
+        '<div class="fine" style="margin-bottom:4px;">Pulled from Amazon, not editable here.</div>' +
+
+        '<label class="field-label">Language</label>' +
+        '<select id="lang-' + b.tempId + '" ' + (submitted ? 'disabled' : '') + '>' + langOptions + '</select>' +
+
+        '<label class="field-label">Book description</label>' +
+        '<textarea id="desc-' + b.tempId + '" ' + (submitted ? 'disabled' : '') + '>' + escapeHtml(b.description || '') + '</textarea>' +
+        '<div class="char-count" id="charcount-' + b.tempId + '"></div>' +
+
+        '<label class="field-label">KDP keywords <span style="font-weight:400;color:var(--muted);">(optional)</span></label>' +
+        '<input type="text" id="keywords-' + b.tempId + '" ' + (submitted ? 'disabled' : '') + ' placeholder="e.g. mindset, habits, self discipline">' +
+        '<div class="fine">Amazon doesn\'t make your backend keywords public, so we can\'t pull these. Add up to 7 if you have them, it improves your Keyword Coverage score. Skip if you\'re not sure, you can add these later from your dashboard.</div>' +
+
+        '<label class="field-label">Monthly sales <span style="font-weight:400;color:var(--muted);">(optional)</span></label>' +
+        '<input type="number" min="0" id="sales-' + b.tempId + '" ' + (submitted ? 'disabled' : '') + ' placeholder="e.g. 40">' +
+        '<div class="fine">Roughly how many copies you sell a month. Check your KDP Reports dashboard if you\'re not sure. Skip this and add it later, it won\'t affect your Discoverability Score.</div>' +
+
+        '<label class="field-label">PDF reader copy <span style="font-weight:400;color:var(--muted);">(optional for now)</span></label>' +
+        '<div class="upload-drop">' +
+          '<i class="ti ti-cloud-upload"></i>' +
+          '<p>Drag &amp; drop your PDF here, or click to browse</p>' +
+          '<div class="fine">Upload the full book, not a chapter, summary or excerpt. Max 50MB.</div>' +
+          (submitted ? '' : '<input type="file" accept="application/pdf" id="file-' + b.tempId + '">') +
+        '</div>' +
+        '<div class="upload-file-row" id="filerow-' + b.tempId + '"><span></span><span>&#10003; attached</span></div>' +
+
+        '<div class="confirm-row">' +
+          '<input type="checkbox" id="confirm-' + b.tempId + '" ' + (submitted ? 'disabled checked' : '') + '>' +
+          '<label for="confirm-' + b.tempId + '">I confirm this is the complete manuscript (if attached) and I\'m responsible for what I upload.</label>' +
+        '</div>' +
+
+        '<div class="detail-error" id="detail-error-' + b.tempId + '" style="display:none;"></div>' +
+
+        '<div class="detail-actions">' +
+          '<button class="btn btn-primary" id="submit-' + b.tempId + '" ' + (submitted ? 'disabled' : '') + '>' + (submitted ? 'Submitted' : 'Submit book') + '</button>' +
+        '</div>' +
+      '</div>'
+    );
+  }
+
+  function wireDetailPanel(b) {
+    if (b.status === 'submitted') return;
+
+    var desc = document.getElementById('desc-' + b.tempId);
+    var charCount = document.getElementById('charcount-' + b.tempId);
+    function updateCharCount() {
+      var n = desc.value.length;
+      charCount.textContent = n + ' / 100 minimum';
+      charCount.style.color = n >= 100 ? 'var(--teal-d)' : 'var(--orange-d)';
+    }
+    desc.addEventListener('input', updateCharCount);
+    updateCharCount();
+
+    var fileInput = document.getElementById('file-' + b.tempId);
+    var fileRow = document.getElementById('filerow-' + b.tempId);
+    if (fileInput) {
+      fileInput.addEventListener('change', function () {
+        if (fileInput.files && fileInput.files[0]) {
+          var f = fileInput.files[0];
+          fileRow.style.display = 'flex';
+          fileRow.querySelector('span').textContent = f.name + ' (' + (f.size / 1024 / 1024).toFixed(1) + ' MB)';
+        }
+      });
+    }
+
+    document.getElementById('submit-' + b.tempId).addEventListener('click', function () {
+      var errorEl = document.getElementById('detail-error-' + b.tempId);
+      errorEl.style.display = 'none';
+
+      if (desc.value.trim().length < 100) {
+        errorEl.textContent = 'Description must be at least 100 characters.';
+        errorEl.style.display = 'block';
+        return;
+      }
+      if (!document.getElementById('confirm-' + b.tempId).checked) {
+        errorEl.textContent = 'Please confirm the responsibility checkbox before submitting.';
+        errorEl.style.display = 'block';
+        return;
+      }
+
+      document.getElementById('submit-modal-title').textContent = b.title || b.asin;
+      document.getElementById('submit-modal').classList.add('active');
+      document.getElementById('submit-modal').setAttribute('data-book', b.tempId);
+    });
+  }
+
+  document.getElementById('submit-cancel').addEventListener('click', function () {
+    document.getElementById('submit-modal').classList.remove('active');
+  });
+
+  document.getElementById('submit-confirm').addEventListener('click', async function () {
+    var modal = document.getElementById('submit-modal');
+    var tempId = modal.getAttribute('data-book');
+    var b = byId(tempId);
+    if (!b) return;
+
+    var confirmBtn = document.getElementById('submit-confirm');
+    confirmBtn.disabled = true;
+    confirmBtn.textContent = 'Submitting...';
+
+    var language = document.getElementById('lang-' + tempId).value;
+    var description = document.getElementById('desc-' + tempId).value;
+    var keywords = document.getElementById('keywords-' + tempId).value;
+    var monthlySalesRaw = document.getElementById('sales-' + tempId).value;
+    var monthlySales = monthlySalesRaw === '' ? null : Number(monthlySalesRaw);
+    var fileInput = document.getElementById('file-' + tempId);
+    var file = fileInput && fileInput.files && fileInput.files[0];
+
+    var manuscriptPath = null;
+    if (file) {
+      var path = user.id + '/' + b.rowId + '.pdf';
+      var { error: uploadError } = await readerbull.client.storage
+        .from('manuscripts')
+        .upload(path, file, { upsert: true, contentType: 'application/pdf' });
+      if (uploadError) {
+        var errorEl = document.getElementById('detail-error-' + tempId);
+        errorEl.textContent = 'Manuscript upload failed: ' + uploadError.message;
+        errorEl.style.display = 'block';
+        confirmBtn.disabled = false;
+        confirmBtn.textContent = 'Yes, submit';
+        modal.classList.remove('active');
+        return;
+      }
+      manuscriptPath = path;
+    }
+
+    var scoreResult = computeDiscoverabilityScore({
+      reviewCount: b.reviewCount,
+      rating: b.rating,
+      keywords: keywords,
+      imported: true,
+      category: b.category,
+      bestsellerRank: b.bestsellerRank
+    });
+
+    var { error: updateError } = await readerbull.client
+      .from('books')
+      .update({
+        language: language,
+        book_title: b.title,
+        keywords: keywords,
+        monthly_sales: monthlySales,
+        manuscript_url: manuscriptPath,
+        score: scoreResult.score,
+        score_breakdown: scoreResult.breakdown
+      })
+      .eq('id', b.rowId);
+
+    confirmBtn.disabled = false;
+    confirmBtn.textContent = 'Yes, submit';
+    modal.classList.remove('active');
+
+    if (updateError) {
+      var errorEl2 = document.getElementById('detail-error-' + tempId);
+      errorEl2.textContent = updateError.message;
+      errorEl2.style.display = 'block';
+      return;
+    }
+
+    b.status = 'submitted';
+    // Only swap this one panel to its submitted state, so anything the
+    // author was mid-typing on a different book's panel isn't lost.
+    var panelWrap = document.getElementById('detail-panels');
+    var temp = document.createElement('div');
+    temp.innerHTML = renderDetailPanel(b);
+    panelWrap.replaceChild(temp.firstElementChild, document.getElementById('detail-panel-' + tempId));
+    updateFinishButton();
+  });
+
+  function updateFinishButton() {
+    var imported = BOOKS.filter(function (b) { return b.status === 'imported' || b.status === 'submitted'; });
+    var allSubmitted = imported.length > 0 && imported.every(function (b) { return b.status === 'submitted'; });
+    document.getElementById('finish-btn').style.display = allSubmitted ? 'inline-flex' : 'none';
+  }
+
+  document.getElementById('finish-btn').addEventListener('click', function () {
     window.location.href = 'dashboard.html';
   });
+
+  function escapeHtml(s) {
+    return String(s == null ? '' : s)
+      .replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;')
+      .replace(/"/g, '&quot;').replace(/'/g, '&#39;');
+  }
 })();
 </script>
 

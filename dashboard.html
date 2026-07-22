@@ -166,16 +166,17 @@
     .from('books')
     .select('*')
     .eq('user_id', user.id)
-    .limit(1);
+    .order('created_at', { ascending: true });
 
-  var book = books && books.length ? books[0] : null;
+  books = books || [];
+  var legacyBook = books.filter(function (b) { return b.dashboard_url; })[0];
 
   document.getElementById('loading-state').style.display = 'none';
   document.getElementById('shell').style.display = 'flex';
 
   var overviewPanel = document.getElementById('panel-overview');
 
-  if (book && book.dashboard_url) {
+  if (legacyBook) {
     // Legacy, hand-built dashboard: it ships its own full navigation inside
     // the embedded page, so hide our sidebar entirely to avoid a duplicate
     // nav on the left. The embedded site's nav is the only nav shown.
@@ -184,61 +185,115 @@
     var frameWrap = document.createElement('div');
     frameWrap.className = 'legacy-frame-wrap';
     var iframe = document.createElement('iframe');
-    iframe.src = book.dashboard_url;
+    iframe.src = legacyBook.dashboard_url;
     iframe.title = 'Your Readerbull audit';
     frameWrap.appendChild(iframe);
     overviewPanel.appendChild(frameWrap);
 
-  } else if (book && book.score !== null && book.score !== undefined) {
-    // Automated audit: show the real score and breakdown.
-    var panel = document.createElement('div');
-    panel.className = 'shell-panel';
-
-    var barsHtml = '';
-    var listHtml = '';
-    var breakdown = book.score_breakdown || {};
-    Object.keys(breakdown).forEach(function (key) {
-      var item = breakdown[key];
-      var pct = item.max ? Math.round((item.points / item.max) * 100) : 0;
-      barsHtml +=
-        '<div class="bar-row">' +
-          '<div class="bar-meta"><span>' + item.label + '</span><span>' + item.points + ' / ' + item.max + '</span></div>' +
-          '<div class="bar-track"><div class="bar-fill" style="width:' + pct + '%;"></div></div>' +
-        '</div>';
-      listHtml +=
-        '<div style="display:flex;justify-content:space-between;padding:10px 0;border-bottom:1px solid var(--border);font-size:14px;">' +
-          '<span style="color:var(--navy);font-weight:600;">' + item.label + '</span>' +
-          '<span style="color:var(--mid);">' + item.points + ' / ' + item.max + ' pts</span>' +
-        '</div>';
-    });
-
-    panel.innerHTML =
-      '<div class="split">' +
-        '<div class="score-demo">' +
-          '<div class="eyebrow2">Discoverability Score</div>' +
-          '<div class="num">' + book.score + '<span>&thinsp;/ 100</span></div>' +
-          '<div class="bars">' + barsHtml + '</div>' +
-        '</div>' +
-        '<div class="breakdown-card">' +
-          '<h2>What\'s holding your book back</h2>' +
-          '<p>Here\'s exactly where your points came from.</p>' +
-          '<div>' + listHtml + '</div>' +
-        '</div>' +
-      '</div>';
-    overviewPanel.appendChild(panel);
-
-  } else {
-    // Signed up, but haven't finished the second form yet.
-    var panel2 = document.createElement('div');
-    panel2.className = 'shell-panel';
-    panel2.innerHTML =
+  } else if (!books.length) {
+    // No books at all yet.
+    var emptyPanel = document.createElement('div');
+    emptyPanel.className = 'shell-panel';
+    emptyPanel.innerHTML =
       '<div class="shell-empty">' +
         '<i class="ti ti-lock"></i>' +
-        '<h3>Finish your Discoverability Audit</h3>' +
+        '<h3>Add your first book</h3>' +
         '<p>You\'re one short step away from your Discoverability Score. ' +
-        '<a href="onboarding.html" style="color:var(--teal-d);font-weight:700;">Complete the audit form</a> to unlock your dashboard.</p>' +
+        '<a href="onboarding.html" style="color:var(--teal-d);font-weight:700;">Add a book</a> to unlock your dashboard.</p>' +
       '</div>';
-    overviewPanel.appendChild(panel2);
+    overviewPanel.appendChild(emptyPanel);
+
+  } else {
+    // Catalog: every book this author has added, plus an "add another"
+    // tile. Clicking a scored book shows its breakdown below the grid.
+    var catalogPanel = document.createElement('div');
+    catalogPanel.className = 'shell-panel';
+
+    var cardsHtml = books.map(function (b) {
+      var scored = b.score !== null && b.score !== undefined;
+      var cover = b.cover_image_url
+        ? '<img src="' + b.cover_image_url + '" alt="">'
+        : (b.book_title || '?').slice(0, 10);
+      return (
+        '<div class="book-card" data-book-id="' + b.id + '" style="' + (scored ? '' : 'cursor:default;') + '">' +
+          '<div class="cover-ph">' + cover + '</div>' +
+          '<h4>' + escapeHtml(b.book_title || 'Untitled book') + '</h4>' +
+          (scored
+            ? '<div class="score-badge">' + b.score + '<span> / 100</span></div>'
+            : '<span class="status-pill needs-details">Needs details</span>')
+        + '</div>'
+      );
+    }).join('');
+
+    cardsHtml += '<a href="onboarding.html" class="book-card add-book-card" style="text-decoration:none;"><i class="ti ti-plus"></i><span>Add another book</span></a>';
+
+    catalogPanel.innerHTML =
+      '<h1 style="font-size:20px;font-weight:800;color:var(--navy);margin-bottom:4px;">Your Books</h1>' +
+      '<p style="font-size:14px;color:var(--mid);margin-bottom:0;">Every book you\'ve added to Readerbull, in one place.</p>' +
+      '<div class="catalog-grid" id="catalog-grid">' + cardsHtml + '</div>' +
+      '<div id="book-score-detail" style="display:none;margin-top:32px;"></div>';
+
+    overviewPanel.appendChild(catalogPanel);
+
+    var booksById = {};
+    books.forEach(function (b) { booksById[b.id] = b; });
+
+    document.querySelectorAll('#catalog-grid .book-card[data-book-id]').forEach(function (card) {
+      card.addEventListener('click', function () {
+        var b = booksById[card.getAttribute('data-book-id')];
+        if (!b || b.score === null || b.score === undefined) return;
+        showScoreDetail(b);
+      });
+    });
+
+    function showScoreDetail(b) {
+      var detailWrap = document.getElementById('book-score-detail');
+      var barsHtml = '';
+      var listHtml = '';
+      var breakdown = b.score_breakdown || {};
+      Object.keys(breakdown).forEach(function (key) {
+        var item = breakdown[key];
+        var pct = item.max ? Math.round((item.points / item.max) * 100) : 0;
+        barsHtml +=
+          '<div class="bar-row">' +
+            '<div class="bar-meta"><span>' + item.label + '</span><span>' + item.points + ' / ' + item.max + '</span></div>' +
+            '<div class="bar-track"><div class="bar-fill" style="width:' + pct + '%;"></div></div>' +
+          '</div>';
+        listHtml +=
+          '<div style="display:flex;justify-content:space-between;padding:10px 0;border-bottom:1px solid var(--border);font-size:14px;">' +
+            '<span style="color:var(--navy);font-weight:600;">' + item.label + '</span>' +
+            '<span style="color:var(--mid);">' + item.points + ' / ' + item.max + ' pts</span>' +
+          '</div>';
+      });
+
+      detailWrap.style.display = 'block';
+      detailWrap.innerHTML =
+        '<div class="sec-eyebrow" style="margin-bottom:6px;">Selected book</div>' +
+        '<h2 style="font-size:20px;color:var(--navy);margin-bottom:16px;">' + escapeHtml(b.book_title || '') + '</h2>' +
+        '<div class="split" style="align-items:stretch;">' +
+          '<div class="score-demo" style="height:100%;">' +
+            '<div class="eyebrow2">Discoverability Score</div>' +
+            '<div class="num">' + b.score + '<span>&thinsp;/ 100</span></div>' +
+            '<div class="bars">' + barsHtml + '</div>' +
+          '</div>' +
+          '<div class="breakdown-card">' +
+            '<h2>What\'s holding your book back</h2>' +
+            '<p>Here\'s exactly where your points came from.</p>' +
+            '<div>' + listHtml + '</div>' +
+          '</div>' +
+        '</div>';
+      detailWrap.scrollIntoView({ behavior: 'smooth', block: 'start' });
+    }
+
+    // Show the first scored book's breakdown by default, if there is one.
+    var firstScored = books.filter(function (b) { return b.score !== null && b.score !== undefined; })[0];
+    if (firstScored) showScoreDetail(firstScored);
+  }
+
+  function escapeHtml(s) {
+    return String(s == null ? '' : s)
+      .replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;')
+      .replace(/"/g, '&quot;').replace(/'/g, '&#39;');
   }
 
   // Tab switching between Navigate items (locked items have no data-panel, so
