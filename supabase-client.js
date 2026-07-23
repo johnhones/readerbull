@@ -1,8 +1,11 @@
 /*
  * Readerbull Supabase client
  * -----------------------------------------------------------------------
- * Publishable (anon) key only, safe for the browser. Auth is passwordless
- * magic link only, no passwords anywhere in the product.
+ * Publishable (anon) key only, safe for the browser. Magic link is the
+ * default, frictionless sign-in for everyone. Authors can optionally set a
+ * password from their dashboard (Settings > Set a password) for a faster
+ * return login, especially useful on mobile where email can be slow to
+ * arrive, see login.html for the password sign-in form.
  * Requires the Supabase UMD script to be loaded on the page before this
  * file, see the <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.js">
  * tag in each page's <head>.

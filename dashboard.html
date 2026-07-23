@@ -47,7 +47,10 @@
         <img src="readerbull-icon.png" alt="Readerbull">
         readerbull
       </a>
-      <a href="#" id="logout-link"><i class="ti ti-logout"></i> Log out</a>
+      <div class="shell-topbar-actions">
+        <a href="#" id="set-password-link"><i class="ti ti-key"></i> Set a password</a>
+        <a href="#" id="logout-link"><i class="ti ti-logout"></i> Log out</a>
+      </div>
     </div>
 
     <!-- OVERVIEW: populated by JS, either the embedded legacy dashboard or the auto score -->
@@ -150,6 +153,23 @@
   </div>
 </div>
 
+<!-- SET PASSWORD MODAL -->
+<div class="modal-overlay" id="password-modal">
+  <div class="modal-card">
+    <h3>Set a password</h3>
+    <p>Add a password so you can log in faster next time, no need to wait on an email link.</p>
+    <label class="field-label" style="margin-top:0;">New password</label>
+    <input type="password" id="new-password" placeholder="At least 8 characters">
+    <label class="field-label">Confirm password</label>
+    <input type="password" id="confirm-password" placeholder="Re-enter your password">
+    <div class="detail-error" id="password-modal-error" style="display:none;"></div>
+    <div class="modal-actions">
+      <button class="btn btn-outline" id="password-modal-cancel">Cancel</button>
+      <button class="btn btn-primary" id="password-modal-save">Save password</button>
+    </div>
+  </div>
+</div>
+
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.js"></script>
 <script src="supabase-client.js"></script>
 <script>
@@ -160,6 +180,65 @@
   document.getElementById('logout-link').addEventListener('click', function (e) {
     e.preventDefault();
     readerbull.signOut();
+  });
+
+  // Optional password login: any magic-link user can set a password here so
+  // they don't have to wait on an email link every time, especially handy
+  // on mobile where the email can take a while to arrive.
+  var pwModal = document.getElementById('password-modal');
+  var pwModalCard = pwModal.querySelector('.modal-card');
+  var pwModalDefaultHtml = pwModalCard.innerHTML;
+
+  function wirePasswordForm() {
+    document.getElementById('password-modal-cancel').addEventListener('click', function () {
+      pwModal.classList.remove('active');
+    });
+    document.getElementById('password-modal-save').addEventListener('click', async function () {
+      var pw = document.getElementById('new-password').value;
+      var pw2 = document.getElementById('confirm-password').value;
+      var errEl = document.getElementById('password-modal-error');
+      errEl.style.display = 'none';
+
+      if (pw.length < 8) {
+        errEl.textContent = 'Password must be at least 8 characters.';
+        errEl.style.display = 'block';
+        return;
+      }
+      if (pw !== pw2) {
+        errEl.textContent = "Passwords don't match.";
+        errEl.style.display = 'block';
+        return;
+      }
+
+      var saveBtn = document.getElementById('password-modal-save');
+      saveBtn.disabled = true;
+      saveBtn.textContent = 'Saving...';
+
+      var { error } = await readerbull.client.auth.updateUser({ password: pw });
+
+      if (error) {
+        saveBtn.disabled = false;
+        saveBtn.textContent = 'Save password';
+        errEl.textContent = error.message || 'Something went wrong, please try again.';
+        errEl.style.display = 'block';
+        return;
+      }
+
+      pwModalCard.innerHTML =
+        '<h3>Password set</h3>' +
+        '<p>You can now log in with your email and password any time from the login page, no waiting on an email link.</p>' +
+        '<div class="modal-actions"><button class="btn btn-primary" id="password-modal-done">Done</button></div>';
+      document.getElementById('password-modal-done').addEventListener('click', function () {
+        pwModal.classList.remove('active');
+      });
+    });
+  }
+
+  document.getElementById('set-password-link').addEventListener('click', function (e) {
+    e.preventDefault();
+    pwModalCard.innerHTML = pwModalDefaultHtml;
+    wirePasswordForm();
+    pwModal.classList.add('active');
   });
 
   var { data: books } = await readerbull.client

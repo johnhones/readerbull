@@ -33,7 +33,18 @@
           <input type="email" id="email" placeholder="you@example.com" required>
           <button type="submit" class="btn btn-primary" id="login-submit">Send my login link</button>
           <div class="fine">Don't have an account yet? <a href="index.html#start" style="color:var(--teal-d);font-weight:700;">Get your free audit</a> instead.</div>
+          <div class="fine"><a href="#" id="use-password-link" style="color:var(--teal-d);font-weight:700;">Log in with a password instead</a></div>
           <div class="field-error" id="login-error">Something went wrong, please try again.</div>
+        </form>
+
+        <form id="password-login-form" style="display:none;">
+          <label for="pw-email">Your email</label>
+          <input type="email" id="pw-email" placeholder="you@example.com" required>
+          <label for="pw-password">Password</label>
+          <input type="password" id="pw-password" placeholder="Your password" required>
+          <button type="submit" class="btn btn-primary" id="pw-login-submit">Log in</button>
+          <div class="fine"><a href="#" id="use-link-link" style="color:var(--teal-d);font-weight:700;">Use a magic link instead</a></div>
+          <div class="field-error" id="pw-login-error">Something went wrong, please try again.</div>
         </form>
       </div>
     </div>
@@ -92,6 +103,45 @@ document.getElementById('login-form').addEventListener('submit', async function 
 
   document.getElementById('form-state').style.display = 'none';
   document.getElementById('success-state').style.display = 'block';
+});
+
+// Toggle between magic-link and password login, same form card either way.
+document.getElementById('use-password-link').addEventListener('click', function (e) {
+  e.preventDefault();
+  document.getElementById('login-form').style.display = 'none';
+  document.getElementById('password-login-form').style.display = 'block';
+});
+document.getElementById('use-link-link').addEventListener('click', function (e) {
+  e.preventDefault();
+  document.getElementById('password-login-form').style.display = 'none';
+  document.getElementById('login-form').style.display = 'block';
+});
+
+document.getElementById('password-login-form').addEventListener('submit', async function (e) {
+  e.preventDefault();
+
+  var submitBtn = document.getElementById('pw-login-submit');
+  var errorEl = document.getElementById('pw-login-error');
+  errorEl.style.display = 'none';
+
+  var email = document.getElementById('pw-email').value.trim();
+  var password = document.getElementById('pw-password').value;
+
+  submitBtn.disabled = true;
+  submitBtn.textContent = 'Logging in...';
+
+  var { error } = await readerbull.client.auth.signInWithPassword({ email: email, password: password });
+
+  if (error) {
+    submitBtn.disabled = false;
+    submitBtn.textContent = 'Log in';
+    errorEl.textContent = "That email and password don't match. If you haven't set a password yet, log in with your magic link once, then set one from your dashboard.";
+    errorEl.style.display = 'block';
+    return;
+  }
+
+  var dashboardUrl = window.location.origin + window.location.pathname.replace(/login\.html$/, '').replace(/\/$/, '') + '/dashboard.html';
+  window.location.href = dashboardUrl;
 });
 </script>
 
