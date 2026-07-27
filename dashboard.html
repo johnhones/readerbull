@@ -20,33 +20,33 @@
       readerbull
     </a>
 
-    <div class="shell-section-label">Navigate</div>
-    <button class="shell-nav-item active" data-panel="overview"><i class="ti ti-layout-dashboard"></i> Overview</button>
-    <button class="shell-nav-item" data-panel="market-analysis" data-navigate-extra><i class="ti ti-users"></i> Market Analysis</button>
-    <button class="shell-nav-item" data-panel="marketing-strategy" data-navigate-extra><i class="ti ti-speakerphone"></i> Marketing Strategy</button>
-    <button class="shell-nav-item" data-panel="keywords" data-navigate-extra><i class="ti ti-search"></i> Keywords</button>
-    <button class="shell-nav-item" data-panel="quick-wins" data-navigate-extra><i class="ti ti-bolt"></i> Quick Wins</button>
+    <div class="shell-nav">
+      <div class="shell-section-label">Navigate</div>
+      <button class="shell-nav-item active" data-panel="overview"><i class="ti ti-layout-dashboard"></i> Overview</button>
+      <button class="shell-nav-item" data-panel="market-analysis" data-navigate-extra><i class="ti ti-users"></i> Market Analysis</button>
+      <button class="shell-nav-item" data-panel="marketing-strategy" data-navigate-extra><i class="ti ti-speakerphone"></i> Marketing Strategy</button>
+      <button class="shell-nav-item" data-panel="keywords" data-navigate-extra><i class="ti ti-search"></i> Keywords</button>
+      <button class="shell-nav-item" data-panel="quick-wins" data-navigate-extra><i class="ti ti-bolt"></i> Quick Wins</button>
 
-    <div class="shell-section-label">Tools</div>
-    <button class="shell-nav-item locked" data-panel="get-reviews"><i class="ti ti-star"></i> Get Reviews <i class="ti ti-lock"></i></button>
-    <button class="shell-nav-item locked" data-panel="build-arc"><i class="ti ti-book-2"></i> Build Your ARC <i class="ti ti-lock"></i></button>
-    <button class="shell-nav-item locked" data-panel="ad-campaigns"><i class="ti ti-ad-2"></i> Ad Campaigns <i class="ti ti-lock"></i></button>
+      <hr class="shell-divider">
+      <div class="shell-section-label">Tools</div>
+      <button class="shell-nav-item act" data-panel="get-reviews"><i class="ti ti-star"></i> Get Reviews</button>
+      <button class="shell-nav-item act" data-panel="build-arc"><i class="ti ti-book-2"></i> Build Your ARC</button>
+      <button class="shell-nav-item act" data-panel="ad-campaigns"><i class="ti ti-ad-2"></i> Ad Campaigns</button>
 
-    <div class="shell-section-label">Marketplaces</div>
-    <button class="shell-nav-item locked" data-panel="amazon-kdp"><i class="ti ti-shopping-cart"></i> Amazon KDP <i class="ti ti-lock"></i></button>
-    <button class="shell-nav-item locked" data-panel="tiktok-shop"><i class="ti ti-brand-tiktok"></i> TikTok Shop <i class="ti ti-lock"></i></button>
-    <button class="shell-nav-item locked" data-panel="barnes-noble"><i class="ti ti-building-store"></i> Barnes &amp; Noble <i class="ti ti-lock"></i></button>
-    <button class="shell-nav-item locked" data-panel="apple-books"><i class="ti ti-device-tablet"></i> Apple Books <i class="ti ti-lock"></i></button>
-    <button class="shell-nav-item locked" data-panel="audible-acx"><i class="ti ti-headphones"></i> Audible / ACX <i class="ti ti-lock"></i></button>
+      <hr class="shell-divider">
+      <div class="shell-section-label">Marketplaces</div>
+      <button class="shell-nav-item act" data-panel="amazon-kdp"><i class="ti ti-shopping-cart"></i> Amazon KDP</button>
+      <button class="shell-nav-item act" data-panel="tiktok-shop"><i class="ti ti-brand-tiktok"></i> TikTok Shop</button>
+      <button class="shell-nav-item act" data-panel="barnes-noble"><i class="ti ti-building-store"></i> Barnes &amp; Noble</button>
+      <button class="shell-nav-item act" data-panel="apple-books"><i class="ti ti-device-tablet"></i> Apple Books</button>
+      <button class="shell-nav-item act" data-panel="audible-acx"><i class="ti ti-headphones"></i> Audible / ACX</button>
+    </div>
   </div>
 
   <!-- MAIN -->
   <div class="shell-main">
     <div class="shell-topbar">
-      <a href="dashboard.html" class="shell-topbar-logo">
-        <img src="readerbull-icon.png" alt="Readerbull">
-        readerbull
-      </a>
       <div class="shell-topbar-actions">
         <a href="#" id="set-password-link"><i class="ti ti-key"></i> Set a password</a>
         <a href="#" id="logout-link"><i class="ti ti-logout"></i> Log out</a>
@@ -56,34 +56,10 @@
     <!-- OVERVIEW: populated by JS, either the embedded legacy dashboard or the auto score -->
     <div id="panel-overview" class="shell-panel-container"></div>
 
-    <div id="panel-market-analysis" class="shell-panel" style="display:none;">
-      <div class="shell-empty">
-        <i class="ti ti-users"></i>
-        <h3>Market Analysis is on its way</h3>
-        <p>See which books are competing for your keywords and where you have a realistic chance to rank. This unlocks as your audit deepens.</p>
-      </div>
-    </div>
-    <div id="panel-marketing-strategy" class="shell-panel" style="display:none;">
-      <div class="shell-empty">
-        <i class="ti ti-speakerphone"></i>
-        <h3>Marketing Strategy is on its way</h3>
-        <p>A clear action plan built from your audit results, not a generic report. This unlocks as your audit deepens.</p>
-      </div>
-    </div>
-    <div id="panel-keywords" class="shell-panel" style="display:none;">
-      <div class="shell-empty">
-        <i class="ti ti-search"></i>
-        <h3>Keywords is on its way</h3>
-        <p>Full keyword coverage and gaps based on your book and category. This unlocks as your audit deepens.</p>
-      </div>
-    </div>
-    <div id="panel-quick-wins" class="shell-panel" style="display:none;">
-      <div class="shell-empty">
-        <i class="ti ti-bolt"></i>
-        <h3>Quick Wins is on its way</h3>
-        <p>The single highest-leverage change to make next. This unlocks as your audit deepens.</p>
-      </div>
-    </div>
+    <div id="panel-market-analysis" class="shell-panel" style="display:none;"></div>
+    <div id="panel-marketing-strategy" class="shell-panel" style="display:none;"></div>
+    <div id="panel-keywords" class="shell-panel" style="display:none;"></div>
+    <div id="panel-quick-wins" class="shell-panel" style="display:none;"></div>
 
     <div id="panel-get-reviews" class="shell-panel" style="display:none;">
       <div class="shell-empty">
@@ -150,6 +126,19 @@
       </div>
     </div>
 
+  </div>
+</div>
+
+<!-- DELETE BOOK MODAL -->
+<div class="modal-overlay" id="delete-modal">
+  <div class="modal-card">
+    <h3>Delete this book?</h3>
+    <p id="delete-modal-text">This removes it and its Discoverability Score from your dashboard for good. This can't be undone.</p>
+    <div class="detail-error" id="delete-modal-error" style="display:none;"></div>
+    <div class="modal-actions">
+      <button class="btn btn-outline" id="delete-modal-cancel">Cancel</button>
+      <button class="btn btn-primary" id="delete-modal-confirm" style="background:#b3261e;border-color:#b3261e;">Delete book</button>
+    </div>
   </div>
 </div>
 
@@ -270,7 +259,13 @@
     overviewPanel.appendChild(frameWrap);
 
   } else if (!books.length) {
-    // No books at all yet.
+    renderEmptyState();
+  } else {
+    renderOverview();
+  }
+
+  function renderEmptyState() {
+    overviewPanel.innerHTML = '';
     var emptyPanel = document.createElement('div');
     emptyPanel.className = 'shell-panel';
     emptyPanel.innerHTML =
@@ -281,10 +276,21 @@
         '<a href="onboarding.html" style="color:var(--teal-d);font-weight:700;">Add a book</a> to unlock your dashboard.</p>' +
       '</div>';
     overviewPanel.appendChild(emptyPanel);
+    renderAuditPanels(null);
+  }
 
-  } else {
-    // Catalog: every book this author has added, plus an "add another"
-    // tile. Clicking a scored book shows its breakdown below the grid.
+  // Catalog: every book this author has added, plus an "add another" tile.
+  // Clicking a scored book shows its breakdown below the grid and drives the
+  // Market Analysis / Marketing Strategy / Keywords / Quick Wins panels.
+  // Rebuildable on demand (called again after a delete).
+  function renderOverview() {
+    overviewPanel.innerHTML = '';
+
+    if (!books.length) {
+      renderEmptyState();
+      return;
+    }
+
     var catalogPanel = document.createElement('div');
     catalogPanel.className = 'shell-panel';
 
@@ -295,6 +301,7 @@
         : (b.book_title || '?').slice(0, 10);
       return (
         '<div class="book-card" data-book-id="' + b.id + '" style="' + (scored ? '' : 'cursor:default;') + '">' +
+          '<button type="button" class="book-card-delete" data-delete-book-id="' + b.id + '" aria-label="Delete book" title="Delete book"><i class="ti ti-trash"></i></button>' +
           '<div class="cover-ph">' + cover + '</div>' +
           '<h4>' + escapeHtml(b.book_title || 'Untitled book') + '</h4>' +
           (scored
@@ -321,9 +328,23 @@
       card.addEventListener('click', function () {
         var b = booksById[card.getAttribute('data-book-id')];
         if (!b || b.score === null || b.score === undefined) return;
-        showScoreDetail(b);
+        selectBook(b);
       });
     });
+
+    document.querySelectorAll('.book-card-delete[data-delete-book-id]').forEach(function (btn) {
+      btn.addEventListener('click', function (e) {
+        e.stopPropagation();
+        var b = booksById[btn.getAttribute('data-delete-book-id')];
+        if (b) openDeleteModal(b);
+      });
+    });
+
+    function selectBook(b) {
+      currentAuditBook = b;
+      showScoreDetail(b);
+      renderAuditPanels(b);
+    }
 
     function showScoreDetail(b) {
       var detailWrap = document.getElementById('book-score-detail');
@@ -366,7 +387,8 @@
 
     // Show the first scored book's breakdown by default, if there is one.
     var firstScored = books.filter(function (b) { return b.score !== null && b.score !== undefined; })[0];
-    if (firstScored) showScoreDetail(firstScored);
+    if (firstScored) selectBook(firstScored);
+    else renderAuditPanels(null);
   }
 
   function escapeHtml(s) {
@@ -375,8 +397,239 @@
       .replace(/"/g, '&quot;').replace(/'/g, '&#39;');
   }
 
-  // Tab switching between Navigate items (locked items have no data-panel, so
-  // they simply do nothing when clicked).
+  // ---------- DELETE BOOK ----------
+  var deleteModal = document.getElementById('delete-modal');
+  var deleteModalText = document.getElementById('delete-modal-text');
+  var deleteModalError = document.getElementById('delete-modal-error');
+  var deleteModalConfirm = document.getElementById('delete-modal-confirm');
+  var pendingDeleteBook = null;
+
+  function openDeleteModal(b) {
+    pendingDeleteBook = b;
+    deleteModalError.style.display = 'none';
+    deleteModalConfirm.disabled = false;
+    deleteModalConfirm.textContent = 'Delete book';
+    deleteModalText.textContent = 'This removes "' + (b.book_title || 'this book') + '" and its Discoverability Score from your dashboard for good. This can\'t be undone.';
+    deleteModal.classList.add('active');
+  }
+
+  document.getElementById('delete-modal-cancel').addEventListener('click', function () {
+    deleteModal.classList.remove('active');
+    pendingDeleteBook = null;
+  });
+
+  deleteModalConfirm.addEventListener('click', async function () {
+    if (!pendingDeleteBook) return;
+    var b = pendingDeleteBook;
+
+    deleteModalConfirm.disabled = true;
+    deleteModalConfirm.textContent = 'Deleting...';
+    deleteModalError.style.display = 'none';
+
+    if (b.manuscript_url) {
+      await readerbull.client.storage.from('manuscripts').remove([b.manuscript_url]);
+    }
+
+    var { error } = await readerbull.client.from('books').delete().eq('id', b.id);
+
+    if (error) {
+      deleteModalConfirm.disabled = false;
+      deleteModalConfirm.textContent = 'Delete book';
+      deleteModalError.textContent = error.message || 'Something went wrong, please try again.';
+      deleteModalError.style.display = 'block';
+      return;
+    }
+
+    books = books.filter(function (x) { return x.id !== b.id; });
+    if (currentAuditBook && currentAuditBook.id === b.id) currentAuditBook = null;
+    deleteModal.classList.remove('active');
+    pendingDeleteBook = null;
+
+    if (!books.length) renderEmptyState();
+    else renderOverview();
+  });
+
+  // ---------- AUDIT CONTENT (Market Analysis / Marketing Strategy / Keywords / Quick Wins) ----------
+  // First-pass, automated read built entirely from what we already pull live
+  // from Amazon plus the Discoverability Score breakdown, no invented
+  // competitor names or numbers, that deeper layer comes later.
+  var currentAuditBook = null;
+
+  function auditEmptyHtml(icon, title, body) {
+    return '<div class="shell-empty"><i class="ti ti-' + icon + '"></i><h3>' + title + '</h3><p>' + body + '</p></div>';
+  }
+
+  function renderAuditPanels(b) {
+    var panels = {
+      'market-analysis': document.getElementById('panel-market-analysis'),
+      'marketing-strategy': document.getElementById('panel-marketing-strategy'),
+      'keywords': document.getElementById('panel-keywords'),
+      'quick-wins': document.getElementById('panel-quick-wins')
+    };
+
+    if (!b) {
+      panels['market-analysis'].innerHTML = auditEmptyHtml('users', 'Market Analysis', 'Add and score a book to see how it stacks up in its category.');
+      panels['marketing-strategy'].innerHTML = auditEmptyHtml('speakerphone', 'Marketing Strategy', 'Add and score a book to get a tailored action plan.');
+      panels['keywords'].innerHTML = auditEmptyHtml('search', 'Keywords', 'Add and score a book to see its keyword coverage.');
+      panels['quick-wins'].innerHTML = auditEmptyHtml('bolt', 'Quick Wins', 'Add and score a book to see your highest-leverage next step.');
+      return;
+    }
+
+    panels['market-analysis'].innerHTML = marketAnalysisHtml(b);
+    panels['marketing-strategy'].innerHTML = marketingStrategyHtml(b);
+    panels['keywords'].innerHTML = keywordsHtml(b);
+    panels['quick-wins'].innerHTML = quickWinsHtml(b);
+  }
+
+  function statRow(label, value) {
+    return '<div style="display:flex;justify-content:space-between;padding:10px 0;border-bottom:1px solid var(--border);font-size:14px;">' +
+      '<span style="color:var(--navy);font-weight:600;">' + label + '</span>' +
+      '<span style="color:var(--mid);">' + (value == null || value === '' ? 'Not available' : escapeHtml(String(value))) + '</span>' +
+    '</div>';
+  }
+
+  function marketAnalysisHtml(b) {
+    var rankNum = b.bestseller_rank_number;
+    var reviewCount = Number(b.live_review_count) || 0;
+    var standing;
+    if (rankNum && rankNum <= 10000) {
+      standing = 'This book ranks strongly in its category already. The focus now is protecting that position: keep reviews coming in and keep the listing optimised.';
+    } else if (rankNum && rankNum <= 100000) {
+      standing = 'This book has a solid foothold in its category, with real room to climb. Reviews and category fit are the two levers most likely to move the rank.';
+    } else if (rankNum) {
+      standing = 'This book\'s bestseller rank shows it needs more visibility in its category. Reviews, keyword coverage, and category placement are the places to focus first.';
+    } else {
+      standing = 'We don\'t have a bestseller rank for this book yet. Once Amazon reports one, we\'ll use it here to gauge category standing.';
+    }
+    var reviewNote = reviewCount >= 15
+      ? 'With ' + reviewCount + ' reviews, this book has enough social proof to support running ads.'
+      : 'With ' + reviewCount + ' review' + (reviewCount === 1 ? '' : 's') + ', this book is still building the review base most competitive listings in a category carry (a common benchmark is 15+) before ads pay off.';
+
+    return (
+      '<div class="sec-eyebrow" style="margin-bottom:6px;">Market Analysis</div>' +
+      '<h2 style="font-size:20px;color:var(--navy);margin-bottom:16px;">' + escapeHtml(b.book_title || '') + '</h2>' +
+      '<div class="breakdown-card" style="margin-bottom:24px;">' +
+        '<h2>Where this book stands</h2>' +
+        '<p>' + standing + ' ' + reviewNote + '</p>' +
+        '<div>' +
+          statRow('Category', b.amazon_category) +
+          statRow('Bestseller rank', b.bestseller_rank) +
+          statRow('Star rating', b.live_rating ? (b.live_rating + ' / 5') : null) +
+          statRow('Reviews', b.live_review_count) +
+          statRow('Price', b.live_price) +
+        '</div>' +
+      '</div>' +
+      '<p style="font-size:13px;color:var(--muted);">This is a first-pass read built from this book\'s live Amazon listing. Competitor-by-competitor benchmarking is a planned next step.</p>'
+    );
+  }
+
+  function marketingStrategyHtml(b) {
+    var breakdown = b.score_breakdown || {};
+    var steps = [];
+
+    var reviews = breakdown.reviews || {};
+    if ((reviews.points || 0) < (reviews.max || 40)) {
+      steps.push({
+        title: 'Build your reviews',
+        body: 'Reviews are the single strongest signal here. Use an ARC service (BookSirens, Hidden Gems, NetGalley) to reach opted-in readers, and add a warm, compliant review request inside the book itself.'
+      });
+    }
+    var keywords = breakdown.keywords || {};
+    if ((keywords.points || 0) < (keywords.max || 30)) {
+      steps.push({
+        title: 'Strengthen your backend keywords',
+        body: 'Add more of your 7 KDP keyword fields targeting specific, buyer-intent search terms in your niche rather than single broad words.'
+      });
+    }
+    var category = breakdown.category || {};
+    if ((category.points || 0) < (category.max || 15)) {
+      steps.push({
+        title: 'Check your category placement',
+        body: 'A tighter, less-crowded category (or a second category via KDP support) can meaningfully improve how easily readers browse into this book.'
+      });
+    }
+    var listing = breakdown.listing || {};
+    if ((listing.points || 0) < (listing.max || 15)) {
+      steps.push({
+        title: 'Confirm your listing is complete',
+        body: 'Make sure the title, description, and cover are all in place on the live Amazon listing, that\'s the foundation everything else builds on.'
+      });
+    }
+    if (!steps.length) {
+      steps.push({
+        title: 'Keep the momentum going',
+        body: 'This book scores well across the board. Keep an eye on new reviews and consider testing Amazon Ads now that the foundations are solid.'
+      });
+    }
+
+    var stepsHtml = steps.map(function (s, i) {
+      return (
+        '<div style="padding:16px 0;border-bottom:1px solid var(--border);">' +
+          '<div style="display:flex;gap:12px;align-items:flex-start;">' +
+            '<div style="width:24px;height:24px;border-radius:50%;background:var(--teal-l);color:var(--teal-d);font-weight:800;font-size:12px;display:flex;align-items:center;justify-content:center;flex-shrink:0;">' + (i + 1) + '</div>' +
+            '<div><h3 style="font-size:15px;color:var(--navy);margin-bottom:4px;">' + s.title + '</h3><p style="font-size:14px;color:var(--mid);line-height:1.6;">' + s.body + '</p></div>' +
+          '</div>' +
+        '</div>'
+      );
+    }).join('');
+
+    return (
+      '<div class="sec-eyebrow" style="margin-bottom:6px;">Marketing Strategy</div>' +
+      '<h2 style="font-size:20px;color:var(--navy);margin-bottom:16px;">' + escapeHtml(b.book_title || '') + '</h2>' +
+      '<div class="breakdown-card"><h2>Your action plan</h2><p>Ordered by what\'s most likely to move your Discoverability Score next.</p><div>' + stepsHtml + '</div></div>'
+    );
+  }
+
+  function keywordsHtml(b) {
+    var list = String(b.keywords || '').split(',').map(function (k) { return k.trim(); }).filter(Boolean);
+    var chipsHtml = list.length
+      ? '<div style="display:flex;flex-wrap:wrap;gap:8px;">' + list.map(function (k) {
+          return '<span style="background:var(--teal-l);color:var(--teal-d);font-size:13px;font-weight:600;padding:6px 14px;border-radius:20px;">' + escapeHtml(k) + '</span>';
+        }).join('') + '</div>'
+      : '<p style="font-size:14px;color:var(--mid);">No keywords recorded yet for this book.</p>';
+
+    return (
+      '<div class="sec-eyebrow" style="margin-bottom:6px;">Keywords</div>' +
+      '<h2 style="font-size:20px;color:var(--navy);margin-bottom:16px;">' + escapeHtml(b.book_title || '') + '</h2>' +
+      '<div class="breakdown-card"><h2>Your backend keywords</h2><p>What you\'ve recorded for this book\'s 7 KDP keyword fields.</p>' + chipsHtml + '</div>' +
+      '<p style="font-size:13px;color:var(--muted);margin-top:16px;">Real-time search-volume research for these terms is a planned enhancement.</p>'
+    );
+  }
+
+  function quickWinsHtml(b) {
+    var breakdown = b.score_breakdown || {};
+    var gaps = Object.keys(breakdown).map(function (key) {
+      var item = breakdown[key];
+      return { key: key, label: item.label, gap: (item.max || 0) - (item.points || 0) };
+    }).filter(function (g) { return g.gap > 0; }).sort(function (a, c) { return c.gap - a.gap; });
+
+    var actionText = {
+      reviews: 'Launch an ARC campaign to build reviews, this is worth the most points and usually moves fastest.',
+      keywords: 'Fill in more of your 7 backend keyword fields with specific buyer-intent phrases.',
+      listing: 'Double check your title, description, and cover are all live and complete on Amazon.',
+      category: 'Request a tighter or second category placement through KDP support.'
+    };
+
+    var itemsHtml = gaps.length
+      ? gaps.slice(0, 3).map(function (g, i) {
+          return (
+            '<div style="display:flex;gap:14px;align-items:flex-start;padding:16px 0;border-bottom:1px solid var(--border);">' +
+              '<div style="width:26px;height:26px;border-radius:50%;background:var(--orange-l);color:var(--orange-d);font-weight:800;font-size:13px;display:flex;align-items:center;justify-content:center;flex-shrink:0;">' + (i + 1) + '</div>' +
+              '<div><h3 style="font-size:15px;color:var(--navy);margin-bottom:4px;">' + g.label + ' (' + g.gap + ' points available)</h3>' +
+              '<p style="font-size:14px;color:var(--mid);line-height:1.6;">' + (actionText[g.key] || 'Focus on improving this area next.') + '</p></div>' +
+            '</div>'
+          );
+        }).join('')
+      : '<p style="font-size:14px;color:var(--mid);">This book is scoring full marks everywhere we can measure automatically, nice work.</p>';
+
+    return (
+      '<div class="sec-eyebrow" style="margin-bottom:6px;">Quick Wins</div>' +
+      '<h2 style="font-size:20px;color:var(--navy);margin-bottom:16px;">' + escapeHtml(b.book_title || '') + '</h2>' +
+      '<div class="breakdown-card"><h2>Do these next, in order</h2><p>Ranked by how many Discoverability Score points are still on the table.</p>' + itemsHtml + '</div>'
+    );
+  }
+
+  // Tab switching between Navigate items.
   document.querySelectorAll('.shell-nav-item[data-panel]').forEach(function (btn) {
     btn.addEventListener('click', function () {
       document.querySelectorAll('.shell-nav-item[data-panel]').forEach(function (b) {

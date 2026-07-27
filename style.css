@@ -183,23 +183,20 @@ img { max-width: 100%; display: block; }
 
 /* ---------- DASHBOARD SHELL (sidebar nav) ---------- */
 .shell { display: flex; min-height: 100vh; }
-.shell-sidebar { width: 240px; flex-shrink: 0; background: var(--navy); padding: 24px 16px; display: flex; flex-direction: column; }
-.shell-logo { display: flex; align-items: center; gap: 10px; color: var(--orange); font-weight: 800; font-size: 18px; text-decoration: none; padding: 0 8px 24px; }
-.shell-logo img { width: 34px; height: 34px; object-fit: contain; }
-.shell-section-label { color: rgba(255,255,255,.4); font-size: 11px; font-weight: 700; letter-spacing: 1.5px; text-transform: uppercase; padding: 16px 8px 8px; }
-.shell-section-label:first-of-type { padding-top: 0; }
-.shell-nav-item { display: flex; align-items: center; gap: 10px; padding: 10px 8px; border-radius: 8px; color: rgba(255,255,255,.7); font-size: 14px; font-weight: 600; text-decoration: none; cursor: pointer; border: none; background: none; width: 100%; text-align: left; font-family: inherit; }
+.shell-sidebar { position: fixed; top: 0; left: 0; bottom: 0; width: 220px; flex-shrink: 0; background: var(--navy); display: flex; flex-direction: column; border-right: 1px solid rgba(255,255,255,.07); overflow-y: auto; z-index: 400; }
+.shell-logo { display: flex; flex-direction: column; align-items: center; gap: 8px; color: var(--orange); font-weight: 800; font-size: 14px; letter-spacing: .3px; text-decoration: none; padding: 24px 12px 20px; border-bottom: 1px solid rgba(255,255,255,.07); }
+.shell-logo img { width: 40px; height: 40px; object-fit: contain; }
+.shell-nav { padding: 16px 10px; }
+.shell-section-label { color: rgba(255,255,255,.7); font-size: 9px; font-weight: 700; letter-spacing: 2px; text-transform: uppercase; padding: 0 8px; margin: 16px 0 6px; }
+.shell-section-label:first-of-type { margin-top: 0; }
+.shell-divider { border: none; border-top: 1px solid rgba(255,255,255,.07); margin: 12px 0; }
+.shell-nav-item { display: flex; align-items: center; gap: 10px; padding: 9px 10px; border-radius: 5px; color: rgba(255,255,255,.5); font-size: 12px; font-weight: 600; text-decoration: none; cursor: pointer; border: none; background: none; width: 100%; text-align: left; font-family: inherit; margin-bottom: 2px; transition: background .15s, color .15s; }
 .shell-nav-item i { font-size: 16px; width: 18px; text-align: center; flex-shrink: 0; }
-.shell-nav-item:hover { background: rgba(255,255,255,.06); color: #fff; }
-.shell-nav-item.active { background: rgba(0,181,173,.18); color: var(--teal); }
-.shell-nav-item.locked { color: rgba(255,255,255,.5); }
-.shell-nav-item.locked:hover { background: rgba(255,255,255,.06); color: #fff; }
-.shell-nav-item.locked.active { background: rgba(0,181,173,.18); color: var(--teal); }
-.shell-nav-item.locked i.ti-lock { margin-left: auto; font-size: 12px; opacity: .6; }
-.shell-main { flex: 1; min-width: 0; background: var(--light); }
-.shell-topbar { display: flex; align-items: center; justify-content: space-between; padding: 16px 32px; background: var(--white); border-bottom: 1px solid var(--border); }
-.shell-topbar-logo { display: flex; align-items: center; gap: 10px; color: var(--orange); font-weight: 800; font-size: 18px; text-decoration: none; }
-.shell-topbar-logo img { width: 30px; height: 30px; object-fit: contain; }
+.shell-nav-item:hover, .shell-nav-item.active { background: rgba(0,181,173,.12); color: var(--teal); }
+.shell-nav-item.act { color: rgba(244,116,33,.65); }
+.shell-nav-item.act:hover { background: rgba(244,116,33,.1); color: var(--orange); }
+.shell-main { flex: 1; min-width: 0; margin-left: 220px; background: var(--light); }
+.shell-topbar { display: flex; align-items: center; justify-content: flex-end; padding: 16px 32px; background: var(--white); border-bottom: 1px solid var(--border); }
 .shell-topbar-actions { display: flex; align-items: center; gap: 22px; }
 .shell-topbar-actions a { font-size: 13px; font-weight: 600; color: var(--mid); text-decoration: none; display: flex; align-items: center; gap: 6px; }
 .shell-topbar-actions a:hover { color: var(--teal-d); }
@@ -270,7 +267,10 @@ img { max-width: 100%; display: block; }
 .modal-actions { display: flex; justify-content: flex-end; gap: 10px; }
 
 .catalog-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(220px, 1fr)); gap: 20px; margin-top: 24px; }
-.book-card { background: var(--white); border: 1px solid var(--border); border-radius: 10px; padding: 18px; text-align: center; cursor: pointer; transition: box-shadow .15s, transform .15s; }
+.book-card { position: relative; background: var(--white); border: 1px solid var(--border); border-radius: 10px; padding: 18px; text-align: center; cursor: pointer; transition: box-shadow .15s, transform .15s; }
+.book-card-delete { position: absolute; top: 10px; right: 10px; width: 28px; height: 28px; border-radius: 50%; border: none; background: var(--light); color: var(--muted); display: flex; align-items: center; justify-content: center; cursor: pointer; font-size: 14px; opacity: 0; transition: opacity .15s, background .15s, color .15s; }
+.book-card:hover .book-card-delete { opacity: 1; }
+.book-card-delete:hover { background: #fdeaea; color: #b3261e; }
 .book-card:hover { box-shadow: 0 8px 24px rgba(27,58,72,.1); transform: translateY(-2px); }
 .book-card .cover-ph { width: 90px; height: 130px; margin: 0 auto 14px; }
 .book-card h4 { font-size: 14px; color: var(--navy); margin-bottom: 8px; line-height: 1.3; }
@@ -291,9 +291,13 @@ img { max-width: 100%; display: block; }
 
 @media(max-width: 900px) {
   .shell { flex-direction: column; }
-  .shell-sidebar { width: 100%; flex-direction: row; flex-wrap: wrap; padding: 16px; }
-  .shell-logo { padding: 0 8px; margin-right: auto; }
+  .shell-sidebar { position: static; width: 100%; flex-direction: row; flex-wrap: wrap; border-right: none; border-bottom: 1px solid rgba(255,255,255,.07); }
+  .shell-main { margin-left: 0; }
+  .shell-logo { padding: 12px; border-bottom: none; flex-direction: row; }
+  .shell-logo img { width: 26px; height: 26px; }
+  .shell-nav { display: flex; flex-wrap: wrap; padding: 8px 10px; }
   .shell-section-label { display: none; }
+  .shell-divider { display: none; }
   .shell-nav-item { width: auto; padding: 8px 12px; }
   .legacy-frame-wrap { height: 80vh; }
 }
