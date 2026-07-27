@@ -197,11 +197,13 @@
     var el = document.getElementById('import-card-' + b.tempId);
     if (!el) return;
 
+    var label = displayLabel(b.input);
+
     if (b.status === 'importing') {
       el.innerHTML =
-        '<div class="cover-ph">' + escapeHtml(b.input.slice(0, 12)) + '</div>' +
+        '<div class="cover-ph">' + escapeHtml(label.slice(0, 12)) + '</div>' +
         '<div class="import-card-body">' +
-          '<h4>' + escapeHtml(b.input) + '</h4>' +
+          '<h4>' + escapeHtml(label) + '</h4>' +
           '<p style="font-size:13px;color:var(--mid);"><span class="spinner"></span>Pulling listing data from Amazon&hellip;</p>' +
         '</div>' +
         '<div class="status-pill importing">Importing</div>';
@@ -212,7 +214,7 @@
       el.innerHTML =
         '<div class="cover-ph" style="background:var(--muted);">?</div>' +
         '<div class="import-card-body">' +
-          '<h4>' + escapeHtml(b.input) + '</h4>' +
+          '<h4>' + escapeHtml(label) + '</h4>' +
           '<p style="font-size:13px;color:var(--orange-d);">' + escapeHtml(b.error || 'Could not import this one.') + '</p>' +
         '</div>' +
         '<div class="status-pill error">Failed</div>';
@@ -526,6 +528,17 @@
     return String(s == null ? '' : s)
       .replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;')
       .replace(/"/g, '&quot;').replace(/'/g, '&#39;');
+  }
+
+  // Amazon listing URLs come with a pile of tracking query params that make
+  // for a messy, wrapping card while we're still waiting on the real title.
+  // Show the bare ASIN if we can pull one out, otherwise just truncate.
+  function displayLabel(input) {
+    var trimmed = String(input || '').trim();
+    if (/^[A-Z0-9]{10}$/i.test(trimmed)) return trimmed.toUpperCase();
+    var match = trimmed.match(/\/(?:dp|gp\/product|ASIN)\/([A-Z0-9]{10})/i);
+    if (match) return 'ASIN: ' + match[1].toUpperCase();
+    return trimmed.length > 60 ? trimmed.slice(0, 60) + '…' : trimmed;
   }
 })();
 </script>
