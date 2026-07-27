@@ -20,39 +20,51 @@
 </div>
 
 <div class="form-page">
-  <div class="form-page-inner">
+  <div class="form-page-inner auth-page">
 
-    <div id="form-state">
-      <div class="sec-eyebrow">Welcome back</div>
-      <h1>Log in to your dashboard</h1>
-      <p>No password, ever. We'll email you a one-time link to log straight in.</p>
+    <div class="auth-logo"><img src="readerbull-icon.png" alt="Readerbull"></div>
+    <h1>Welcome back</h1>
+    <p class="auth-subtitle">Log in to your Readerbull dashboard</p>
 
-      <div class="audit-form standalone">
-        <form id="login-form">
-          <label for="email">Your email</label>
-          <input type="email" id="email" placeholder="you@example.com" required>
-          <button type="submit" class="btn btn-primary" id="login-submit">Send my login link</button>
-          <div class="fine">Don't have an account yet? <a href="index.html#start" style="color:var(--teal-d);font-weight:700;">Get your free audit</a> instead.</div>
-          <div class="fine"><a href="#" id="use-password-link" style="color:var(--teal-d);font-weight:700;">Log in with a password instead</a></div>
-          <div class="field-error" id="login-error">Something went wrong, please try again.</div>
-        </form>
+    <div class="audit-form standalone auth-card">
 
-        <form id="password-login-form" style="display:none;">
-          <label for="pw-email">Your email</label>
-          <input type="email" id="pw-email" placeholder="you@example.com" required>
-          <label for="pw-password">Password</label>
-          <input type="password" id="pw-password" placeholder="Your password" required>
-          <button type="submit" class="btn btn-primary" id="pw-login-submit">Log in</button>
-          <div class="fine"><a href="#" id="use-link-link" style="color:var(--teal-d);font-weight:700;">Use a magic link instead</a></div>
-          <div class="field-error" id="pw-login-error">Something went wrong, please try again.</div>
-        </form>
-      </div>
-    </div>
+      <!-- STEP 1: email -->
+      <form id="email-step">
+        <label for="email">Email</label>
+        <input type="email" id="email" placeholder="Enter your email address..." required>
+        <div class="fine" style="text-align:left;margin-top:6px;">We'll email you a one-time code to sign in.</div>
+        <button type="submit" class="btn btn-primary" id="email-submit">Continue</button>
+        <div class="fine">Don't have an account yet? <a href="index.html#start" style="color:var(--teal-d);font-weight:700;">Get your free audit</a> instead.</div>
+        <div class="fine"><a href="#" id="use-password-link" style="color:var(--teal-d);font-weight:700;">Log in with a password instead</a></div>
+        <div class="field-error" id="email-error"></div>
+      </form>
 
-    <div id="success-state" style="display:none;">
-      <div class="sec-eyebrow">Almost there</div>
-      <h1>Check your email</h1>
-      <p>We've sent a login link to your inbox. Click it to go straight to your dashboard.</p>
+      <!-- STEP 2: enter the code emailed to them -->
+      <form id="otp-step" style="display:none;">
+        <label>Email</label>
+        <div class="auth-email-pill">
+          <span id="otp-email-display"></span>
+          <button type="button" id="otp-change-email" aria-label="Change email"><i class="ti ti-x"></i></button>
+        </div>
+        <label for="otp-code">Verification code</label>
+        <input type="text" inputmode="numeric" autocomplete="one-time-code" id="otp-code" class="otp-code-input" placeholder="Enter code" required>
+        <div class="fine" style="text-align:left;margin-top:6px;">We sent a code to your inbox. It expires shortly.</div>
+        <button type="submit" class="btn btn-primary" id="otp-submit">Continue</button>
+        <div class="fine"><a href="#" id="otp-resend" style="color:var(--teal-d);font-weight:700;">Resend code</a></div>
+        <div class="field-error" id="otp-error"></div>
+      </form>
+
+      <!-- ALTERNATE: password login -->
+      <form id="password-step" style="display:none;">
+        <label for="pw-email">Email</label>
+        <input type="email" id="pw-email" placeholder="Enter your email address..." required>
+        <label for="pw-password">Password</label>
+        <input type="password" id="pw-password" placeholder="Your password" required>
+        <button type="submit" class="btn btn-primary" id="pw-login-submit">Log in</button>
+        <div class="fine"><a href="#" id="use-code-link" style="color:var(--teal-d);font-weight:700;">Use an email code instead</a></div>
+        <div class="field-error" id="pw-login-error"></div>
+      </form>
+
     </div>
 
   </div>
@@ -69,11 +81,24 @@
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.js"></script>
 <script src="supabase-client.js"></script>
 <script>
-document.getElementById('login-form').addEventListener('submit', async function (e) {
+var currentEmail = '';
+
+function showStep(name) {
+  ['email-step', 'otp-step', 'password-step'].forEach(function (id) {
+    document.getElementById(id).style.display = (id === name) ? 'block' : 'none';
+  });
+}
+
+function dashboardUrl() {
+  return window.location.origin + window.location.pathname.replace(/login\.html$/, '').replace(/\/$/, '') + '/dashboard.html';
+}
+
+// ---------- STEP 1: request a code ----------
+document.getElementById('email-step').addEventListener('submit', async function (e) {
   e.preventDefault();
 
-  var submitBtn = document.getElementById('login-submit');
-  var errorEl = document.getElementById('login-error');
+  var submitBtn = document.getElementById('email-submit');
+  var errorEl = document.getElementById('email-error');
   errorEl.style.display = 'none';
 
   var email = document.getElementById('email').value.trim();
@@ -81,19 +106,15 @@ document.getElementById('login-form').addEventListener('submit', async function 
   submitBtn.disabled = true;
   submitBtn.textContent = 'Sending...';
 
-  var redirectTo = window.location.origin + window.location.pathname.replace(/login\.html$/, '').replace(/\/$/, '') + '/onboarding.html';
-
   var { error } = await readerbull.client.auth.signInWithOtp({
     email: email,
-    options: {
-      emailRedirectTo: redirectTo,
-      shouldCreateUser: false
-    }
+    options: { shouldCreateUser: false }
   });
 
+  submitBtn.disabled = false;
+  submitBtn.textContent = 'Continue';
+
   if (error) {
-    submitBtn.disabled = false;
-    submitBtn.textContent = 'Send my login link';
     errorEl.textContent = /signup|not.*found|not.*allowed/i.test(error.message)
       ? "We couldn't find an account with that email. Try the free audit instead."
       : (error.message || 'Something went wrong, please try again.');
@@ -101,23 +122,67 @@ document.getElementById('login-form').addEventListener('submit', async function 
     return;
   }
 
-  document.getElementById('form-state').style.display = 'none';
-  document.getElementById('success-state').style.display = 'block';
+  currentEmail = email;
+  document.getElementById('otp-email-display').textContent = email;
+  document.getElementById('otp-code').value = '';
+  document.getElementById('otp-error').style.display = 'none';
+  showStep('otp-step');
 });
 
-// Toggle between magic-link and password login, same form card either way.
+// ---------- STEP 2: verify the code ----------
+document.getElementById('otp-change-email').addEventListener('click', function () {
+  showStep('email-step');
+});
+
+document.getElementById('otp-resend').addEventListener('click', async function (e) {
+  e.preventDefault();
+  var resendLink = document.getElementById('otp-resend');
+  resendLink.textContent = 'Sending...';
+  await readerbull.client.auth.signInWithOtp({ email: currentEmail, options: { shouldCreateUser: false } });
+  resendLink.textContent = 'Code sent';
+  setTimeout(function () { resendLink.textContent = 'Resend code'; }, 4000);
+});
+
+document.getElementById('otp-step').addEventListener('submit', async function (e) {
+  e.preventDefault();
+
+  var submitBtn = document.getElementById('otp-submit');
+  var errorEl = document.getElementById('otp-error');
+  errorEl.style.display = 'none';
+
+  var code = document.getElementById('otp-code').value.trim();
+
+  submitBtn.disabled = true;
+  submitBtn.textContent = 'Verifying...';
+
+  var { error } = await readerbull.client.auth.verifyOtp({
+    email: currentEmail,
+    token: code,
+    type: 'email'
+  });
+
+  if (error) {
+    submitBtn.disabled = false;
+    submitBtn.textContent = 'Continue';
+    errorEl.textContent = "That code didn't work, double check it or request a new one.";
+    errorEl.style.display = 'block';
+    return;
+  }
+
+  window.location.href = dashboardUrl();
+});
+
+// ---------- ALTERNATE: password login ----------
 document.getElementById('use-password-link').addEventListener('click', function (e) {
   e.preventDefault();
-  document.getElementById('login-form').style.display = 'none';
-  document.getElementById('password-login-form').style.display = 'block';
+  showStep('password-step');
 });
-document.getElementById('use-link-link').addEventListener('click', function (e) {
+document.getElementById('use-code-link').addEventListener('click', function (e) {
   e.preventDefault();
-  document.getElementById('password-login-form').style.display = 'none';
-  document.getElementById('login-form').style.display = 'block';
+  showStep('email-step');
 });
 
-document.getElementById('password-login-form').addEventListener('submit', async function (e) {
+document.getElementById('password-step').addEventListener('submit', async function (e) {
   e.preventDefault();
 
   var submitBtn = document.getElementById('pw-login-submit');
@@ -135,13 +200,12 @@ document.getElementById('password-login-form').addEventListener('submit', async 
   if (error) {
     submitBtn.disabled = false;
     submitBtn.textContent = 'Log in';
-    errorEl.textContent = "That email and password don't match. If you haven't set a password yet, log in with your magic link once, then set one from your dashboard.";
+    errorEl.textContent = "That email and password don't match. If you haven't set a password yet, use an email code once, then set one from your dashboard.";
     errorEl.style.display = 'block';
     return;
   }
 
-  var dashboardUrl = window.location.origin + window.location.pathname.replace(/login\.html$/, '').replace(/\/$/, '') + '/dashboard.html';
-  window.location.href = dashboardUrl;
+  window.location.href = dashboardUrl();
 });
 </script>
 

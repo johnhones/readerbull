@@ -149,6 +149,18 @@ img { max-width: 100%; display: block; }
 .form-page-inner > p { font-size: 15px; color: var(--mid); margin-bottom: 8px; }
 .audit-form.standalone { margin-top: 28px; }
 
+/* ---------- AUTH (Notion-style clean centered login/signup) ---------- */
+.auth-logo { width: 44px; height: 44px; margin: 0 auto 20px; }
+.auth-logo img { width: 100%; height: 100%; object-fit: contain; }
+.form-page-inner.auth-page h1 { font-size: 26px; margin-bottom: 6px; }
+.auth-subtitle { font-size: 15px; color: var(--muted); margin-bottom: 0; }
+.audit-form.auth-card { border: none; box-shadow: none; padding: 0; background: transparent; margin-top: 32px; }
+.audit-form.auth-card label:first-child { margin-top: 0; }
+.auth-email-pill { display: flex; align-items: center; justify-content: space-between; border: 1px solid var(--border); border-radius: 6px; padding: 10px 12px; font-size: 14px; color: var(--navy); background: var(--light); margin-bottom: 4px; }
+.auth-email-pill button { border: none; background: none; color: var(--muted); font-size: 14px; cursor: pointer; line-height: 1; padding: 4px; display: flex; }
+.auth-email-pill button:hover { color: var(--navy); }
+.otp-code-input { letter-spacing: 3px; font-size: 18px; text-align: center; font-family: 'SFMono-Regular', Consolas, monospace; }
+
 /* ---------- DASHBOARD ---------- */
 .dash-header { background: var(--navy); padding: 40px 0; }
 .dash-header .wrap { display: flex; align-items: center; justify-content: space-between; flex-wrap: wrap; gap: 16px; }

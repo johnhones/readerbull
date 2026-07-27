@@ -174,23 +174,28 @@
 
     <div class="audit-form" id="audit-form">
       <form id="lead-form">
-        <label for="author-name">Your name</label>
-        <input type="text" id="author-name" placeholder="e.g. Jordan Truehart" required>
-        <label for="book-title">Book title</label>
-        <input type="text" id="book-title" placeholder="e.g. My Human Design Journal" required>
-        <label for="amazon-link">Amazon listing link</label>
-        <input type="url" id="amazon-link" placeholder="https://amazon.com/..." required>
+        <label for="author-name">Your name <span style="font-weight:400;color:var(--muted);">(optional)</span></label>
+        <input type="text" id="author-name" placeholder="e.g. Jordan Truehart">
         <label for="email">Your email</label>
         <input type="email" id="email" placeholder="you@example.com" required>
         <button type="submit" class="btn btn-primary" id="lead-submit">Get My Free Discoverability Score</button>
-        <div class="fine">We'll email you a magic link to continue, no spam, ever.</div>
-        <div class="field-error" id="lead-error">Something went wrong, please try again.</div>
+        <div class="fine">We'll email you a one-time code, no spam, ever. You'll add your book's Amazon link on the next step.</div>
+        <div class="field-error" id="lead-error"></div>
       </form>
-      <div class="form-success" id="form-success">
-        <i class="ti ti-circle-check"></i>
-        <h4>Check your email</h4>
-        <p>We've sent a magic link to your inbox. Click it to verify your email and continue your Discoverability Audit.</p>
-      </div>
+
+      <form id="otp-step" style="display:none;">
+        <label>Email</label>
+        <div class="auth-email-pill">
+          <span id="otp-email-display"></span>
+          <button type="button" id="otp-change-email" aria-label="Change email"><i class="ti ti-x"></i></button>
+        </div>
+        <label for="otp-code">Verification code</label>
+        <input type="text" inputmode="numeric" autocomplete="one-time-code" id="otp-code" class="otp-code-input" placeholder="Enter code" required>
+        <div class="fine" style="text-align:left;margin-top:6px;">We sent a code to your inbox. It expires shortly.</div>
+        <button type="submit" class="btn btn-primary" id="otp-submit">Continue</button>
+        <div class="fine"><a href="#" id="otp-resend" style="color:var(--teal-d);font-weight:700;">Resend code</a></div>
+        <div class="field-error" id="otp-error"></div>
+      </form>
     </div>
   </div>
 </div>
@@ -206,6 +211,12 @@
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.js"></script>
 <script src="supabase-client.js"></script>
 <script>
+var currentEmail = '';
+
+function onboardingUrl() {
+  return window.location.origin + window.location.pathname.replace(/index\.html$/, '').replace(/\/$/, '') + '/onboarding.html';
+}
+
 document.getElementById('lead-form').addEventListener('submit', async function (e) {
   e.preventDefault();
 
@@ -214,37 +225,77 @@ document.getElementById('lead-form').addEventListener('submit', async function (
   errorEl.style.display = 'none';
 
   var authorName = document.getElementById('author-name').value.trim();
-  var bookTitle = document.getElementById('book-title').value.trim();
-  var amazonLink = document.getElementById('amazon-link').value.trim();
   var email = document.getElementById('email').value.trim();
 
   submitBtn.disabled = true;
   submitBtn.textContent = 'Sending...';
 
-  var redirectTo = window.location.origin + window.location.pathname.replace(/index\.html$/, '').replace(/\/$/, '') + '/onboarding.html';
-
   var { error } = await readerbull.client.auth.signInWithOtp({
     email: email,
     options: {
-      emailRedirectTo: redirectTo,
-      data: {
-        author_name: authorName,
-        book_title: bookTitle,
-        amazon_link: amazonLink
-      }
+      emailRedirectTo: onboardingUrl(),
+      data: authorName ? { author_name: authorName } : {}
     }
   });
 
+  submitBtn.disabled = false;
+  submitBtn.textContent = 'Get My Free Discoverability Score';
+
   if (error) {
-    submitBtn.disabled = false;
-    submitBtn.textContent = 'Get My Free Discoverability Score';
     errorEl.textContent = error.message || 'Something went wrong, please try again.';
     errorEl.style.display = 'block';
     return;
   }
 
+  currentEmail = email;
+  document.getElementById('otp-email-display').textContent = email;
+  document.getElementById('otp-code').value = '';
+  document.getElementById('otp-error').style.display = 'none';
   document.getElementById('lead-form').style.display = 'none';
-  document.getElementById('form-success').style.display = 'block';
+  document.getElementById('otp-step').style.display = 'block';
+});
+
+document.getElementById('otp-change-email').addEventListener('click', function () {
+  document.getElementById('otp-step').style.display = 'none';
+  document.getElementById('lead-form').style.display = 'block';
+});
+
+document.getElementById('otp-resend').addEventListener('click', async function (e) {
+  e.preventDefault();
+  var resendLink = document.getElementById('otp-resend');
+  resendLink.textContent = 'Sending...';
+  await readerbull.client.auth.signInWithOtp({ email: currentEmail, options: { emailRedirectTo: onboardingUrl() } });
+  resendLink.textContent = 'Code sent';
+  setTimeout(function () { resendLink.textContent = 'Resend code'; }, 4000);
+});
+
+document.getElementById('otp-step').addEventListener('submit', async function (e) {
+  e.preventDefault();
+
+  var submitBtn = document.getElementById('otp-submit');
+  var errorEl = document.getElementById('otp-error');
+  errorEl.style.display = 'none';
+
+  var code = document.getElementById('otp-code').value.trim();
+
+  submitBtn.disabled = true;
+  submitBtn.textContent = 'Verifying...';
+
+  var { error } = await readerbull.client.auth.verifyOtp({
+    email: currentEmail,
+    token: code,
+    type: 'email'
+  });
+
+  if (error) {
+    submitBtn.disabled = false;
+    submitBtn.textContent = 'Continue';
+    errorEl.textContent = "That code didn't work, double check it or request a new one.";
+    errorEl.style.display = 'block';
+    return;
+  }
+
+  window.location.href = onboardingUrl();
 });
 </script>
 

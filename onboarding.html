@@ -145,14 +145,6 @@
   var detectedCount = document.getElementById('detected-count');
   var pasteError = document.getElementById('paste-error');
 
-  // Nice touch for a first-time signup: prefill with the Amazon link they
-  // already gave us on the homepage form, if they have no books yet.
-  var { data: existingBooksCheck } = await readerbull.client
-    .from('books').select('id').eq('user_id', user.id).limit(1);
-  if ((!existingBooksCheck || !existingBooksCheck.length) && meta.amazon_link) {
-    pasteInput.value = meta.amazon_link;
-  }
-
   function parsedEntries() {
     return pasteInput.value.split('\n').map(function (l) { return l.trim(); }).filter(Boolean);
   }
@@ -270,7 +262,7 @@
           .insert({
             user_id: user.id,
             author_name: meta.author_name || null,
-            book_title: payload.title || meta.book_title || null,
+            book_title: payload.title || null,
             amazon_link: payload.amazonUrl || b.input,
             email: user.email,
             asin: payload.asin,
