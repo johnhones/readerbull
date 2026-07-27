@@ -39,18 +39,13 @@ module.exports = async function handler(req, res) {
     return;
   }
 
-  if (req.body && req.body.debug) {
-    res.status(200).json(data);
-    return;
-  }
-
   var product = data.product_results || {};
-    var details = data.product_details || {};
+      var details = data.product_details || {};
     var ranks = details.best_sellers_rank || [];
 
   // Pick the strongest (lowest) rank across every category the book
   // shows up in, that's the category most worth surfacing as "category
-  // fit" for the Discoverability Score, auto-picked, no author input.
+      // fit" for the Discoverability Score, auto-picked, no author input.
   var bestRank = null;
     ranks.forEach(function (r) {
       if (typeof r.extracted_rank === 'number' && (!bestRank || r.extracted_rank < bestRank.extracted_rank)) {
@@ -58,13 +53,27 @@ module.exports = async function handler(req, res) {
       }
     });
 
-  var coverImage = (product.thumbnails && product.thumbnails[0]) || product.thumbnail || null;
+                         var coverImage = (product.thumbnails && product.thumbnails[0]) || product.thumbnail || null;
 
-  // Plain book listings often don't have a `description` field at all,
-  // Amazon just shows feature bullets instead. Fall back to those (joined
-  // into one paragraph) so the author always has real pulled text to
-  // start from, rather than an empty box they have to write from scratch.
+  // Plain book listings rarely have a `product_results.description` field.
+  // The real description text (Amazon's "A+ content") lives under the
+  // top-level `product_description` block instead, as a list of feature
+  // entries with their own text. Fall back to feature_bullets after that,
+  // so the author always has real pulled text to start from rather than
+  // an empty box they have to write from scratch.
+  var descriptionParts = [];
+    if (Array.isArray(data.product_description)) {
+      data.product_description.forEach(function (block) {
+        if (Array.isArray(block.features)) {
+          block.features.forEach(function (f) {
+            if (f && f.text) descriptionParts.push(f.text);
+          });
+                          }
+      });
+    }
+
   var description = product.description
+    || (descriptionParts.length ? descriptionParts.join('\n\n') : null)
     || (Array.isArray(product.feature_bullets) ? product.feature_bullets.join(' ') : null)
     || null;
 
