@@ -39,6 +39,11 @@ module.exports = async function handler(req, res) {
     return;
   }
 
+  if (req.body && req.body.debug) {
+    res.status(200).json(data);
+    return;
+  }
+
   var product = data.product_results || {};
     var details = data.product_details || {};
     var ranks = details.best_sellers_rank || [];
@@ -70,7 +75,7 @@ module.exports = async function handler(req, res) {
     rating: product.rating || details.rating || null,
     reviewCount: product.reviews || details.review || null,
     price: product.price || null,
-      extractedPrice: product.extracted_price || null,
+    extractedPrice: product.extracted_price || null,
     coverImage: coverImage,
     category: bestRank ? (bestRank.link_text || bestRank.text) : null,
     bestsellerRank: bestRank ? bestRank.extracted_rank : null,
