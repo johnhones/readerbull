@@ -43,6 +43,9 @@ module.exports = async function handler(req, res) {
     var details = data.product_details || {};
     var ranks = details.best_sellers_rank || [];
 
+  // Pick the strongest (lowest) rank across every category the book
+  // shows up in, that's the category most worth surfacing as "category
+  // fit" for the Discoverability Score, auto-picked, no author input.
   var bestRank = null;
     ranks.forEach(function (r) {
       if (typeof r.extracted_rank === 'number' && (!bestRank || r.extracted_rank < bestRank.extracted_rank)) {
@@ -52,14 +55,22 @@ module.exports = async function handler(req, res) {
 
   var coverImage = (product.thumbnails && product.thumbnails[0]) || product.thumbnail || null;
 
+  // Plain book listings often don't have a `description` field at all,
+  // Amazon just shows feature bullets instead. Fall back to those (joined
+  // into one paragraph) so the author always has real pulled text to
+  // start from, rather than an empty box they have to write from scratch.
+  var description = product.description
+    || (Array.isArray(product.feature_bullets) ? product.feature_bullets.join(' ') : null)
+    || null;
+
   res.status(200).json({
     asin: asin,
     title: product.title || null,
-    description: product.description || null,
+    description: description,
     rating: product.rating || details.rating || null,
     reviewCount: product.reviews || details.review || null,
     price: product.price || null,
-    extractedPrice: product.extracted_price || null,
+      extractedPrice: product.extracted_price || null,
     coverImage: coverImage,
     category: bestRank ? (bestRank.link_text || bestRank.text) : null,
     bestsellerRank: bestRank ? bestRank.extracted_rank : null,
