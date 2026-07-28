@@ -413,11 +413,13 @@
       var reviewsPct = reviews.max ? Math.round((reviews.points / reviews.max) * 100) : 0;
 
       var sales = b.monthly_sales;
-      var salesText = (sales === null || sales === undefined || sales === '') ? 'Not available' : String(sales) + '/mo';
+      var hasSalesFigure = !(sales === null || sales === undefined || sales === '');
+      var salesText = hasSalesFigure ? String(sales) + '/mo' : 'Not available';
       // No fixed ceiling for "good" monthly sales, so this bar just shows
-      // a filled state once any figure is present, matching the honesty
-      // rule of not inventing a benchmark we don't have.
-      var salesPct = (sales === null || sales === undefined || sales === '') ? 0 : 100;
+      // a filled state once a genuine non-zero figure is present, matching
+      // the honesty rule of not inventing a benchmark we don't have. A
+      // real value of 0 must show an empty bar, not a full one.
+      var salesPct = (hasSalesFigure && Number(sales) > 0) ? 100 : 0;
 
       return (
         '<div class="breakdown-card" style="margin-top:24px;">' +
