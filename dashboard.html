@@ -381,8 +381,56 @@
             '<p>Here\'s exactly where your points came from.</p>' +
             '<div>' + listHtml + '</div>' +
           '</div>' +
-        '</div>';
+        '</div>' +
+        snapshotHtml(b);
       detailWrap.scrollIntoView({ behavior: 'smooth', block: 'start' });
+    }
+
+    // Secondary metrics snapshot, matching the legacy dashboards' visual
+    // pattern (Listing / Reviews & Ratings / Rating / Sales-per-month bars).
+    // These are independent metrics shown side by side, not a decomposition
+    // of the 100-point score above, built entirely from data already pulled
+    // or self-reported, no new data source needed.
+    function snapshotBar(label, valueText, pct) {
+      var clamped = Math.max(0, Math.min(100, pct == null ? 0 : pct));
+      return (
+        '<div class="bar-row">' +
+          '<div class="bar-meta"><span>' + label + '</span><span>' + valueText + '</span></div>' +
+          '<div class="bar-track"><div class="bar-fill" style="width:' + clamped + '%;"></div></div>' +
+        '</div>'
+      );
+    }
+
+    function snapshotHtml(b) {
+      var breakdown = b.score_breakdown || {};
+      var listing = breakdown.listing || {};
+      var listingPct = listing.max ? Math.round((listing.points / listing.max) * 100) : 0;
+
+      var rating = Number(b.live_rating) || 0;
+      var ratingPct = rating ? Math.round((rating / 5) * 100) : 0;
+
+      var reviews = breakdown.reviews || {};
+      var reviewsPct = reviews.max ? Math.round((reviews.points / reviews.max) * 100) : 0;
+
+      var sales = b.monthly_sales;
+      var salesText = (sales === null || sales === undefined || sales === '') ? 'Not available' : String(sales) + '/mo';
+      // No fixed ceiling for "good" monthly sales, so this bar just shows
+      // a filled state once any figure is present, matching the honesty
+      // rule of not inventing a benchmark we don't have.
+      var salesPct = (sales === null || sales === undefined || sales === '') ? 0 : 100;
+
+      return (
+        '<div class="breakdown-card" style="margin-top:24px;">' +
+          '<h2>Snapshot</h2>' +
+          '<p>A quick read on listing quality, reviews, rating and sales.</p>' +
+          '<div class="bars">' +
+            snapshotBar('Listing', listing.points != null ? (listing.points + ' / ' + listing.max) : 'Not available', listingPct) +
+            snapshotBar('Reviews &amp; Ratings', reviews.points != null ? (reviews.points + ' / ' + reviews.max) : 'Not available', reviewsPct) +
+            snapshotBar('Rating', rating ? (rating + ' / 5') : 'Not available', ratingPct) +
+            snapshotBar('Sales / mo', salesText, salesPct) +
+          '</div>' +
+        '</div>'
+      );
     }
 
     // Show the first scored book's breakdown by default, if there is one.
@@ -481,6 +529,17 @@
     panels['quick-wins'].innerHTML = quickWinsHtml(b);
   }
 
+  // Narrative text from the LLM may contain paragraph breaks, render each
+  // as its own <p> rather than collapsing into one escaped block.
+  function narrativeHtml(text) {
+    return String(text || '')
+      .split(/\n\s*\n/)
+      .map(function (p) { return p.trim(); })
+      .filter(Boolean)
+      .map(function (p) { return '<p>' + escapeHtml(p) + '</p>'; })
+      .join('');
+  }
+
   function statRow(label, value) {
     return '<div style="display:flex;justify-content:space-between;padding:10px 0;border-bottom:1px solid var(--border);font-size:14px;">' +
       '<span style="color:var(--navy);font-weight:600;">' + label + '</span>' +
@@ -488,29 +547,72 @@
     '</div>';
   }
 
+  function competitorTableHtml(competitors) {
+    if (!competitors || !competitors.length) return '';
+    var rows = competitors.map(function (c) {
+      return (
+        '<tr>' +
+          '<td>' + escapeHtml(c.title || '') + '</td>' +
+          '<td>' + (c.rating ? (escapeHtml(String(c.rating)) + ' / 5') : 'Not available') + '</td>' +
+          '<td>' + (c.reviews != null ? escapeHtml(String(c.reviews)) : 'Not available') + '</td>' +
+          '<td>' + (c.price ? escapeHtml(String(c.price)) : 'Not available') + '</td>' +
+          '<td>' + (c.sponsored ? 'Running ads' : 'No ads seen') + '</td>' +
+        '</tr>'
+      );
+    }).join('');
+
+    return (
+      '<div class="breakdown-card" style="margin-top:24px;overflow-x:auto;">' +
+        '<h2>Who this book is competing with</h2>' +
+        '<p>Real listings currently ranking for this book\'s category, pulled live.</p>' +
+        '<table style="width:100%;border-collapse:collapse;font-size:14px;margin-top:8px;">' +
+          '<thead><tr style="text-align:left;border-bottom:1px solid var(--border);">' +
+            '<th style="padding:8px 6px;">Book</th><th style="padding:8px 6px;">Rating</th>' +
+            '<th style="padding:8px 6px;">Reviews</th><th style="padding:8px 6px;">Price</th>' +
+            '<th style="padding:8px 6px;">Ads</th>' +
+          '</tr></thead>' +
+          '<tbody>' + rows + '</tbody>' +
+        '</table>' +
+      '</div>'
+    );
+  }
+
   function marketAnalysisHtml(b) {
-    var rankNum = b.bestseller_rank_number;
-    var reviewCount = Number(b.live_review_count) || 0;
+    var narrative = b.audit_narrative_json;
+    var competitors = b.competitors_json;
+
     var standing;
-    if (rankNum && rankNum <= 10000) {
-      standing = 'This book ranks strongly in its category already. The focus now is protecting that position: keep reviews coming in and keep the listing optimised.';
-    } else if (rankNum && rankNum <= 100000) {
-      standing = 'This book has a solid foothold in its category, with real room to climb. Reviews and category fit are the two levers most likely to move the rank.';
-    } else if (rankNum) {
-      standing = 'This book\'s bestseller rank shows it needs more visibility in its category. Reviews, keyword coverage, and category placement are the places to focus first.';
+    if (narrative && narrative.marketAnalysis) {
+      standing = narrative.marketAnalysis;
     } else {
-      standing = 'We don\'t have a bestseller rank for this book yet. Once Amazon reports one, we\'ll use it here to gauge category standing.';
+      var rankNum = b.bestseller_rank_number;
+      var reviewCount = Number(b.live_review_count) || 0;
+      if (rankNum && rankNum <= 10000) {
+        standing = 'This book ranks strongly in its category already. The focus now is protecting that position: keep reviews coming in and keep the listing optimised.';
+      } else if (rankNum && rankNum <= 100000) {
+        standing = 'This book has a solid foothold in its category, with real room to climb. Reviews and category fit are the two levers most likely to move the rank.';
+      } else if (rankNum) {
+        standing = 'This book\'s bestseller rank shows it needs more visibility in its category. Reviews, keyword coverage, and category placement are the places to focus first.';
+      } else {
+        standing = 'We don\'t have a bestseller rank for this book yet. Once Amazon reports one, we\'ll use it here to gauge category standing.';
+      }
+      var reviewNote = reviewCount >= 15
+        ? 'With ' + reviewCount + ' reviews, this book has enough social proof to support running ads.'
+        : 'With ' + reviewCount + ' review' + (reviewCount === 1 ? '' : 's') + ', this book is still building the review base most competitive listings in a category carry (a common benchmark is 15+) before ads pay off.';
+      standing = standing + ' ' + reviewNote;
     }
-    var reviewNote = reviewCount >= 15
-      ? 'With ' + reviewCount + ' reviews, this book has enough social proof to support running ads.'
-      : 'With ' + reviewCount + ' review' + (reviewCount === 1 ? '' : 's') + ', this book is still building the review base most competitive listings in a category carry (a common benchmark is 15+) before ads pay off.';
+
+    var insightHtml = (narrative && narrative.bookInsight)
+      ? '<p style="font-weight:700;color:var(--navy);margin-bottom:12px;">' + escapeHtml(narrative.bookInsight) + '</p>'
+      : '';
 
     return (
       '<div class="sec-eyebrow" style="margin-bottom:6px;">Market Analysis</div>' +
       '<h2 style="font-size:20px;color:var(--navy);margin-bottom:16px;">' + escapeHtml(b.book_title || '') + '</h2>' +
       '<div class="breakdown-card" style="margin-bottom:24px;">' +
         '<h2>Where this book stands</h2>' +
-        '<p>' + standing + ' ' + reviewNote + '</p>' +
+        insightHtml +
+        narrativeHtml(standing) +
         '<div>' +
           statRow('Category', b.amazon_category) +
           statRow('Bestseller rank', b.bestseller_rank) +
@@ -519,11 +621,17 @@
           statRow('Price', b.live_price) +
         '</div>' +
       '</div>' +
-      '<p style="font-size:13px;color:var(--muted);">This is a first-pass read built from this book\'s live Amazon listing. Competitor-by-competitor benchmarking is a planned next step.</p>'
+      competitorTableHtml(competitors) +
+      (competitors && competitors.length
+        ? ''
+        : '<p style="font-size:13px;color:var(--muted);margin-top:16px;">This is a first-pass read built from this book\'s live Amazon listing. Competitor-by-competitor benchmarking is a planned next step.</p>')
     );
   }
 
-  function marketingStrategyHtml(b) {
+  // Template-driven strategy steps, used whenever no LLM narrative is
+  // stored for this book (older imports, or if enrichment failed/was
+  // skipped at submit time).
+  function fallbackStrategySteps(b) {
     var breakdown = b.score_breakdown || {};
     var steps = [];
 
@@ -561,13 +669,21 @@
         body: 'This book scores well across the board. Keep an eye on new reviews and consider testing Amazon Ads now that the foundations are solid.'
       });
     }
+    return steps;
+  }
+
+  function marketingStrategyHtml(b) {
+    var narrative = b.audit_narrative_json;
+    var steps = (narrative && Array.isArray(narrative.strategySteps) && narrative.strategySteps.length)
+      ? narrative.strategySteps
+      : fallbackStrategySteps(b);
 
     var stepsHtml = steps.map(function (s, i) {
       return (
         '<div style="padding:16px 0;border-bottom:1px solid var(--border);">' +
           '<div style="display:flex;gap:12px;align-items:flex-start;">' +
             '<div style="width:24px;height:24px;border-radius:50%;background:var(--teal-l);color:var(--teal-d);font-weight:800;font-size:12px;display:flex;align-items:center;justify-content:center;flex-shrink:0;">' + (i + 1) + '</div>' +
-            '<div><h3 style="font-size:15px;color:var(--navy);margin-bottom:4px;">' + s.title + '</h3><p style="font-size:14px;color:var(--mid);line-height:1.6;">' + s.body + '</p></div>' +
+            '<div><h3 style="font-size:15px;color:var(--navy);margin-bottom:4px;">' + escapeHtml(s.title) + '</h3><p style="font-size:14px;color:var(--mid);line-height:1.6;">' + escapeHtml(s.body) + '</p></div>' +
           '</div>' +
         '</div>'
       );
@@ -597,30 +713,45 @@
   }
 
   function quickWinsHtml(b) {
-    var breakdown = b.score_breakdown || {};
-    var gaps = Object.keys(breakdown).map(function (key) {
-      var item = breakdown[key];
-      return { key: key, label: item.label, gap: (item.max || 0) - (item.points || 0) };
-    }).filter(function (g) { return g.gap > 0; }).sort(function (a, c) { return c.gap - a.gap; });
+    var narrative = b.audit_narrative_json;
+    var itemsHtml;
 
-    var actionText = {
-      reviews: 'Launch an ARC campaign to build reviews, this is worth the most points and usually moves fastest.',
-      keywords: 'Fill in more of your 7 backend keyword fields with specific buyer-intent phrases.',
-      listing: 'Double check your title, description, and cover are all live and complete on Amazon.',
-      category: 'Request a tighter or second category placement through KDP support.'
-    };
+    if (narrative && Array.isArray(narrative.quickWins) && narrative.quickWins.length) {
+      itemsHtml = narrative.quickWins.slice(0, 3).map(function (w, i) {
+        return (
+          '<div style="display:flex;gap:14px;align-items:flex-start;padding:16px 0;border-bottom:1px solid var(--border);">' +
+            '<div style="width:26px;height:26px;border-radius:50%;background:var(--orange-l);color:var(--orange-d);font-weight:800;font-size:13px;display:flex;align-items:center;justify-content:center;flex-shrink:0;">' + (i + 1) + '</div>' +
+            '<div><h3 style="font-size:15px;color:var(--navy);margin-bottom:4px;">' + escapeHtml(w.title) + '</h3>' +
+            '<p style="font-size:14px;color:var(--mid);line-height:1.6;">' + escapeHtml(w.body) + '</p></div>' +
+          '</div>'
+        );
+      }).join('');
+    } else {
+      var breakdown = b.score_breakdown || {};
+      var gaps = Object.keys(breakdown).map(function (key) {
+        var item = breakdown[key];
+        return { key: key, label: item.label, gap: (item.max || 0) - (item.points || 0) };
+      }).filter(function (g) { return g.gap > 0; }).sort(function (a, c) { return c.gap - a.gap; });
 
-    var itemsHtml = gaps.length
-      ? gaps.slice(0, 3).map(function (g, i) {
-          return (
-            '<div style="display:flex;gap:14px;align-items:flex-start;padding:16px 0;border-bottom:1px solid var(--border);">' +
-              '<div style="width:26px;height:26px;border-radius:50%;background:var(--orange-l);color:var(--orange-d);font-weight:800;font-size:13px;display:flex;align-items:center;justify-content:center;flex-shrink:0;">' + (i + 1) + '</div>' +
-              '<div><h3 style="font-size:15px;color:var(--navy);margin-bottom:4px;">' + g.label + ' (' + g.gap + ' points available)</h3>' +
-              '<p style="font-size:14px;color:var(--mid);line-height:1.6;">' + (actionText[g.key] || 'Focus on improving this area next.') + '</p></div>' +
-            '</div>'
-          );
-        }).join('')
-      : '<p style="font-size:14px;color:var(--mid);">This book is scoring full marks everywhere we can measure automatically, nice work.</p>';
+      var actionText = {
+        reviews: 'Launch an ARC campaign to build reviews, this is worth the most points and usually moves fastest.',
+        keywords: 'Fill in more of your 7 backend keyword fields with specific buyer-intent phrases.',
+        listing: 'Double check your title, description, and cover are all live and complete on Amazon.',
+        category: 'Request a tighter or second category placement through KDP support.'
+      };
+
+      itemsHtml = gaps.length
+        ? gaps.slice(0, 3).map(function (g, i) {
+            return (
+              '<div style="display:flex;gap:14px;align-items:flex-start;padding:16px 0;border-bottom:1px solid var(--border);">' +
+                '<div style="width:26px;height:26px;border-radius:50%;background:var(--orange-l);color:var(--orange-d);font-weight:800;font-size:13px;display:flex;align-items:center;justify-content:center;flex-shrink:0;">' + (i + 1) + '</div>' +
+                '<div><h3 style="font-size:15px;color:var(--navy);margin-bottom:4px;">' + g.label + ' (' + g.gap + ' points available)</h3>' +
+                '<p style="font-size:14px;color:var(--mid);line-height:1.6;">' + (actionText[g.key] || 'Focus on improving this area next.') + '</p></div>' +
+              '</div>'
+            );
+          }).join('')
+        : '<p style="font-size:14px;color:var(--mid);">This book is scoring full marks everywhere we can measure automatically, nice work.</p>';
+    }
 
     return (
       '<div class="sec-eyebrow" style="margin-bottom:6px;">Quick Wins</div>' +

@@ -480,6 +480,38 @@
       bestsellerRank: b.bestsellerRank
     });
 
+    // Best-effort deep audit content: real competitor data plus an LLM
+    // narrative, built once here and stored on the row. Never blocks
+    // submit, if this fails or times out the dashboard just falls back to
+    // its lighter, template-driven rendering for this book.
+    var competitorsJson = null;
+    var narrativeJson = null;
+    try {
+      var enrichResp = await fetch('/api/enrich-audit', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          title: b.title,
+          category: b.category,
+          keywords: keywords,
+          asin: b.asin,
+          price: b.price,
+          rating: b.rating,
+          reviewCount: b.reviewCount,
+          bestsellerRank: b.bestsellerRank,
+          score: scoreResult.score,
+          breakdown: scoreResult.breakdown
+        })
+      });
+      if (enrichResp.ok) {
+        var enrichData = await enrichResp.json();
+        competitorsJson = enrichData.competitors || null;
+        narrativeJson = enrichData.narrative || null;
+      }
+    } catch (err) {
+      // swallow, this step is best-effort
+    }
+
     var { error: updateError } = await readerbull.client
       .from('books')
       .update({
@@ -490,7 +522,9 @@
         monthly_sales: monthlySales,
         manuscript_url: manuscriptPath,
         score: scoreResult.score,
-        score_breakdown: scoreResult.breakdown
+        score_breakdown: scoreResult.breakdown,
+        competitors_json: competitorsJson,
+        audit_narrative_json: narrativeJson
       })
       .eq('id', b.rowId);
 
