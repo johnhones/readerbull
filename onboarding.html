@@ -345,14 +345,17 @@
         '</div>' +
 
         '<div class="tag-grid" style="margin-top:0;margin-bottom:4px;">' + chips + '</div>' +
-        '<div class="fine" style="margin-bottom:4px;">Pulled from Amazon, not editable here.</div>' +
+        '<div class="fine" style="margin-bottom:4px;">Rating, price and category pulled from Amazon, not editable here.</div>' +
 
         '<label class="field-label">Language</label>' +
         '<select id="lang-' + b.tempId + '" ' + (submitted ? 'disabled' : '') + '>' + langOptions + '</select>' +
 
         '<label class="field-label">Book description</label>' +
-        '<textarea id="desc-' + b.tempId + '" ' + (submitted ? 'disabled' : '') + '>' + escapeHtml(b.description || '') + '</textarea>' +
+        '<textarea id="desc-' + b.tempId + '" ' + (submitted ? 'disabled' : '') +
+          (b.description ? '' : ' placeholder="We couldn\'t pull a description for this book from Amazon, write one here (at least 100 characters)."') +
+          '>' + escapeHtml(b.description || '') + '</textarea>' +
         '<div class="char-count" id="charcount-' + b.tempId + '"></div>' +
+        (b.description ? '' : '<div class="fine">No description was available from Amazon for this listing, please write one so your audit and listing have something to work with.</div>') +
 
         '<label class="field-label">KDP keywords <span style="font-weight:400;color:var(--muted);">(optional)</span></label>' +
         '<input type="text" id="keywords-' + b.tempId + '" ' + (submitted ? 'disabled' : '') + ' placeholder="e.g. mindset, habits, self discipline">' +
