@@ -39,20 +39,6 @@ module.exports = async function handler(req, res) {
       return;
     }
 
-    // Temporary diagnostic path: POST { input, debug: true } returns the raw
-    // top-level shape SerpApi gave us, so we can see why a description
-    // extraction is coming back empty for a specific listing. Safe to keep,
-    // never exposes the API key, just echoes back what SerpApi already sent.
-    if (req.body && req.body.debug) {
-      res.status(200).json({
-        topLevelKeys: Object.keys(data),
-        product_results_keys: data.product_results ? Object.keys(data.product_results) : null,
-        product_features: data.product_features || null,
-        product_details: data.product_details || null
-      });
-      return;
-    }
-
     var product = data.product_results || {};
     var details = data.product_details || {};
     var ranks = details.best_sellers_rank || [];
