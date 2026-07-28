@@ -34,63 +34,80 @@ module.exports = async function handler(req, res) {
     var response = await fetch(serpUrl);
     var data = await response.json();
 
-  if (!response.ok || (data.search_metadata && data.search_metadata.status === 'Error')) {
-    res.status(404).json({ error: (data && data.error) || 'Could not find that book on Amazon. Double check the ASIN or URL.' });
-    return;
-  }
+    if (!response.ok || (data.search_metadata && data.search_metadata.status === 'Error')) {
+      res.status(404).json({ error: (data && data.error) || 'Could not find that book on Amazon. Double check the ASIN or URL.' });
+      return;
+    }
 
-  var product = data.product_results || {};
-      var details = data.product_details || {};
+    // Temporary diagnostic path: POST { input, debug: true } returns the raw
+    // top-level shape SerpApi gave us, so we can see why a description
+    // extraction is coming back empty for a specific listing. Safe to keep,
+    // never exposes the API key, just echoes back what SerpApi already sent.
+    if (req.body && req.body.debug) {
+      res.status(200).json({
+        topLevelKeys: Object.keys(data),
+        product_results_keys: data.product_results ? Object.keys(data.product_results) : null,
+        product_description: data.product_description || null,
+        feature_bullets: (data.product_results && data.product_results.feature_bullets) || null,
+        product_description_raw: data.product_description_raw || null,
+        editorial_reviews: data.editorial_reviews || null,
+        product_information: data.product_information || null
+      });
+      return;
+    }
+
+    var product = data.product_results || {};
+    var details = data.product_details || {};
     var ranks = details.best_sellers_rank || [];
 
-  // Pick the strongest (lowest) rank across every category the book
-  // shows up in, that's the category most worth surfacing as "category
-      // fit" for the Discoverability Score, auto-picked, no author input.
-  var bestRank = null;
+    // Pick the strongest (lowest) rank across every category the book
+    // shows up in, that's the category most worth surfacing as "category
+    // fit" for the Discoverability Score, auto-picked, no author input.
+    var bestRank = null;
     ranks.forEach(function (r) {
       if (typeof r.extracted_rank === 'number' && (!bestRank || r.extracted_rank < bestRank.extracted_rank)) {
         bestRank = r;
       }
     });
 
-                         var coverImage = (product.thumbnails && product.thumbnails[0]) || product.thumbnail || null;
+    var coverImage = (product.thumbnails && product.thumbnails[0]) || product.thumbnail || null;
 
-  // Plain book listings rarely have a `product_results.description` field.
-  // The real description text (Amazon's "A+ content") lives under the
-  // top-level `product_description` block instead, as a list of feature
-  // entries with their own text. Fall back to feature_bullets after that,
-  // so the author always has real pulled text to start from rather than
-  // an empty box they have to write from scratch.
-  var descriptionParts = [];
+    // Plain book listings rarely have a `product_results.description` field.
+    // The real description text (Amazon's "A+ content") lives under the
+    // top-level `product_description` block instead, as a list of feature
+    // entries with their own text. Fall back to feature_bullets after that,
+    // so the author always has real pulled text to start from rather than
+    // an empty box they have to write from scratch.
+    var descriptionParts = [];
     if (Array.isArray(data.product_description)) {
       data.product_description.forEach(function (block) {
         if (Array.isArray(block.features)) {
           block.features.forEach(function (f) {
             if (f && f.text) descriptionParts.push(f.text);
           });
-                          }
+        }
       });
     }
 
-  var description = product.description
-    || (descriptionParts.length ? descriptionParts.join('\n\n') : null)
-    || (Array.isArray(product.feature_bullets) ? product.feature_bullets.join(' ') : null)
-    || null;
+    var description = product.description
+      || (descriptionParts.length ? descriptionParts.join('\n\n') : null)
+      || (Array.isArray(product.feature_bullets) ? product.feature_bullets.join(' ') : null)
+      || null;
 
-  res.status(200).json({
-    asin: asin,
-    title: product.title || null,
-    description: description,
-    rating: product.rating || details.rating || null,
-    reviewCount: product.reviews || details.review || null,
-    price: product.price || null,
-    extractedPrice: product.extracted_price || null,
-    coverImage: coverImage,
-    category: bestRank ? (bestRank.link_text || bestRank.text) : null,
-    bestsellerRank: bestRank ? bestRank.extracted_rank : null,
-    bestsellerRankText: bestRank ? bestRank.text : null,
-    amazonUrl: (data.search_metadata && data.search_metadata.amazon_product_url) || null
-  });
+    res.status(200).json({
+      asin: asin,
+      title: product.title || null,
+      description: description,
+      rating: product.rating || details.rating || null,
+      reviewCount: product.reviews || details.review || null,
+      price: product.price || null,
+      extractedPrice: product.extracted_price || null,
+      coverImage: coverImage,
+      category: bestRank ? (bestRank.link_text || bestRank.text) : null,
+      bestsellerRank: bestRank ? bestRank.extracted_rank : null,
+      bestsellerRankText: bestRank ? bestRank.text : null,
+      amazonUrl: (data.search_metadata && data.search_metadata.amazon_product_url) || null
+    });
   } catch (err) {
     res.status(502).json({ error: 'Amazon lookup failed, please try again.' });
   }
@@ -98,7 +115,9 @@ module.exports = async function handler(req, res) {
 
 function extractAsin(input) {
   var trimmed = String(input || '').trim();
+  // bare ASIN pasted directly, e.g. B0H2CZYD6R
   if (/^[A-Z0-9]{10}$/i.test(trimmed)) return trimmed.toUpperCase();
+  // full Amazon URL, e.g. .../dp/B0H2CZYD6R/ or .../gp/product/B0H2CZYD6R
   var match = trimmed.match(/\/(?:dp|gp\/product|ASIN)\/([A-Z0-9]{10})/i);
   return match ? match[1].toUpperCase() : null;
 }
