@@ -1,22 +1,38 @@
 // Vercel serverless function: builds the "deep" audit content for the
 // native dashboard, real competitor data plus a narrative write-up, so the
 // automated Market Analysis / Marketing Strategy / Quick Wins panels can
-// match the depth of the legacy hand-built dashboards.
+// match the depth of the legacy hand-built dashboards. Also runs the R27
+// "organic page rank" lookup for the Listing sub-score (scoring.js), so
+// the score can be computed with real page-rank data rather than
+// dropping that sub-factor.
 //
-// Runs once, at onboarding submit time, and the result is stored on the
-// books row (competitors_json, audit_narrative_json), not recomputed on
-// every dashboard view. Two paid calls per audit: one SerpApi Amazon
-// search (competitor discovery) and one Anthropic Messages call
-// (narrative). If either fails, this returns whatever it could get rather
-// than erroring the whole submit, dashboard.html falls back to its
-// existing lighter-weight rendering when a field is missing.
+// Runs once, at onboarding submit time, BEFORE computeDiscoverabilityScore
+// (see onboarding.html), because Price vs Niche and the Listing page-rank
+// sub-factor both need this endpoint's output as scoring inputs. The
+// result is stored on the books row (competitors_json,
+// audit_narrative_json), not recomputed on every dashboard view. Three
+// paid calls per audit: two SerpApi Amazon calls (competitor discovery,
+// page-rank check against the primary keyword only) and one Anthropic
+// Messages call (narrative). Because this now runs before scoring, the
+// narrative is generated without a final discoverabilityScore in its
+// input, the prompt is written to handle missing fields honestly. If any
+// step fails, this returns whatever it could get rather than erroring the
+// whole submit, dashboard.html and scoring.js fall back gracefully when a
+// field is missing.
 //
-// Deliberately does NOT attempt keyword search-volume data, no reliable
-// source is wired in yet, see ReaderBull_ARC_Roadmap.md.
+// Also runs Amazon keyword research (DataForSEO Amazon Related Keywords),
+// classified into a broad "Amazon Keywords" list (Use/Skip) and a curated
+// "Readerbull Recommended" subset (Priority/Best Fit), matching the
+// two-table pattern confirmed across the legacy hand-built dashboards
+// (Jordan Truehart, Rebecca Wells, and both example dashboards). Result is
+// cached inside audit_narrative_json.keywordResearch, no new DB column
+// needed. The dashboard's Keywords tab lets the author add/remove
+// keywords from either table, which recomputes the score client-side
+// using this cached data, no repeat DataForSEO call per click.
 //
 // POST { title, category, keywords, asin, price, rating, reviewCount,
-//        bestsellerRank, score, breakdown }
-// -> { competitors: [...], narrative: {...} }
+//        bestsellerRank }
+// -> { competitors: [...], pageRank: {...}, keywordResearch: {...}, narrative: {...} }
 
 module.exports = async function handler(req, res) {
   if (req.method !== 'POST') {
@@ -25,10 +41,14 @@ module.exports = async function handler(req, res) {
   }
 
   var input = req.body || {};
-  var result = { competitors: [], narrative: null };
+  var result = { competitors: [], pageRank: null, keywordResearch: null, narrative: null };
 
   var competitors = await findCompetitors(input);
   result.competitors = competitors;
+
+  result.pageRank = await findPageRank(input);
+
+  result.keywordResearch = await findKeywordResearch(input);
 
   var narrative = await generateNarrative(input, competitors);
   result.narrative = narrative;
@@ -37,6 +57,47 @@ module.exports = async function handler(req, res) {
   // result still lets the submit flow continue and store what it got.
   res.status(200).json(result);
 };
+
+// ---------- Organic page rank (SerpApi Amazon Search, primary keyword only) ----------
+// Checks whether this book's ASIN shows up in SerpApi's amazon search
+// engine results for the author's own primary backend keyword (the first
+// entry in the comma-separated keywords field). One extra paid SerpApi
+// call per book, not per keyword, "build it now" was chosen for this
+// rebuild with that one-call-per-book scope specifically to keep the
+// recurring cost bounded, see ReaderBull_Scoring_Rebuild_Handover.md.
+async function findPageRank(input) {
+  var apiKey = process.env.SERPAPI_KEY;
+  if (!apiKey) return null;
+
+  var keywords = String(input.keywords || '').split(',').map(function (k) { return k.trim(); }).filter(Boolean);
+  var primaryKeyword = keywords[0];
+  var asin = (input.asin || '').toUpperCase();
+  if (!primaryKeyword || !asin) return { keyword: primaryKeyword || null, position: null, checked: false };
+
+  var url = 'https://serpapi.com/search.json?engine=amazon&k=' +
+    encodeURIComponent(primaryKeyword) + '&amazon_domain=amazon.com&api_key=' + encodeURIComponent(apiKey);
+
+  try {
+    var response = await fetch(url);
+    var data = await response.json();
+    if (!response.ok) return { keyword: primaryKeyword, position: null, checked: true };
+
+    var results = Array.isArray(data.organic_results) ? data.organic_results : [];
+    var match = null;
+    for (var i = 0; i < results.length; i++) {
+      if (results[i].asin && results[i].asin.toUpperCase() === asin) { match = results[i]; break; }
+    }
+
+    return {
+      keyword: primaryKeyword,
+      position: match ? (match.position || (results.indexOf(match) + 1)) : null,
+      resultsChecked: results.length,
+      checked: true
+    };
+  } catch (err) {
+    return { keyword: primaryKeyword, position: null, checked: false };
+  }
+}
 
 // ---------- Competitor discovery (SerpApi Amazon Search) ----------
 async function findCompetitors(input) {
@@ -73,6 +134,162 @@ async function findCompetitors(input) {
       });
   } catch (err) {
     return [];
+  }
+}
+
+// ---------- Keyword research (DataForSEO Amazon Related Keywords + Anthropic classification) ----------
+// Two paid calls: one DataForSEO request for related keywords with
+// volume, one Anthropic call to classify them the way the legacy
+// dashboards were hand-built (Use/Skip on the full list, a curated
+// Priority/Best Fit subset), since DataForSEO returns raw related terms
+// with no relevance judgment of its own (it doesn't know this is a
+// non-fiction reincarnation book vs a manga, for example).
+async function findKeywordResearch(input) {
+  var login = process.env.DATAFORSEO_LOGIN;
+  var password = process.env.DATAFORSEO_PASSWORD;
+  if (!login || !password) return null;
+
+  // Seed term: the category leaf name reads closer to the legacy
+  // dashboards' seed keywords ("Reincarnation", "Dog Grooming Business")
+  // than the full book title does. Falls back to the title if no
+  // category was pulled.
+  var seed = String(input.category || input.title || '').trim();
+  // Category text often arrives as a full browse path
+  // ("Books > Religion & Spirituality > ... > Near-Death Experiences"),
+  // the last segment is the actual niche term.
+  if (seed.indexOf('>') !== -1) {
+    var segments = seed.split('>').map(function (s) { return s.trim(); }).filter(Boolean);
+    seed = segments[segments.length - 1] || seed;
+  }
+  if (!seed) return null;
+
+  var auth = Buffer.from(login + ':' + password).toString('base64');
+
+  var items = [];
+  var totalFound = 0;
+  try {
+    var response = await fetch('https://api.dataforseo.com/v3/dataforseo_labs/amazon/related_keywords/live', {
+      method: 'POST',
+      headers: {
+        'Authorization': 'Basic ' + auth,
+        'Content-Type': 'application/json'
+      },
+      // depth 3 (~258 keywords max) mirrors the "hundreds of keywords
+      // researched" framing on the legacy dashboards without pushing all
+      // the way to depth 4 (~1554), limit caps the response size and cost.
+      body: JSON.stringify([{
+        keyword: seed.toLowerCase(),
+        language_name: 'English',
+        location_code: 2840,
+        depth: 3,
+        limit: 200,
+        include_seed_keyword: true
+      }])
+    });
+    var data = await response.json();
+    if (!response.ok) return null;
+
+    var task = data.tasks && data.tasks[0];
+    var result = task && task.result && task.result[0];
+    if (!result) return null;
+
+    totalFound = result.total_count || (result.items ? result.items.length : 0);
+    items = (result.items || []).map(function (it) {
+      var kd = it.keyword_data || {};
+      var info = kd.keyword_info || {};
+      return { keyword: kd.keyword || null, volume: (typeof info.search_volume === 'number') ? info.search_volume : null };
+    }).filter(function (it) { return it.keyword; });
+  } catch (err) {
+    return null;
+  }
+
+  if (!items.length) return null;
+
+  var classified = await classifyKeywords(input, seed, items);
+  if (classified) {
+    classified.totalFound = totalFound;
+    classified.seedKeyword = seed;
+    return classified;
+  }
+
+  // Classification failed (e.g. no Anthropic key), fall back to the raw
+  // list with no Use/Skip judgment rather than losing the DataForSEO data
+  // entirely, dashboard.html treats missing status as "Use".
+  return {
+    seedKeyword: seed,
+    totalFound: totalFound,
+    amazonKeywords: items.slice(0, 30).map(function (it) { return { keyword: it.keyword, volume: it.volume, status: 'Use' }; }),
+    recommendedKeywords: []
+  };
+}
+
+async function classifyKeywords(input, seed, items) {
+  var apiKey = process.env.ANTHROPIC_API_KEY;
+  if (!apiKey) return null;
+
+  var systemPrompt =
+    'You are doing Amazon KDP keyword research triage for Readerbull, a platform that helps ' +
+    'self-published authors sell more books. You are given a list of Amazon-related search ' +
+    'keywords with monthly search volume for one specific book, plus that book\'s own details. ' +
+    'Flag any keyword that is clearly off-market for THIS book as "Skip" (for example: fiction, ' +
+    'manga, kids\', or free-ebook variants when the book itself is a paid non-fiction adult title, ' +
+    'or vice versa if the book is fiction), everything else buyer-intent relevant is "Use". ' +
+    'Never invent keywords or volumes beyond what is given. Do not skip more than necessary, only ' +
+    'skip keywords a knowledgeable KDP consultant would actually rule out. ' +
+    'From the "Use" keywords, pick up to 8 for a "Recommended" list, the strongest few as ' +
+    '"Priority" and the rest as "Best Fit", the ones most worth putting in the author\'s 7 KDP ' +
+    'backend keyword fields. ' +
+    'Respond with ONLY a JSON object, no markdown fences, no commentary, matching exactly this shape: ' +
+    '{"amazonKeywords": [{"keyword": "...", "volume": <number or null>, "status": "Use"|"Skip"}], ' +
+    '"recommendedKeywords": [{"keyword": "...", "volume": <number or null>, "status": "Priority"|"Best Fit"}]}. ' +
+    'Include every keyword given to you exactly once in amazonKeywords, preserve the volume value given.';
+
+  var payload = {
+    book: {
+      title: input.title || null,
+      category: input.category || null,
+      seedKeyword: seed,
+      description: (input.description || '').slice(0, 500) || null
+    },
+    keywords: items
+  };
+
+  try {
+    var response = await fetch('https://api.anthropic.com/v1/messages', {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'x-api-key': apiKey,
+        'anthropic-version': '2023-06-01'
+      },
+      body: JSON.stringify({
+        model: 'claude-haiku-4-5-20251001',
+        max_tokens: 4000,
+        system: systemPrompt,
+        messages: [
+          { role: 'user', content: 'Here is the keyword research data:\n\n' + JSON.stringify(payload, null, 2) }
+        ]
+      })
+    });
+
+    var data = await response.json();
+    if (!response.ok) return null;
+
+    var text = (data.content && data.content[0] && data.content[0].text) || '';
+    var cleaned = text.trim().replace(/^```(json)?/i, '').replace(/```$/, '').trim();
+
+    var parsed;
+    try {
+      parsed = JSON.parse(cleaned);
+    } catch (e) {
+      return null;
+    }
+
+    if (!parsed || !Array.isArray(parsed.amazonKeywords)) return null;
+    parsed.recommendedKeywords = Array.isArray(parsed.recommendedKeywords) ? parsed.recommendedKeywords.slice(0, 8) : [];
+    return parsed;
+  } catch (err) {
+    return null;
   }
 }
 

@@ -4,7 +4,7 @@
 //
 // POST { input: "<ASIN or Amazon URL>" }
 // -> { asin, title, description, rating, reviewCount, price, extractedPrice,
-//      coverImage, category, bestsellerRankText, amazonUrl }
+//      coverImage, category, categoryCount, bestsellerRankText, amazonUrl }
 // or -> { error: "..." } with a 4xx/5xx status.
 
 module.exports = async function handler(req, res) {
@@ -96,6 +96,11 @@ module.exports = async function handler(req, res) {
       extractedPrice: product.extracted_price || null,
       coverImage: coverImage,
       category: bestRank ? (bestRank.link_text || bestRank.text) : null,
+      // How many categories this listing shows up in per SerpApi's
+      // best_sellers_rank list, feeds the R27 Listing "number of
+      // categories" sub-factor (scoring.js), 0-3 used, more than 3 capped
+      // there.
+      categoryCount: ranks.length,
       bestsellerRank: bestRank ? bestRank.extracted_rank : null,
       bestsellerRankText: bestRank ? bestRank.text : null,
       amazonUrl: (data.search_metadata && data.search_metadata.amazon_product_url) || null
