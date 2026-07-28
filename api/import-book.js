@@ -27,8 +27,10 @@ module.exports = async function handler(req, res) {
     return;
   }
 
+  var forceFresh = !!(req.body && req.body.debug);
   var serpUrl = 'https://serpapi.com/search.json?engine=amazon_product&asin=' +
-    encodeURIComponent(asin) + '&amazon_domain=amazon.com&api_key=' + encodeURIComponent(apiKey);
+    encodeURIComponent(asin) + '&amazon_domain=amazon.com&api_key=' + encodeURIComponent(apiKey) +
+    (forceFresh ? '&no_cache=true' : '');
 
   try {
     var response = await fetch(serpUrl);
@@ -36,6 +38,11 @@ module.exports = async function handler(req, res) {
 
     if (!response.ok || (data.search_metadata && data.search_metadata.status === 'Error')) {
       res.status(404).json({ error: (data && data.error) || 'Could not find that book on Amazon. Double check the ASIN or URL.' });
+      return;
+    }
+
+    if (req.body && req.body.debug) {
+      res.status(200).json(data);
       return;
     }
 
