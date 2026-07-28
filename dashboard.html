@@ -372,8 +372,13 @@
         '<h2 style="font-size:20px;color:var(--navy);margin-bottom:16px;">' + escapeHtml(b.book_title || '') + '</h2>' +
         '<div class="split" style="align-items:stretch;">' +
           '<div class="score-demo" style="height:100%;">' +
-            '<div class="eyebrow2">Discoverability Score</div>' +
-            '<div class="num">' + b.score + '<span>&thinsp;/ 100</span></div>' +
+            '<div class="score-top">' +
+              '<div>' +
+                '<div class="eyebrow2">Discoverability Score</div>' +
+                '<div class="num">' + b.score + '<span>&thinsp;/ 100</span></div>' +
+              '</div>' +
+              (b.cover_image_url ? '<div class="score-cover"><img src="' + b.cover_image_url + '" alt=""></div>' : '') +
+            '</div>' +
             '<div class="bars">' + barsHtml + '</div>' +
           '</div>' +
           '<div class="breakdown-card">' +
