@@ -161,6 +161,7 @@
 
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.js"></script>
 <script src="supabase-client.js"></script>
+<script src="scoring.js"></script>
 <script>
 (async function () {
   var user = await readerbull.requireUser('index.html');
@@ -305,7 +306,7 @@
           '<div class="cover-ph">' + cover + '</div>' +
           '<h4>' + escapeHtml(b.book_title || 'Untitled book') + '</h4>' +
           (scored
-            ? '<div class="score-badge">' + b.score + '<span> / 100</span></div>'
+            ? '<div class="score-badge">' + b.score + '<span> / 100</span></div><div style="font-size:11px;font-weight:600;color:var(--mid);margin-top:2px;">' + scoreBadge(b.score) + '</div>'
             : '<span class="status-pill needs-details">Needs details</span>')
         + '</div>'
       );
@@ -346,25 +347,66 @@
       renderAuditPanels(b);
     }
 
+    // R27 display rules (scoring.js / ReaderBull_Scoring_Rebuild_Handover.md):
+    // three visible bars (Listing, Reviews & Ratings, Star Rating), one
+    // milestone bar (Sales/mo, progress only, never a number), Price vs
+    // Niche fully internal (never rendered anywhere), Amazon Ads as an
+    // unscored status pill. Total is always higher than the sum of the
+    // visible bars by design, that's expected, not a bug.
     function showScoreDetail(b) {
       var detailWrap = document.getElementById('book-score-detail');
-      var barsHtml = '';
-      var listHtml = '';
       var breakdown = b.score_breakdown || {};
-      Object.keys(breakdown).forEach(function (key) {
-        var item = breakdown[key];
-        var pct = item.max ? Math.round((item.points / item.max) * 100) : 0;
-        barsHtml +=
-          '<div class="bar-row">' +
-            '<div class="bar-meta"><span>' + item.label + '</span><span>' + item.points + ' / ' + item.max + '</span></div>' +
-            '<div class="bar-track"><div class="bar-fill" style="width:' + pct + '%;"></div></div>' +
-          '</div>';
-        listHtml +=
-          '<div style="display:flex;justify-content:space-between;padding:10px 0;border-bottom:1px solid var(--border);font-size:14px;">' +
-            '<span style="color:var(--navy);font-weight:600;">' + item.label + '</span>' +
-            '<span style="color:var(--mid);">' + item.points + ' / ' + item.max + ' pts</span>' +
-          '</div>';
-      });
+      var listing = breakdown.listing || { points: 0, max: 20 };
+      var reviews = breakdown.reviews || { points: 0, max: 20, rawCount: 0 };
+      var starRating = breakdown.starRating || { points: 0, max: 20, rating: null };
+      var salesPerMonth = breakdown.salesPerMonth || { points: 0, max: 20, estimatedRevenue: null };
+      var amazonAds = breakdown.amazonAds || { active: false };
+
+      var listingPct = listing.max ? Math.round((listing.points / listing.max) * 100) : 0;
+      var reviewsPct = reviews.max ? Math.round((reviews.points / reviews.max) * 100) : 0;
+      var starPct = starRating.rating ? Math.round((Math.min(5, starRating.rating) / 5) * 100) : 0;
+
+      var revenue = salesPerMonth.estimatedRevenue;
+      var salesPct = revenue ? Math.round(Math.min(1, revenue / 1000) * 100) : 0;
+      var salesMilestoneText = revenue == null
+        ? 'Not enough data yet'
+        : (revenue >= 1000 ? '$1,000+ milestone reached' : (revenue >= 500 ? '$500+ milestone reached' : 'Building toward $500/mo'));
+
+      var barsHtml =
+        '<div class="bar-row">' +
+          '<div class="bar-meta"><span>Listing</span><span>' + listing.points + ' / ' + listing.max + '</span></div>' +
+          '<div class="bar-track"><div class="bar-fill" style="width:' + listingPct + '%;"></div></div>' +
+        '</div>' +
+        '<div class="bar-row">' +
+          '<div class="bar-meta"><span>Reviews &amp; Ratings</span><span>' + reviews.rawCount + ' ratings (approx.)</span></div>' +
+          '<div class="bar-track"><div class="bar-fill" style="width:' + reviewsPct + '%;"></div></div>' +
+        '</div>' +
+        '<div class="bar-row">' +
+          '<div class="bar-meta"><span>Star Rating</span><span>' + (starRating.rating ? (starRating.rating + ' / 5') : 'Unrated') + '</span></div>' +
+          '<div class="bar-track"><div class="bar-fill" style="width:' + starPct + '%;"></div></div>' +
+        '</div>' +
+        '<div class="bar-row">' +
+          '<div class="bar-meta"><span>Sales/mo</span><span>' + salesMilestoneText + '</span></div>' +
+          '<div class="bar-track"><div class="bar-fill" style="width:' + salesPct + '%;background:var(--orange-d);"></div></div>' +
+          '<div style="font-size:11px;color:var(--muted);margin-top:2px;">Estimated from bestseller rank, not a reported figure.</div>' +
+        '</div>';
+
+      var listHtml =
+        '<div style="display:flex;justify-content:space-between;padding:10px 0;border-bottom:1px solid var(--border);font-size:14px;">' +
+          '<span style="color:var(--navy);font-weight:600;">Listing</span>' +
+          '<span style="color:var(--mid);">' + listing.points + ' / ' + listing.max + ' pts</span>' +
+        '</div>' +
+        '<div style="display:flex;justify-content:space-between;padding:10px 0;border-bottom:1px solid var(--border);font-size:14px;">' +
+          '<span style="color:var(--navy);font-weight:600;">Reviews &amp; Ratings</span>' +
+          '<span style="color:var(--mid);">' + reviews.points + ' / ' + reviews.max + ' pts</span>' +
+        '</div>' +
+        '<div style="display:flex;justify-content:space-between;padding:10px 0;border-bottom:1px solid var(--border);font-size:14px;">' +
+          '<span style="color:var(--navy);font-weight:600;">Star Rating</span>' +
+          '<span style="color:var(--mid);">' + starRating.points + ' / ' + starRating.max + ' pts</span>' +
+        '</div>';
+
+      var badge = scoreBadge(b.score);
+      var adsPillHtml = '<span class="status-pill ' + (amazonAds.active ? 'imported' : 'error') + '" style="margin-left:8px;">Amazon Ads: ' + (amazonAds.active ? 'Active' : 'Not active') + '</span>';
 
       detailWrap.style.display = 'block';
       detailWrap.innerHTML =
@@ -376,6 +418,7 @@
               '<div>' +
                 '<div class="eyebrow2">Discoverability Score</div>' +
                 '<div class="num">' + b.score + '<span>&thinsp;/ 100</span></div>' +
+                '<div style="font-size:12px;font-weight:700;color:var(--teal-d);margin-top:2px;">' + badge + adsPillHtml + '</div>' +
               '</div>' +
               (b.cover_image_url ? '<div class="score-cover"><img src="' + b.cover_image_url + '" alt=""></div>' : '') +
             '</div>' +
@@ -383,57 +426,13 @@
           '</div>' +
           '<div class="breakdown-card">' +
             '<h2>What\'s holding your book back</h2>' +
-            '<p>Here\'s exactly where your points came from.</p>' +
+            '<p>Here\'s exactly where your points came from. Two more factors (Sales/mo and Price vs Niche) also feed your total score but aren\'t broken out point-by-point here.</p>' +
             '<div>' + listHtml + '</div>' +
           '</div>' +
-        '</div>' +
-        snapshotHtml(b);
+        '</div>';
       detailWrap.scrollIntoView({ behavior: 'smooth', block: 'start' });
     }
-
-    // Secondary metrics snapshot, matching the legacy dashboards' visual
-    // pattern (Listing / Reviews & Ratings / Rating / Sales-per-month bars).
-    // These are independent metrics shown side by side, not a decomposition
-    // of the 100-point score above, built entirely from data already pulled
-    // or self-reported, no new data source needed.
-    function snapshotBar(label, valueText, pct) {
-      var clamped = Math.max(0, Math.min(100, pct == null ? 0 : pct));
-      return (
-        '<div class="bar-row">' +
-          '<div class="bar-meta"><span>' + label + '</span><span>' + valueText + '</span></div>' +
-          '<div class="bar-track"><div class="bar-fill" style="width:' + clamped + '%;"></div></div>' +
-        '</div>'
-      );
-    }
-
-    function snapshotHtml(b) {
-      var rating = Number(b.live_rating) || 0;
-      var ratingPct = rating ? Math.round((rating / 5) * 100) : 0;
-
-      var sales = b.monthly_sales;
-      var hasSalesFigure = !(sales === null || sales === undefined || sales === '');
-      var salesText = hasSalesFigure ? String(sales) + '/mo' : 'Not available';
-      // No fixed ceiling for "good" monthly sales, so this bar just shows
-      // a filled state once a genuine non-zero figure is present, matching
-      // the honesty rule of not inventing a benchmark we don't have. A
-      // real value of 0 must show an empty bar, not a full one.
-      var salesPct = (hasSalesFigure && Number(sales) > 0) ? 100 : 0;
-
-      // Only Rating and Sales/mo here, both are deliberately NOT part of
-      // the score breakdown above (Listing Setup, Reviews & Ratings,
-      // Category Fit, Keyword Coverage), so nothing in this card repeats
-      // a number already shown in the score panel or the breakdown list.
-      return (
-        '<div class="breakdown-card" style="margin-top:24px;">' +
-          '<h2>Rating &amp; sales</h2>' +
-          '<p>Two more signals, not part of your Discoverability Score breakdown above.</p>' +
-          '<div class="bars">' +
-            snapshotBar('Rating', rating ? (rating + ' / 5') : 'Not available', ratingPct) +
-            snapshotBar('Sales / mo', salesText, salesPct) +
-          '</div>' +
-        '</div>'
-      );
-    }
+    currentShowScoreDetail = showScoreDetail;
 
     // Show the first scored book's breakdown by default, if there is one.
     var firstScored = books.filter(function (b) { return b.score !== null && b.score !== undefined; })[0];
@@ -504,6 +503,10 @@
   // from Amazon plus the Discoverability Score breakdown, no invented
   // competitor names or numbers, that deeper layer comes later.
   var currentAuditBook = null;
+  // Hoisted out of renderOverview's closure so the Keywords tab (defined
+  // below, outside that closure) can refresh the score panel after an
+  // add/remove without a full catalog re-render.
+  var currentShowScoreDetail = null;
 
   function auditEmptyHtml(icon, title, body) {
     return '<div class="shell-empty"><i class="ti ti-' + icon + '"></i><h3>' + title + '</h3><p>' + body + '</p></div>';
@@ -528,6 +531,7 @@
     panels['market-analysis'].innerHTML = marketAnalysisHtml(b);
     panels['marketing-strategy'].innerHTML = marketingStrategyHtml(b);
     panels['keywords'].innerHTML = keywordsHtml(b);
+    wireKeywordsPanel(b);
     panels['quick-wins'].innerHTML = quickWinsHtml(b);
   }
 
@@ -638,37 +642,30 @@
     var steps = [];
 
     var reviews = breakdown.reviews || {};
-    if ((reviews.points || 0) < (reviews.max || 40)) {
+    if ((reviews.points || 0) < (reviews.max || 20)) {
       steps.push({
-        title: 'Build your reviews',
-        body: 'Reviews are the single strongest signal here. Use an ARC service (BookSirens, Hidden Gems, NetGalley) to reach opted-in readers, and add a warm, compliant review request inside the book itself.'
+        title: 'Build your reviews and ratings',
+        body: 'This is approximated from your total ratings count. Use an ARC service (BookSirens, Hidden Gems, NetGalley) to reach opted-in readers, and add a warm, compliant review request inside the book itself.'
       });
     }
-    var keywords = breakdown.keywords || {};
-    if ((keywords.points || 0) < (keywords.max || 30)) {
+    var starRating = breakdown.starRating || {};
+    if ((starRating.points || 0) < (starRating.max || 20)) {
       steps.push({
-        title: 'Strengthen your backend keywords',
-        body: 'Add more of your 7 KDP keyword fields targeting specific, buyer-intent search terms in your niche rather than single broad words.'
-      });
-    }
-    var category = breakdown.category || {};
-    if ((category.points || 0) < (category.max || 15)) {
-      steps.push({
-        title: 'Check your category placement',
-        body: 'A tighter, less-crowded category (or a second category via KDP support) can meaningfully improve how easily readers browse into this book.'
+        title: 'Protect and lift your star rating',
+        body: 'Star rating carries its own 20 points separate from review volume. Address anything recurring in critical reviews before pushing for more volume.'
       });
     }
     var listing = breakdown.listing || {};
-    if ((listing.points || 0) < (listing.max || 15)) {
+    if ((listing.points || 0) < (listing.max || 20)) {
       steps.push({
-        title: 'Confirm your listing is complete',
-        body: 'Make sure the title, description, and cover are all in place on the live Amazon listing, that\'s the foundation everything else builds on.'
+        title: 'Strengthen your listing',
+        body: 'Fill in all 7 backend KDP keyword fields with specific, buyer-intent terms (scores are capped until all 7 are confirmed), make sure your primary keyword is in the title, and confirm your description and categories are strong.'
       });
     }
     if (!steps.length) {
       steps.push({
         title: 'Keep the momentum going',
-        body: 'This book scores well across the board. Keep an eye on new reviews and consider testing Amazon Ads now that the foundations are solid.'
+        body: 'This book scores well across the board on what we can measure automatically. Keep an eye on new reviews and consider testing Amazon Ads now that the foundations are solid.'
       });
     }
     return steps;
@@ -698,20 +695,173 @@
     );
   }
 
+  function currentKeywordList(b) {
+    return String(b.keywords || '').split(',').map(function (k) { return k.trim(); }).filter(Boolean);
+  }
+
+  function keywordRowHtml(item, inList, atCap) {
+    var kw = item.keyword || '';
+    var volume = (item.volume === null || item.volume === undefined || item.volume === '') ? '-' : escapeHtml(String(item.volume));
+    var statusClass = (item.status === 'Skip') ? 'error' : (item.status === 'Priority' ? 'imported' : 'needs-details');
+    var btnHtml;
+    if (inList) {
+      btnHtml = '<button type="button" class="btn btn-outline" style="padding:4px 12px;font-size:12px;" data-kw-remove="' + escapeHtml(kw) + '">Remove</button>';
+    } else if (atCap) {
+      btnHtml = '<button type="button" class="btn btn-outline" style="padding:4px 12px;font-size:12px;" disabled title="7/7 keywords used">+ Add</button>';
+    } else {
+      btnHtml = '<button type="button" class="btn btn-outline" style="padding:4px 12px;font-size:12px;" data-kw-add="' + escapeHtml(kw) + '">+ Add</button>';
+    }
+    return (
+      '<tr>' +
+        '<td style="padding:8px 6px;">' + escapeHtml(kw) + '</td>' +
+        '<td style="padding:8px 6px;">' + volume + '</td>' +
+        '<td style="padding:8px 6px;"><span class="status-pill ' + statusClass + '">' + escapeHtml(item.status || '') + '</span></td>' +
+        '<td style="padding:8px 6px;text-align:right;">' + btnHtml + '</td>' +
+      '</tr>'
+    );
+  }
+
+  function keywordTableHtml(title, subtitle, items, currentList) {
+    if (!items || !items.length) return '';
+    var atCap = currentList.length >= 7;
+    var rows = items.map(function (item) {
+      var inList = currentList.some(function (k) { return k.toLowerCase() === String(item.keyword || '').toLowerCase(); });
+      return keywordRowHtml(item, inList, atCap && !inList);
+    }).join('');
+    return (
+      '<div class="breakdown-card" style="margin-top:24px;overflow-x:auto;">' +
+        '<h2>' + title + '</h2><p>' + subtitle + '</p>' +
+        '<table style="width:100%;border-collapse:collapse;font-size:14px;margin-top:8px;">' +
+          '<thead><tr style="text-align:left;border-bottom:1px solid var(--border);">' +
+            '<th style="padding:8px 6px;">Keyword</th><th style="padding:8px 6px;">Volume</th>' +
+            '<th style="padding:8px 6px;">Status</th><th style="padding:8px 6px;"></th>' +
+          '</tr></thead>' +
+          '<tbody>' + rows + '</tbody>' +
+        '</table>' +
+      '</div>'
+    );
+  }
+
   function keywordsHtml(b) {
-    var list = String(b.keywords || '').split(',').map(function (k) { return k.trim(); }).filter(Boolean);
+    var list = currentKeywordList(b);
     var chipsHtml = list.length
       ? '<div style="display:flex;flex-wrap:wrap;gap:8px;">' + list.map(function (k) {
-          return '<span style="background:var(--teal-l);color:var(--teal-d);font-size:13px;font-weight:600;padding:6px 14px;border-radius:20px;">' + escapeHtml(k) + '</span>';
+          return '<span style="background:var(--teal-l);color:var(--teal-d);font-size:13px;font-weight:600;padding:6px 14px;border-radius:20px;display:inline-flex;align-items:center;gap:8px;">' +
+            escapeHtml(k) +
+            '<button type="button" data-kw-remove="' + escapeHtml(k) + '" style="background:none;border:none;color:var(--teal-d);cursor:pointer;font-weight:800;padding:0;line-height:1;" aria-label="Remove ' + escapeHtml(k) + '">&times;</button>' +
+          '</span>';
         }).join('') + '</div>'
       : '<p style="font-size:14px;color:var(--mid);">No keywords recorded yet for this book.</p>';
+
+    var research = b.audit_narrative_json && b.audit_narrative_json.keywordResearch;
+    var researchHtml;
+    if (research && Array.isArray(research.amazonKeywords) && research.amazonKeywords.length) {
+      var recommended = Array.isArray(research.recommendedKeywords) ? research.recommendedKeywords : [];
+      researchHtml =
+        (research.totalFound
+          ? '<p style="font-size:13px;color:var(--muted);margin-top:16px;">Researched ' + escapeHtml(String(research.totalFound)) + ' keywords for "' + escapeHtml(research.seedKeyword || '') + '". Add any of them straight to your 7 KDP fields below.</p>'
+          : '') +
+        keywordTableHtml('Readerbull Recommended Keywords', 'The strongest picks for your 7 KDP backend keyword fields, ranked by fit.', recommended, list) +
+        keywordTableHtml('Amazon Keywords', 'Every related keyword found for this niche, flagged Use or Skip.', research.amazonKeywords, list);
+    } else {
+      researchHtml = '<p style="font-size:13px;color:var(--muted);margin-top:16px;">Keyword research for this book has not run yet, or turned up nothing usable. It runs automatically the next time this book is re-submitted through onboarding.</p>';
+    }
 
     return (
       '<div class="sec-eyebrow" style="margin-bottom:6px;">Keywords</div>' +
       '<h2 style="font-size:20px;color:var(--navy);margin-bottom:16px;">' + escapeHtml(b.book_title || '') + '</h2>' +
-      '<div class="breakdown-card"><h2>Your backend keywords</h2><p>What you\'ve recorded for this book\'s 7 KDP keyword fields.</p>' + chipsHtml + '</div>' +
-      '<p style="font-size:13px;color:var(--muted);margin-top:16px;">Real-time search-volume research for these terms is a planned enhancement.</p>'
+      '<div class="breakdown-card"><h2>Your backend keywords (' + list.length + ' / 7)</h2><p>What\'s currently in this book\'s 7 KDP keyword fields. Adding or removing one here updates your Discoverability Score immediately.</p>' + chipsHtml + '</div>' +
+      '<div id="keyword-save-error" class="detail-error" style="display:none;margin-top:12px;"></div>' +
+      researchHtml
     );
+  }
+
+  // Recomputes the score using data already cached on the book row, no
+  // repeat paid SerpApi/DataForSEO calls per click. pageRank and
+  // categoryCount are read back out of score_breakdown.listing, where
+  // scoring.js stashed them at onboarding time, see scoring.js's comment
+  // on that field for the accepted staleness tradeoff.
+  async function saveKeywordChange(b, newList) {
+    var breakdown = b.score_breakdown || {};
+    var listingMeta = breakdown.listing || {};
+    var amazonAdsActive = !!(breakdown.amazonAds && breakdown.amazonAds.active);
+    var newKeywords = newList.join(', ');
+
+    var scoreResult = computeDiscoverabilityScore({
+      title: b.book_title,
+      reviewCount: b.live_review_count,
+      rating: b.live_rating,
+      keywords: newKeywords,
+      description: b.description,
+      category: b.amazon_category,
+      categoryCount: listingMeta.categoryCount,
+      bestsellerRank: b.bestseller_rank_number,
+      price: b.live_price,
+      coverImage: b.cover_image_url,
+      pageRank: listingMeta.pageRank,
+      competitors: b.competitors_json,
+      amazonAdsActive: amazonAdsActive
+    });
+
+    var errorEl = document.getElementById('keyword-save-error');
+
+    var { error } = await readerbull.client
+      .from('books')
+      .update({ keywords: newKeywords, score: scoreResult.score, score_breakdown: scoreResult.breakdown })
+      .eq('id', b.id);
+
+    if (error) {
+      if (errorEl) {
+        errorEl.textContent = 'Could not save that change: ' + (error.message || 'please try again.');
+        errorEl.style.display = 'block';
+      }
+      return;
+    }
+
+    b.keywords = newKeywords;
+    b.score = scoreResult.score;
+    b.score_breakdown = scoreResult.breakdown;
+
+    // Targeted refresh: the catalog card's score number, the score panel,
+    // and the Keywords tab itself, without rebuilding the whole catalog
+    // grid (that would lose scroll position and re-run selectBook).
+    var card = document.querySelector('.book-card[data-book-id="' + b.id + '"]');
+    if (card) {
+      var badgeEl = card.querySelector('.score-badge');
+      if (badgeEl) badgeEl.innerHTML = b.score + '<span> / 100</span>';
+      var labelEl = card.querySelector('.score-badge + div');
+      if (labelEl) labelEl.textContent = scoreBadge(b.score);
+    }
+    if (currentShowScoreDetail) currentShowScoreDetail(b);
+    // Refreshes all four audit panels (Market Analysis, Marketing Strategy,
+    // Keywords, Quick Wins), not just Keywords, since Quick Wins in
+    // particular derives its gap list from score_breakdown and would
+    // otherwise go stale until the author clicks away and back.
+    renderAuditPanels(b);
+  }
+
+  function wireKeywordsPanel(b) {
+    var panel = document.getElementById('panel-keywords');
+    if (!panel) return;
+
+    panel.querySelectorAll('[data-kw-add]').forEach(function (btn) {
+      btn.addEventListener('click', function () {
+        var kw = btn.getAttribute('data-kw-add');
+        var list = currentKeywordList(b);
+        if (list.length >= 7) return;
+        if (list.some(function (k) { return k.toLowerCase() === kw.toLowerCase(); })) return;
+        list.push(kw);
+        saveKeywordChange(b, list);
+      });
+    });
+
+    panel.querySelectorAll('[data-kw-remove]').forEach(function (btn) {
+      btn.addEventListener('click', function () {
+        var kw = btn.getAttribute('data-kw-remove');
+        var list = currentKeywordList(b).filter(function (k) { return k.toLowerCase() !== kw.toLowerCase(); });
+        saveKeywordChange(b, list);
+      });
+    });
   }
 
   function quickWinsHtml(b) {
@@ -730,16 +880,19 @@
       }).join('');
     } else {
       var breakdown = b.score_breakdown || {};
-      var gaps = Object.keys(breakdown).map(function (key) {
-        var item = breakdown[key];
-        return { key: key, label: item.label, gap: (item.max || 0) - (item.points || 0) };
+      // Only the three visible, author-actionable factors surface as quick
+      // wins, Sales/mo (estimated) and Price vs Niche (fully internal per
+      // R27) are deliberately left out of this list.
+      var visibleKeys = ['listing', 'reviews', 'starRating'];
+      var gaps = visibleKeys.map(function (key) {
+        var item = breakdown[key] || {};
+        return { key: key, label: item.label || key, gap: (item.max || 0) - (item.points || 0) };
       }).filter(function (g) { return g.gap > 0; }).sort(function (a, c) { return c.gap - a.gap; });
 
       var actionText = {
-        reviews: 'Launch an ARC campaign to build reviews, this is worth the most points and usually moves fastest.',
-        keywords: 'Fill in more of your 7 backend keyword fields with specific buyer-intent phrases.',
-        listing: 'Double check your title, description, and cover are all live and complete on Amazon.',
-        category: 'Request a tighter or second category placement through KDP support.'
+        listing: 'Fill in all 7 backend keyword fields (scores are capped at 12/20 until they are), confirm your primary keyword is in the title, and check your categories and description.',
+        reviews: 'Launch an ARC campaign to build reviews and ratings, this is worth the most points and usually moves fastest.',
+        starRating: 'Address anything recurring in critical reviews, star rating is scored separately from review volume.'
       };
 
       itemsHtml = gaps.length

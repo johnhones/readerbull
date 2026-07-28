@@ -295,6 +295,7 @@
         b.price = payload.price;
         b.coverImage = payload.coverImage;
         b.category = payload.category;
+        b.categoryCount = payload.categoryCount;
         b.bestsellerRank = payload.bestsellerRank;
         b.status = 'imported';
         renderImportCard(b);
@@ -361,9 +362,15 @@
         '<input type="text" id="keywords-' + b.tempId + '" ' + (submitted ? 'disabled' : '') + ' placeholder="e.g. mindset, habits, self discipline">' +
         '<div class="fine">Amazon doesn\'t make your backend keywords public, so we can\'t pull these. Add up to 7 if you have them, it improves your Keyword Coverage score. Skip if you\'re not sure, you can add these later from your dashboard.</div>' +
 
-        '<label class="field-label">Monthly sales <span style="font-weight:400;color:var(--muted);">(optional)</span></label>' +
+        '<label class="field-label">Monthly sales <span style="font-weight:400;color:var(--muted);">(optional, for your reference)</span></label>' +
         '<input type="number" min="0" id="sales-' + b.tempId + '" ' + (submitted ? 'disabled' : '') + ' placeholder="e.g. 40">' +
-        '<div class="fine">Roughly how many copies you sell a month. Check your KDP Reports dashboard if you\'re not sure. Skip this and add it later, it won\'t affect your Discoverability Score.</div>' +
+        '<div class="fine">Roughly how many copies you sell a month. We now estimate your Sales/mo score automatically from your bestseller rank, so this figure is stored for your own reference only and still won\'t affect your Discoverability Score.</div>' +
+
+        '<div class="confirm-row">' +
+          '<input type="checkbox" id="ads-' + b.tempId + '" ' + (submitted ? 'disabled' : '') + '>' +
+          '<label for="ads-' + b.tempId + '">I\'m currently running Amazon Ads for this book</label>' +
+        '</div>' +
+        '<div class="fine">Shown as a status pill on your dashboard, doesn\'t affect your Discoverability Score.</div>' +
 
         '<label class="field-label">PDF reader copy <span style="font-weight:400;color:var(--muted);">(optional for now)</span></label>' +
         '<div class="upload-drop">' +
@@ -453,6 +460,7 @@
     var keywords = document.getElementById('keywords-' + tempId).value;
     var monthlySalesRaw = document.getElementById('sales-' + tempId).value;
     var monthlySales = monthlySalesRaw === '' ? null : Number(monthlySalesRaw);
+    var amazonAdsActive = document.getElementById('ads-' + tempId).checked;
     var fileInput = document.getElementById('file-' + tempId);
     var file = fileInput && fileInput.files && fileInput.files[0];
 
@@ -474,20 +482,15 @@
       manuscriptPath = path;
     }
 
-    var scoreResult = computeDiscoverabilityScore({
-      reviewCount: b.reviewCount,
-      rating: b.rating,
-      keywords: keywords,
-      imported: true,
-      category: b.category,
-      bestsellerRank: b.bestsellerRank
-    });
-
-    // Best-effort deep audit content: real competitor data plus an LLM
-    // narrative, built once here and stored on the row. Never blocks
-    // submit, if this fails or times out the dashboard just falls back to
-    // its lighter, template-driven rendering for this book.
+    // Best-effort deep audit content: real competitor data, the R27
+    // organic-page-rank check, and an LLM narrative, built once here and
+    // stored on the row. Runs BEFORE scoring now, because Price vs Niche
+    // and the Listing page-rank sub-factor both need this endpoint's
+    // output as scoring inputs (see api/enrich-audit.js). Never blocks
+    // submit, if this fails or times out, scoring.js and dashboard.html
+    // both fall back gracefully when competitors/pageRank are missing.
     var competitorsJson = null;
+    var pageRankJson = null;
     var narrativeJson = null;
     try {
       var enrichResp = await fetch('/api/enrich-audit', {
@@ -497,23 +500,47 @@
           title: b.title,
           category: b.category,
           keywords: keywords,
+          description: description,
           asin: b.asin,
           price: b.price,
           rating: b.rating,
           reviewCount: b.reviewCount,
-          bestsellerRank: b.bestsellerRank,
-          score: scoreResult.score,
-          breakdown: scoreResult.breakdown
+          bestsellerRank: b.bestsellerRank
         })
       });
       if (enrichResp.ok) {
         var enrichData = await enrichResp.json();
         competitorsJson = enrichData.competitors || null;
+        pageRankJson = enrichData.pageRank || null;
         narrativeJson = enrichData.narrative || null;
+        // Keyword research (DataForSEO Amazon Related Keywords + Use/Skip,
+        // Priority/Best Fit classification) rides along inside
+        // audit_narrative_json rather than a new DB column, dashboard.html's
+        // Keywords tab reads it back out from there.
+        if (enrichData.keywordResearch) {
+          narrativeJson = narrativeJson || {};
+          narrativeJson.keywordResearch = enrichData.keywordResearch;
+        }
       }
     } catch (err) {
       // swallow, this step is best-effort
     }
+
+    var scoreResult = computeDiscoverabilityScore({
+      title: b.title,
+      reviewCount: b.reviewCount,
+      rating: b.rating,
+      keywords: keywords,
+      description: description,
+      category: b.category,
+      categoryCount: b.categoryCount,
+      bestsellerRank: b.bestsellerRank,
+      price: b.price,
+      coverImage: b.coverImage,
+      pageRank: pageRankJson,
+      competitors: competitorsJson,
+      amazonAdsActive: amazonAdsActive
+    });
 
     var { error: updateError } = await readerbull.client
       .from('books')
