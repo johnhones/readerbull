@@ -47,11 +47,8 @@ module.exports = async function handler(req, res) {
       res.status(200).json({
         topLevelKeys: Object.keys(data),
         product_results_keys: data.product_results ? Object.keys(data.product_results) : null,
-        product_description: data.product_description || null,
-        feature_bullets: (data.product_results && data.product_results.feature_bullets) || null,
-        product_description_raw: data.product_description_raw || null,
-        editorial_reviews: data.editorial_reviews || null,
-        product_information: data.product_information || null
+        product_features: data.product_features || null,
+        product_details: data.product_details || null
       });
       return;
     }
