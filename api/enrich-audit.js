@@ -174,15 +174,21 @@ async function findKeywordResearch(input) {
         'Authorization': 'Basic ' + auth,
         'Content-Type': 'application/json'
       },
-      // depth 3 (~258 keywords max) mirrors the "hundreds of keywords
-      // researched" framing on the legacy dashboards without pushing all
-      // the way to depth 4 (~1554), limit caps the response size and cost.
+      // Cost control (tightened 28 July 2026, see
+      // ReaderBull_Scoring_Rebuild_Handover.md discussion on keeping
+      // per-audit API cost down): depth 2 (~42 keywords max) and a limit
+      // of 60 keeps DataForSEO cost to roughly $0.01 task + up to
+      // 60*$0.0001 items = ~$0.016/audit, versus ~$0.03 at the original
+      // depth 3/limit 200. Also shrinks the Anthropic classification
+      // call's input/output proportionally, cutting that cost too and
+      // removing any risk of the classification response getting
+      // truncated at its max_tokens cap.
       body: JSON.stringify([{
         keyword: seed.toLowerCase(),
         language_name: 'English',
         location_code: 2840,
-        depth: 3,
-        limit: 200,
+        depth: 2,
+        limit: 60,
         include_seed_keyword: true
       }])
     });
@@ -264,7 +270,10 @@ async function classifyKeywords(input, seed, items) {
       },
       body: JSON.stringify({
         model: 'claude-haiku-4-5-20251001',
-        max_tokens: 4000,
+        // Sized for up to 60 input keywords (see the depth/limit change in
+        // findKeywordResearch above), comfortable margin without paying
+        // for headroom that's no longer needed at the old 200-item cap.
+        max_tokens: 1800,
         system: systemPrompt,
         messages: [
           { role: 'user', content: 'Here is the keyword research data:\n\n' + JSON.stringify(payload, null, 2) }
