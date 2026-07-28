@@ -27,10 +27,8 @@ module.exports = async function handler(req, res) {
     return;
   }
 
-  var forceFresh = !!(req.body && req.body.debug);
   var serpUrl = 'https://serpapi.com/search.json?engine=amazon_product&asin=' +
-    encodeURIComponent(asin) + '&amazon_domain=amazon.com&api_key=' + encodeURIComponent(apiKey) +
-    (forceFresh ? '&no_cache=true' : '');
+    encodeURIComponent(asin) + '&amazon_domain=amazon.com&api_key=' + encodeURIComponent(apiKey);
 
   try {
     var response = await fetch(serpUrl);
@@ -38,11 +36,6 @@ module.exports = async function handler(req, res) {
 
     if (!response.ok || (data.search_metadata && data.search_metadata.status === 'Error')) {
       res.status(404).json({ error: (data && data.error) || 'Could not find that book on Amazon. Double check the ASIN or URL.' });
-      return;
-    }
-
-    if (req.body && req.body.debug) {
-      res.status(200).json(data);
       return;
     }
 
@@ -68,6 +61,15 @@ module.exports = async function handler(req, res) {
     // entries with their own text. Fall back to feature_bullets after that,
     // so the author always has real pulled text to start from rather than
     // an empty box they have to write from scratch.
+    //
+    // Known gap, confirmed by hand (ASIN B0F4L6TMDP, 28 July 2026): for at
+    // least some Kindle eBook listings, SerpApi's amazon_product engine
+    // returns no description anywhere in the payload at all (checked with
+    // no_cache=true too, not a stale-cache issue), even though the listing
+    // visibly has one on the real Amazon page. This isn't fixable by
+    // reading a different field, the text simply isn't in SerpApi's
+    // response for those listings. onboarding.html handles this by letting
+    // the author type their own description when this comes back null.
     var descriptionParts = [];
     if (Array.isArray(data.product_description)) {
       data.product_description.forEach(function (block) {
