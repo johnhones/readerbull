@@ -190,7 +190,7 @@ img { max-width: 100%; display: block; }
 .shell-section-label { color: rgba(255,255,255,.7); font-size: 9px; font-weight: 700; letter-spacing: 2px; text-transform: uppercase; padding: 0 8px; margin: 16px 0 6px; }
 .shell-section-label:first-of-type { margin-top: 0; }
 .shell-divider { border: none; border-top: 1px solid rgba(255,255,255,.07); margin: 12px 0; }
-.shell-nav-item { display: flex; align-items: center; gap: 10px; padding: 9px 10px; border-radius: 5px; color: rgba(255,255,255,.5); font-size: 12px; font-weight: 600; text-decoration: none; cursor: pointer; border: none; background: none; width: 100%; text-align: left; font-family: inherit; margin-bottom: 2px; transition: background .15s, color .15s; }
+.shell-nav-item { display: flex; align-items: center; gap: 10px; padding: 9px 10px; border-radius: 5px; color: rgba(255,255,255,.5); font-size: 12px; font-weight: 400; text-decoration: none; cursor: pointer; border: none; background: none; width: 100%; text-align: left; font-family: inherit; margin-bottom: 2px; transition: background .15s, color .15s; }
 .shell-nav-item i { font-size: 16px; width: 18px; text-align: center; flex-shrink: 0; }
 .shell-nav-item:hover, .shell-nav-item.active { background: rgba(0,181,173,.12); color: var(--teal); }
 .shell-nav-item.act { color: rgba(244,116,33,.65); }
