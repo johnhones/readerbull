@@ -407,15 +407,8 @@
     }
 
     function snapshotHtml(b) {
-      var breakdown = b.score_breakdown || {};
-      var listing = breakdown.listing || {};
-      var listingPct = listing.max ? Math.round((listing.points / listing.max) * 100) : 0;
-
       var rating = Number(b.live_rating) || 0;
       var ratingPct = rating ? Math.round((rating / 5) * 100) : 0;
-
-      var reviews = breakdown.reviews || {};
-      var reviewsPct = reviews.max ? Math.round((reviews.points / reviews.max) * 100) : 0;
 
       var sales = b.monthly_sales;
       var hasSalesFigure = !(sales === null || sales === undefined || sales === '');
@@ -426,13 +419,15 @@
       // real value of 0 must show an empty bar, not a full one.
       var salesPct = (hasSalesFigure && Number(sales) > 0) ? 100 : 0;
 
+      // Only Rating and Sales/mo here, both are deliberately NOT part of
+      // the score breakdown above (Listing Setup, Reviews & Ratings,
+      // Category Fit, Keyword Coverage), so nothing in this card repeats
+      // a number already shown in the score panel or the breakdown list.
       return (
         '<div class="breakdown-card" style="margin-top:24px;">' +
-          '<h2>Snapshot</h2>' +
-          '<p>A quick read on listing quality, reviews, rating and sales.</p>' +
+          '<h2>Rating &amp; sales</h2>' +
+          '<p>Two more signals, not part of your Discoverability Score breakdown above.</p>' +
           '<div class="bars">' +
-            snapshotBar('Listing', listing.points != null ? (listing.points + ' / ' + listing.max) : 'Not available', listingPct) +
-            snapshotBar('Reviews &amp; Ratings', reviews.points != null ? (reviews.points + ' / ' + reviews.max) : 'Not available', reviewsPct) +
             snapshotBar('Rating', rating ? (rating + ' / 5') : 'Not available', ratingPct) +
             snapshotBar('Sales / mo', salesText, salesPct) +
           '</div>' +
