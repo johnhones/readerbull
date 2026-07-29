@@ -1,0 +1,136 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/@tabler/icons-webfont@latest/tabler-icons.min.css">
+<link rel="stylesheet" href="style.css">
+<title>Readerbull: Pricing</title>
+</head>
+<body>
+
+<!-- NAV -->
+<div class="nav">
+  <div class="nav-inner">
+    <a href="index.html" class="nav-logo">
+      <span class="logo-mark"><img src="readerbull-icon.png" alt="Readerbull"></span>
+      readerbull
+    </a>
+    <div class="nav-links">
+      <a href="pricing.html">Pricing</a>
+      <a href="login.html">Log In</a>
+      <a href="signup.html" class="btn btn-primary">Get Readerbull Free</a>
+    </div>
+  </div>
+</div>
+
+<div class="sec" style="padding:56px 0 72px;">
+  <div class="wrap">
+    <div class="sec-head">
+      <div class="sec-eyebrow" style="justify-content:center;display:flex;">Pricing</div>
+      <h2>Simple pricing that grows with your catalogue.</h2>
+      <p>Every tier gets the full Discoverability Score and automated audit. Higher tiers unlock more books and deeper tools as your catalogue grows.</p>
+    </div>
+
+    <div class="pricing-toggle-row">
+      <div class="pricing-toggle">
+        <button type="button" id="toggle-monthly" class="active">Pay monthly</button>
+        <button type="button" id="toggle-yearly">Pay yearly</button>
+      </div>
+      <span class="pricing-save-note">Save with yearly billing</span>
+    </div>
+
+    <div class="pricing-grid">
+
+      <!-- FREE -->
+      <div class="pricing-card">
+        <h3>Free</h3>
+        <div class="pricing-books">Up to 3 books</div>
+        <div class="pricing-price">£0<span>/month</span></div>
+        <div class="pricing-period-note">No card required</div>
+        <a href="signup.html" class="btn btn-outline">Sign up free</a>
+        <div class="pricing-includes">Includes:</div>
+        <ul>
+          <li><i class="ti ti-circle-check"></i> Full Discoverability Score and automated audit</li>
+          <li><i class="ti ti-circle-check"></i> Real competitor and keyword research</li>
+          <li><i class="ti ti-circle-check"></i> Build Your ARC access once live, read others' books, earn reviews for your own</li>
+          <li><i class="ti ti-circle-check"></i> Access to the Readerbull Amazon KDP community</li>
+        </ul>
+      </div>
+
+      <!-- PLUS -->
+      <div class="pricing-card featured">
+        <div class="pricing-ribbon">Most popular</div>
+        <h3>Plus</h3>
+        <div class="pricing-books">4 to 10 books</div>
+        <div class="pricing-price" id="plus-price" data-monthly="&pound;9<span>/month</span>" data-yearly="&pound;90<span>/year</span>">&pound;9<span>/month</span></div>
+        <div class="pricing-period-note" id="plus-note" data-monthly="Billed monthly" data-yearly="Billed yearly, about &pound;7.50/month">Billed monthly</div>
+        <a href="signup.html" class="btn btn-primary">Get started</a>
+        <div class="pricing-includes">Everything in Free, plus:</div>
+        <ul>
+          <li><i class="ti ti-circle-check"></i> More frequent re-audits and score refreshes</li>
+          <li><i class="ti ti-circle-check"></i> The guided Amazon Ads campaign tool, once live</li>
+        </ul>
+      </div>
+
+      <!-- PRO -->
+      <div class="pricing-card">
+        <h3>Pro</h3>
+        <div class="pricing-books">11 to 30 books</div>
+        <div class="pricing-price" id="pro-price" data-monthly="&pound;24<span>/month</span>" data-yearly="&pound;240<span>/year</span>">&pound;24<span>/month</span></div>
+        <div class="pricing-period-note" id="pro-note" data-monthly="Billed monthly" data-yearly="Billed yearly, about &pound;20/month">Billed monthly</div>
+        <a href="signup.html" class="btn btn-outline">Get started</a>
+        <div class="pricing-includes">Everything in Plus, plus:</div>
+        <ul>
+          <li><i class="ti ti-circle-check"></i> Portfolio-level analysis across your whole catalogue, series and cross-promotion opportunities</li>
+          <li><i class="ti ti-circle-check"></i> Deeper competitor tracking over time</li>
+        </ul>
+      </div>
+
+      <!-- PUBLISHER -->
+      <div class="pricing-card">
+        <h3>Publisher</h3>
+        <div class="pricing-books">30+ books, or usage-based</div>
+        <div class="pricing-price" style="font-size:24px;">Custom pricing</div>
+        <div class="pricing-period-note">Contact us for a quote</div>
+        <a href="mailto:coastlvibes@gmail.com?subject=Readerbull%20Publisher%20plan" class="btn btn-outline">Contact us</a>
+        <div class="pricing-includes">Everything in Pro, plus:</div>
+        <ul>
+          <li><i class="ti ti-circle-check"></i> Usage-based add-ons for heavier re-audit frequency</li>
+          <li><i class="ti ti-circle-check"></i> Dedicated handling for presses and agencies</li>
+        </ul>
+      </div>
+
+    </div>
+
+    <p class="pricing-disclaimer">Plus, Pro and Publisher pricing is shown for reference. Payment isn't live yet, every account today gets full access to the Discoverability Score and automated audit at no cost while we finish building the paid tiers.</p>
+  </div>
+</div>
+
+<!-- FOOTER -->
+<div class="ftr">
+  <div class="wrap">
+    <div class="ftr-logo"><span class="logo-mark"><img src="readerbull-icon.png" alt="Readerbull"></span>readerbull</div>
+    <small>&copy; 2026 Readerbull. A platform that helps you sell more books.</small>
+  </div>
+</div>
+
+<script>
+var toggleMonthly = document.getElementById('toggle-monthly');
+var toggleYearly = document.getElementById('toggle-yearly');
+var priceEls = document.querySelectorAll('.pricing-price[data-monthly]');
+var noteEls = document.querySelectorAll('.pricing-period-note[data-monthly]');
+
+function setPeriod(period) {
+  toggleMonthly.classList.toggle('active', period === 'monthly');
+  toggleYearly.classList.toggle('active', period === 'yearly');
+  priceEls.forEach(function (el) { el.innerHTML = el.getAttribute('data-' + period); });
+  noteEls.forEach(function (el) { el.textContent = el.getAttribute('data-' + period); });
+}
+
+toggleMonthly.addEventListener('click', function () { setPeriod('monthly'); });
+toggleYearly.addEventListener('click', function () { setPeriod('yearly'); });
+</script>
+
+</body>
+</html>

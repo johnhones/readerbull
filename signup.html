@@ -1,0 +1,193 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/@tabler/icons-webfont@latest/tabler-icons.min.css">
+<link rel="stylesheet" href="style.css">
+<title>Readerbull: Create your account</title>
+</head>
+<body>
+
+<!-- NAV -->
+<div class="nav">
+  <div class="nav-inner">
+    <a href="index.html" class="nav-logo">
+      <span class="logo-mark"><img src="readerbull-icon.png" alt="Readerbull"></span>
+      readerbull
+    </a>
+    <div class="nav-links">
+      <a href="pricing.html">Pricing</a>
+      <a href="login.html">Log In</a>
+    </div>
+  </div>
+</div>
+
+<!-- SIGN UP -->
+<div class="sec" style="padding:56px 0 72px;">
+  <div class="wrap">
+    <div class="split" style="align-items:start;">
+
+      <div>
+        <div class="signup-badges">
+          <span class="tag">Free to start</span>
+          <span class="tag tag-orange">Real Amazon data</span>
+          <span class="tag tag-outline">Built by a working KDP publisher</span>
+        </div>
+        <h1 style="font-size:38px;font-weight:800;color:var(--navy);line-height:1.15;margin-bottom:16px;">Find out why your book isn't selling.</h1>
+        <p>Readerbull analyses your book, your keywords and your competition, then gives you a Discoverability Score and a clear plan for what to fix first.</p>
+        <ul class="check-list">
+          <li><i class="ti ti-circle-check"></i> Real Amazon data, not guesswork, we pull your listing automatically, no manuscript upload needed to get your score.</li>
+          <li><i class="ti ti-circle-check"></i> Free to start: get your full Discoverability Score and audit at no cost, no card required.</li>
+          <li><i class="ti ti-circle-check"></i> A clear score, not a vanity number, see exactly what's holding your book back and what to fix first.</li>
+          <li><i class="ti ti-circle-check"></i> See your real competition: benchmark against the books actually ranking in your niche.</li>
+          <li><i class="ti ti-circle-check"></i> Built by a working KDP publisher, not a marketing agency guessing from the outside.</li>
+        </ul>
+      </div>
+
+      <div>
+        <div class="audit-form signup-card" id="signup-card">
+          <div class="sec-eyebrow" style="margin-bottom:8px;">Get started now</div>
+          <h2 style="font-size:22px;font-weight:800;color:var(--navy);margin-bottom:6px;">Create your account</h2>
+          <p style="font-size:13px;color:var(--mid);margin-bottom:0;line-height:1.55;">No manuscript upload needed here, we pull your book's real Amazon listing data automatically once you're in.</p>
+
+          <div class="feature-strip">
+            <div><strong>Free</strong><span>to start</span></div>
+            <div><strong>Fast</strong><span>minutes, not days</span></div>
+            <div><strong>Real data</strong><span>from Amazon</span></div>
+            <div><strong>No card</strong><span>required</span></div>
+          </div>
+
+          <form id="lead-form">
+            <label for="author-name">Your name <span style="font-weight:400;color:var(--muted);">(optional)</span></label>
+            <input type="text" id="author-name" placeholder="e.g. Jordan Truehart">
+            <label for="email">Your email</label>
+            <input type="email" id="email" placeholder="you@example.com" required>
+            <button type="submit" class="btn btn-primary" id="lead-submit">Get Readerbull Free</button>
+            <div class="fine">We'll email you a one-time code, no spam, ever. You'll add your book's Amazon link on the next step.</div>
+            <div class="field-error" id="lead-error"></div>
+          </form>
+
+          <form id="otp-step" style="display:none;">
+            <label>Email</label>
+            <div class="auth-email-pill">
+              <span id="otp-email-display"></span>
+              <button type="button" id="otp-change-email" aria-label="Change email"><i class="ti ti-x"></i></button>
+            </div>
+            <label for="otp-code">Verification code</label>
+            <input type="text" inputmode="numeric" autocomplete="one-time-code" id="otp-code" class="otp-code-input" placeholder="Enter code" required>
+            <div class="fine" style="text-align:left;margin-top:6px;">We sent a code to your inbox. It expires shortly.</div>
+            <button type="submit" class="btn btn-primary" id="otp-submit">Continue</button>
+            <div class="fine"><a href="#" id="otp-resend" style="color:var(--teal-d);font-weight:700;">Resend code</a></div>
+            <div class="field-error" id="otp-error"></div>
+          </form>
+
+          <div class="fine" style="margin-top:18px;">Already have an account? <a href="login.html" style="color:var(--teal-d);font-weight:700;">Log in</a> instead.</div>
+        </div>
+      </div>
+
+    </div>
+  </div>
+</div>
+
+<!-- FOOTER -->
+<div class="ftr">
+  <div class="wrap">
+    <div class="ftr-logo"><span class="logo-mark"><img src="readerbull-icon.png" alt="Readerbull"></span>readerbull</div>
+    <small>&copy; 2026 Readerbull. A platform that helps you sell more books.</small>
+  </div>
+</div>
+
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.js"></script>
+<script src="supabase-client.js"></script>
+<script>
+var currentEmail = '';
+
+function onboardingUrl() {
+  return window.location.origin + window.location.pathname.replace(/signup\.html$/, '').replace(/\/$/, '') + '/onboarding.html';
+}
+
+document.getElementById('lead-form').addEventListener('submit', async function (e) {
+  e.preventDefault();
+
+  var submitBtn = document.getElementById('lead-submit');
+  var errorEl = document.getElementById('lead-error');
+  errorEl.style.display = 'none';
+
+  var authorName = document.getElementById('author-name').value.trim();
+  var email = document.getElementById('email').value.trim();
+
+  submitBtn.disabled = true;
+  submitBtn.textContent = 'Sending...';
+
+  var { error } = await readerbull.client.auth.signInWithOtp({
+    email: email,
+    options: {
+      emailRedirectTo: onboardingUrl(),
+      data: authorName ? { author_name: authorName } : {}
+    }
+  });
+
+  submitBtn.disabled = false;
+  submitBtn.textContent = 'Get Readerbull Free';
+
+  if (error) {
+    errorEl.textContent = error.message || 'Something went wrong, please try again.';
+    errorEl.style.display = 'block';
+    return;
+  }
+
+  currentEmail = email;
+  document.getElementById('otp-email-display').textContent = email;
+  document.getElementById('otp-code').value = '';
+  document.getElementById('otp-error').style.display = 'none';
+  document.getElementById('lead-form').style.display = 'none';
+  document.getElementById('otp-step').style.display = 'block';
+});
+
+document.getElementById('otp-change-email').addEventListener('click', function () {
+  document.getElementById('otp-step').style.display = 'none';
+  document.getElementById('lead-form').style.display = 'block';
+});
+
+document.getElementById('otp-resend').addEventListener('click', async function (e) {
+  e.preventDefault();
+  var resendLink = document.getElementById('otp-resend');
+  resendLink.textContent = 'Sending...';
+  await readerbull.client.auth.signInWithOtp({ email: currentEmail, options: { emailRedirectTo: onboardingUrl() } });
+  resendLink.textContent = 'Code sent';
+  setTimeout(function () { resendLink.textContent = 'Resend code'; }, 4000);
+});
+
+document.getElementById('otp-step').addEventListener('submit', async function (e) {
+  e.preventDefault();
+
+  var submitBtn = document.getElementById('otp-submit');
+  var errorEl = document.getElementById('otp-error');
+  errorEl.style.display = 'none';
+
+  var code = document.getElementById('otp-code').value.trim();
+
+  submitBtn.disabled = true;
+  submitBtn.textContent = 'Verifying...';
+
+  var { error } = await readerbull.client.auth.verifyOtp({
+    email: currentEmail,
+    token: code,
+    type: 'email'
+  });
+
+  if (error) {
+    submitBtn.disabled = false;
+    submitBtn.textContent = 'Continue';
+    errorEl.textContent = "That code didn't work, double check it or request a new one.";
+    errorEl.style.display = 'block';
+    return;
+  }
+
+  window.location.href = onboardingUrl();
+});
+</script>
+
+</body>
+</html>
