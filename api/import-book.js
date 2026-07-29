@@ -4,8 +4,13 @@
 //
 // POST { input: "<ASIN or Amazon URL>" }
 // -> { asin, title, description, rating, reviewCount, price, extractedPrice,
-//      coverImage, category, categoryCount, bestsellerRankText, amazonUrl }
+//      coverImage, category, categoryCount, bestsellerRankText, amazonUrl,
+//      boughtTogether }
 // or -> { error: "..." } with a 4xx/5xx status.
+//
+// boughtTogether rides along on this same call at no extra cost (see below),
+// onboarding.html carries it through to api/enrich-audit.js at submit time,
+// where findCompetitors prefers it over a fresh category search.
 
 module.exports = async function handler(req, res) {
   if (req.method !== 'POST') {
@@ -55,6 +60,31 @@ module.exports = async function handler(req, res) {
 
     var coverImage = (product.thumbnails && product.thumbnails[0]) || product.thumbnail || null;
 
+    // "Frequently bought together" for this exact ASIN, when Amazon shows
+    // it (SerpApi surfaces it as `bought_together` on the same amazon_product
+    // call we're already making, so this costs nothing extra). Real
+    // cross-purchase behaviour, this is a much more reliable "who is this
+    // book actually competing with" signal than a broad category search,
+    // confirmed by comparing it against a live case where category search
+    // returned off-topic results (see api/enrich-audit.js findCompetitors).
+    // Not every listing has this section, Amazon only shows it once enough
+    // purchase-pattern data exists, so this is often empty for lower-volume
+    // KDP titles.
+    var boughtTogether = Array.isArray(data.bought_together)
+      ? data.bought_together
+          .filter(function (r) { return r && r.asin && r.title; })
+          .slice(0, 5)
+          .map(function (r) {
+            return {
+              title: r.title,
+              asin: r.asin,
+              rating: (typeof r.rating === 'number') ? r.rating : null,
+              reviews: (typeof r.reviews === 'number') ? r.reviews : null,
+              price: r.price || null
+            };
+          })
+      : [];
+
     // Plain book listings rarely have a `product_results.description` field.
     // The real description text (Amazon's "A+ content") lives under the
     // top-level `product_description` block instead, as a list of feature
@@ -103,7 +133,8 @@ module.exports = async function handler(req, res) {
       categoryCount: ranks.length,
       bestsellerRank: bestRank ? bestRank.extracted_rank : null,
       bestsellerRankText: bestRank ? bestRank.text : null,
-      amazonUrl: (data.search_metadata && data.search_metadata.amazon_product_url) || null
+      amazonUrl: (data.search_metadata && data.search_metadata.amazon_product_url) || null,
+      boughtTogether: boughtTogether
     });
   } catch (err) {
     res.status(502).json({ error: 'Amazon lookup failed, please try again.' });

@@ -39,8 +39,20 @@
 // book where every mechanical seed fails.
 //
 // POST { title, category, keywords, asin, price, rating, reviewCount,
-//        bestsellerRank }
+//        bestsellerRank, boughtTogether }
 // -> { competitors: [...], pageRank: {...}, keywordResearch: {...}, narrative: {...} }
+//
+// Competitor accuracy fix (29 July 2026): findCompetitors now prefers
+// boughtTogether (Amazon's own "frequently bought together" data for this
+// exact ASIN, passed through from api/import-book.js where it was pulled
+// for free on the same call already made at import time) over a fresh
+// SerpApi category search. This fixes a confirmed live bug where a broad
+// or formal Amazon category (e.g. a cannabis cookbook categorised under
+// general cooking) returned generic, off-topic competitors. When
+// boughtTogether is empty (not every listing has it), falls back to the
+// same seed-fallback pattern already proven for findKeywordResearch:
+// category leaf, then the author's own primary keyword, then the book
+// title, then an AI-guessed shopper phrase as a last resort.
 
 module.exports = async function handler(req, res) {
   if (req.method !== 'POST') {
@@ -107,42 +119,97 @@ async function findPageRank(input) {
   }
 }
 
-// ---------- Competitor discovery (SerpApi Amazon Search) ----------
+// ---------- Competitor discovery ----------
+// Preferred source: Amazon's own "bought together" data for this exact
+// ASIN (see boughtTogether comment near the top of this file), zero extra
+// paid calls since it was already pulled at import time. Only when that's
+// empty do we fall back to a fresh SerpApi Amazon Search call, using the
+// same category/keyword/title/AI-seed fallback chain as
+// findKeywordResearch below, since the root cause (a formal or overly
+// broad category label) is identical for both.
 async function findCompetitors(input) {
+  var ownAsin = (input.asin || '').toUpperCase();
+
+  var boughtTogether = Array.isArray(input.boughtTogether) ? input.boughtTogether : [];
+  var fromBoughtTogether = boughtTogether
+    .filter(function (r) { return r && r.asin && r.title && r.asin.toUpperCase() !== ownAsin; })
+    .slice(0, 5)
+    .map(function (r, i) {
+      return {
+        title: r.title,
+        asin: r.asin,
+        rating: r.rating || null,
+        reviews: r.reviews || null,
+        price: r.price || null,
+        sponsored: false,
+        position: i + 1
+      };
+    });
+  if (fromBoughtTogether.length) return fromBoughtTogether;
+
   var apiKey = process.env.SERPAPI_KEY;
   if (!apiKey) return [];
 
-  var query = (input.category || input.title || '').trim();
-  if (!query) return [];
-
-  var url = 'https://serpapi.com/search.json?engine=amazon&k=' +
-    encodeURIComponent(query) + '&amazon_domain=amazon.com&api_key=' + encodeURIComponent(apiKey);
-
-  try {
-    var response = await fetch(url);
-    var data = await response.json();
-    if (!response.ok) return [];
-
-    var results = Array.isArray(data.organic_results) ? data.organic_results : [];
-    var ownAsin = (input.asin || '').toUpperCase();
-
-    return results
-      .filter(function (r) { return r.asin && r.asin.toUpperCase() !== ownAsin && r.title; })
-      .slice(0, 5)
-      .map(function (r) {
-        return {
-          title: r.title,
-          asin: r.asin,
-          rating: r.rating || null,
-          reviews: r.reviews || null,
-          price: r.price || null,
-          sponsored: !!r.sponsored,
-          position: r.position || null
-        };
-      });
-  } catch (err) {
-    return [];
+  var categorySeed = String(input.category || '').trim();
+  if (categorySeed.indexOf('>') !== -1) {
+    var segments = categorySeed.split('>').map(function (s) { return s.trim(); }).filter(Boolean);
+    categorySeed = segments[segments.length - 1] || categorySeed;
   }
+  var primaryKeywordSeed = String(input.keywords || '').split(',').map(function (k) { return k.trim(); }).filter(Boolean)[0] || '';
+  var titleSeed = String(input.title || '').trim();
+
+  var mechanicalCandidates = [categorySeed, primaryKeywordSeed, titleSeed]
+    .filter(Boolean)
+    .filter(function (s, i, arr) { return arr.indexOf(s) === i; });
+
+  var found = await trySerpApiCompetitorCandidates(mechanicalCandidates, apiKey, ownAsin);
+
+  if (!found.length) {
+    var aiSeeds = await generateSearchSeeds(input);
+    if (aiSeeds.length) found = await trySerpApiCompetitorCandidates(aiSeeds, apiKey, ownAsin);
+  }
+
+  return found;
+}
+
+// Tries each candidate search term against SerpApi's Amazon Search engine
+// in order, stops at the first one that returns at least one real
+// (non-own-ASIN, titled) result. Mirrors tryDataForSeoCandidates below.
+async function trySerpApiCompetitorCandidates(candidates, apiKey, ownAsin) {
+  for (var c = 0; c < candidates.length; c++) {
+    var query = candidates[c];
+    if (!query) continue;
+
+    var url = 'https://serpapi.com/search.json?engine=amazon&k=' +
+      encodeURIComponent(query) + '&amazon_domain=amazon.com&api_key=' + encodeURIComponent(apiKey);
+
+    try {
+      var response = await fetch(url);
+      var data = await response.json();
+      if (!response.ok) continue;
+
+      var results = Array.isArray(data.organic_results) ? data.organic_results : [];
+      var mapped = results
+        .filter(function (r) { return r.asin && r.asin.toUpperCase() !== ownAsin && r.title; })
+        .slice(0, 5)
+        .map(function (r) {
+          return {
+            title: r.title,
+            asin: r.asin,
+            rating: r.rating || null,
+            reviews: r.reviews || null,
+            price: r.price || null,
+            sponsored: !!r.sponsored,
+            position: r.position || null
+          };
+        });
+
+      if (mapped.length) return mapped;
+    } catch (err) {
+      continue;
+    }
+  }
+  return [];
 }
 
 // ---------- Keyword research (DataForSEO Amazon Related Keywords + Anthropic classification) ----------
@@ -439,12 +506,28 @@ async function generateNarrative(input, competitors) {
       reviewCount: input.reviewCount || null,
       bestsellerRank: input.bestsellerRank || null,
       keywords: input.keywords || null,
-      discoverabilityScore: input.score || null
+      discoverabilityScore: input.score || null,
+      // Added 29 July 2026 (content-quality rewrite, see
+      // ReaderBull_Next_Chat_Handover_Prompt.md item 8) so the prompt can
+      // gate the paid-ads and portfolio-expansion recommendations below on
+      // real data rather than guessing.
+      amazonAdsActive: !!input.amazonAdsActive,
+      authorBookCount: (typeof input.authorBookCount === 'number') ? input.authorBookCount : null
     },
     scoreBreakdown: breakdown,
     competitors: competitors
   };
 
+  // Content-quality rewrite, 29 July 2026 (ReaderBull_Next_Chat_Handover_Prompt.md
+  // item 8, all points below confirmed directly with John): removes the
+  // off-platform review-trust angle (Amazon is a closed marketplace, authors
+  // can't reference their own reviews off it), demotes "price justifies
+  // value" out of the top 3, adds a review-count-gated (15+) paid-ads
+  // recommendation with concrete guidance rather than "you should run ads",
+  // adds a single-book portfolio-expansion idea, softens the backend-keyword
+  // assumption to "if you haven't already", and points the reviews
+  // recommendation at Readerbull's own Build Your ARC tool (free to start,
+  // reciprocal) instead of emailing readers or naming an external ARC site.
   var systemPrompt =
     'You write the Market Analysis, Marketing Strategy and Quick Wins content for Readerbull, ' +
     'a platform that helps self-published authors sell more books. You are writing for one specific ' +
@@ -453,6 +536,36 @@ async function generateNarrative(input, competitors) {
     'If a field is missing, write around it honestly rather than guessing. Use British spelling ' +
     '(optimise, personalise, recognise). Never use the em dash character. Keep the tone direct, ' +
     'encouraging and specific, not generic SaaS filler. ' +
+    'Data-gating principle: only make a recommendation whose credibility depends on a specific data ' +
+    'threshold if the book\'s own data actually supports it. Never suggest leveraging review volume, ' +
+    'reviews as a trust signal, or building authority with hesitant buyers off Amazon\'s own platform, ' +
+    'Amazon is a closed marketplace and authors cannot meaningfully reference their own reviews ' +
+    'anywhere else. Apply this same gating logic to any other recommendation whose credibility ' +
+    'depends on the book already having a certain amount of data behind it. ' +
+    'Paid Amazon Ads: if book.amazonAdsActive is false, always include a paid-ads recommendation ' +
+    'somewhere in strategySteps. It only qualifies for a guaranteed top-3 quickWins placement once ' +
+    'book.reviewCount is 15 or more, below that threshold other quick wins (such as building reviews ' +
+    'first) may rank above it. When you recommend ads, give concrete, actionable guidance rather than ' +
+    'just "you should run ads": suggest a modest starting daily budget range, a target ACoS ' +
+    '(advertising cost of sale) ceiling to judge profitability, targeting the book\'s own keywords plus ' +
+    '(only if competitor data is given) Sponsored Display against those specific competitor ASINs, and ' +
+    'a short review-and-adjust timeframe (for example 14 days) before scaling spend. ' +
+    'Price vs value: "price justifies value" is a valid angle but must never be one of the top 3 most ' +
+    'prominent points across marketAnalysis, strategySteps or quickWins combined, rank it further down ' +
+    'if you use it at all. ' +
+    'Reviews: if book.reviewCount is below 15, recommend the author launch or grow their Build Your ARC ' +
+    'campaign (Readerbull\'s own built-in tool, found under Tools in the sidebar) to reach opted-in ' +
+    'readers for honest reviews, it is free to start and reciprocal: the more an author reads and ' +
+    'reviews other authors\' books through it, the more they get back for their own book. Never suggest ' +
+    'emailing or messaging existing readers/reviewers directly to ask for reviews, and never name any ' +
+    'external ARC or review-swap service. ' +
+    'Backend keywords: never assume the author has already filled in their 7 KDP backend keyword ' +
+    'fields. Phrase any related advice as "if you haven\'t already" rather than assuming they\'re ' +
+    'already populated, since we don\'t actually know their KDP backend state. ' +
+    'Portfolio angle: if book.authorBookCount is exactly 1, consider including a quickWin or strategy ' +
+    'step suggesting the author think about a second, related title, since a second book compounds ' +
+    'discoverability (cross-sell, a new keyword footprint, a new category placement). Do not suggest ' +
+    'this if authorBookCount is missing, null, or greater than 1. ' +
     'Respond with ONLY a JSON object, no markdown fences, no commentary, matching exactly this shape: ' +
     '{"bookInsight": "one bolded-worthy sentence summarising the single biggest takeaway", ' +
     '"marketAnalysis": "2-3 short paragraphs on where this book stands versus the competitors given", ' +
