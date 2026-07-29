@@ -266,7 +266,9 @@ async function classifyKeywords(input, seed, items) {
     'Respond with ONLY a JSON object, no markdown fences, no commentary, matching exactly this shape: ' +
     '{"amazonKeywords": [{"keyword": "...", "volume": <number or null>, "status": "Use"|"Skip"}], ' +
     '"recommendedKeywords": [{"keyword": "...", "volume": <number or null>, "status": "Priority"|"Best Fit"}]}. ' +
-    'Include every keyword given to you exactly once in amazonKeywords, preserve the volume value given.';
+    'Include every keyword given to you exactly once in amazonKeywords, preserve the volume value given. ' +
+    'Output MINIFIED JSON on a single line, no indentation, no line breaks, no extra spaces, this keeps ' +
+    'the response short enough to never get cut off.';
 
   var payload = {
     book: {
@@ -288,10 +290,15 @@ async function classifyKeywords(input, seed, items) {
       },
       body: JSON.stringify({
         model: 'claude-haiku-4-5-20251001',
-        // Sized for up to 30 input keywords (see the limit in
-        // findKeywordResearch above), comfortable margin without paying
-        // for headroom that's no longer needed.
-        max_tokens: 1200,
+        // 2000 with a minified-JSON instruction (see systemPrompt above):
+        // the earlier 1200 cap was getting hit mid-response because the
+        // model was pretty-printing the JSON with indentation, which
+        // burns 2-3x the tokens of compact JSON, confirmed live on 29
+        // July 2026 (stop_reason "max_tokens", parse error on truncated
+        // output). Telling it to minify fixes the root cause; this higher
+        // cap is just a safety margin so a slightly verbose response
+        // still completes instead of silently losing the Recommended list.
+        max_tokens: 2000,
         system: systemPrompt,
         messages: [
           { role: 'user', content: 'Here is the keyword research data:\n\n' + JSON.stringify(payload, null, 2) }
@@ -300,7 +307,7 @@ async function classifyKeywords(input, seed, items) {
     });
 
     var data = await response.json();
-    if (!response.ok) return { _debugClassify: { httpStatus: response.status, body: data } };
+    if (!response.ok) return null;
 
     var text = (data.content && data.content[0] && data.content[0].text) || '';
     var cleaned = text.trim().replace(/^```(json)?/i, '').replace(/```$/, '').trim();
@@ -309,14 +316,14 @@ async function classifyKeywords(input, seed, items) {
     try {
       parsed = JSON.parse(cleaned);
     } catch (e) {
-      return { _debugClassify: { parseError: String(e && e.message || e), stopReason: data.stop_reason, textLength: text.length, textTail: text.slice(-300) } };
+      return null;
     }
 
-    if (!parsed || !Array.isArray(parsed.amazonKeywords)) return { _debugClassify: { note: 'parsed but amazonKeywords not array', parsedKeys: parsed && Object.keys(parsed) } };
+    if (!parsed || !Array.isArray(parsed.amazonKeywords)) return null;
     parsed.recommendedKeywords = Array.isArray(parsed.recommendedKeywords) ? parsed.recommendedKeywords.slice(0, 8) : [];
     return parsed;
   } catch (err) {
-    return { _debugClassify: { fetchError: String(err && err.message || err) } };
+    return null;
   }
 }
 
