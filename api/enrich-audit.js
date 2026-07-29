@@ -198,7 +198,7 @@ async function findKeywordResearch(input) {
     }
   }
 
-  if (!found.items.length) return { _debugFind: { mechanicalCandidates: mechanicalCandidates, aiSeeds: aiSeeds, foundSeed: found.seed } };
+  if (!found.items.length) return null;
 
   var classified = await classifyKeywords(input, found.seed, found.items);
   if (classified) {
@@ -285,15 +285,20 @@ async function generateSearchSeeds(input) {
   if (!apiKey) return [];
 
   var systemPrompt =
-    'You help find real Amazon search phrases for a self-published book. Given the book\'s ' +
-    'title, category and description, suggest 2 short, natural phrases (2 to 4 words each) ' +
-    'that a reader would actually type into Amazon search to find a book like this. Think ' +
-    'like a shopper, not a librarian: do not just repeat the book title, and do not just ' +
-    'repeat the formal Amazon category label verbatim, especially if it reads like a stiff ' +
-    'catalogue term rather than something a person would type. Make the two phrases distinct ' +
-    'from each other so they cover different angles. ' +
+    'You help find real Amazon search phrases for a self-published book, for a keyword data ' +
+    'tool that only returns results for short, broad, high-traffic search terms, not specific ' +
+    'or sentence-like phrases. Given the book\'s title, category and description, suggest 3 ' +
+    'short search terms, ordered from broadest to narrowest: 1 to 2 words, then 2 words, then ' +
+    'up to 3 words. Every term must read exactly like something typed into a search bar, not a ' +
+    'description of the book. Good examples: "screen time", "self help", "habit tracker", ' +
+    '"meal prep", "anxiety relief". Bad examples, too long or too sentence-like: "kids screen ' +
+    'time dangers", "smartphone effects on children", "how to build better habits". Do not ' +
+    'repeat the book title, and do not repeat the formal Amazon category label verbatim if it ' +
+    'reads like a stiff catalogue term. Each of the 3 terms should cover a different angle on ' +
+    'the book\'s topic, but all three must stay short and broad, favour a common everyday word ' +
+    'over a precise one every time there is a choice. ' +
     'Respond with ONLY compact JSON on one line, no markdown fences, no commentary, no ' +
-    'indentation, matching exactly this shape: {"seeds": ["phrase one", "phrase two"]}.';
+    'indentation, matching exactly this shape: {"seeds": ["term one", "term two", "term three"]}.';
 
   var payload = {
     title: input.title || null,
