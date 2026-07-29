@@ -174,21 +174,18 @@ async function findKeywordResearch(input) {
         'Authorization': 'Basic ' + auth,
         'Content-Type': 'application/json'
       },
-      // Cost control (tightened 28 July 2026, see
-      // ReaderBull_Scoring_Rebuild_Handover.md discussion on keeping
-      // per-audit API cost down): depth 2 (~42 keywords max) and a limit
-      // of 60 keeps DataForSEO cost to roughly $0.01 task + up to
-      // 60*$0.0001 items = ~$0.016/audit, versus ~$0.03 at the original
-      // depth 3/limit 200. Also shrinks the Anthropic classification
-      // call's input/output proportionally, cutting that cost too and
-      // removing any risk of the classification response getting
-      // truncated at its max_tokens cap.
+      // Cost control (tightened again 29 July 2026): a 7-keyword KDP author
+      // never needs 60 candidates, 30 is plenty of choice while keeping the
+      // Anthropic classification step (which reads every keyword) smaller
+      // and faster. DataForSEO itself barely notices the difference, it is
+      // roughly a flat $0.01 per request plus $0.0001 per item, so 30 vs 60
+      // items is a difference of about half a cent per audit either way.
       body: JSON.stringify([{
         keyword: seed.toLowerCase(),
         language_name: 'English',
         location_code: 2840,
         depth: 2,
-        limit: 60,
+        limit: 30,
         include_seed_keyword: true
       }])
     });
@@ -270,10 +267,10 @@ async function classifyKeywords(input, seed, items) {
       },
       body: JSON.stringify({
         model: 'claude-haiku-4-5-20251001',
-        // Sized for up to 60 input keywords (see the depth/limit change in
+        // Sized for up to 30 input keywords (see the limit in
         // findKeywordResearch above), comfortable margin without paying
-        // for headroom that's no longer needed at the old 200-item cap.
-        max_tokens: 1800,
+        // for headroom that's no longer needed.
+        max_tokens: 1200,
         system: systemPrompt,
         messages: [
           { role: 'user', content: 'Here is the keyword research data:\n\n' + JSON.stringify(payload, null, 2) }
