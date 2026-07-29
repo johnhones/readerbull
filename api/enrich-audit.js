@@ -149,78 +149,85 @@ async function findKeywordResearch(input) {
   var password = process.env.DATAFORSEO_PASSWORD;
   if (!login || !password) return null;
 
-  // Seed term: the category leaf name reads closer to the legacy
-  // dashboards' seed keywords ("Reincarnation", "Dog Grooming Business")
-  // than the full book title does. Falls back to the title if no
-  // category was pulled.
-  var seed = String(input.category || input.title || '').trim();
-  // Category text often arrives as a full browse path
-  // ("Books > Religion & Spirituality > ... > Near-Death Experiences"),
-  // the last segment is the actual niche term.
-  if (seed.indexOf('>') !== -1) {
-    var segments = seed.split('>').map(function (s) { return s.trim(); }).filter(Boolean);
-    seed = segments[segments.length - 1] || seed;
+  // Build a short list of candidate seed terms to try, in order. Amazon's
+  // real category names (pulled by import-book.js) are often formal browse
+  // node labels like "Personal Transformation Self-Help" rather than
+  // something a reader would actually type into search, and DataForSEO's
+  // related-keywords endpoint returns zero results for a lot of those
+  // (confirmed by a live test on 29 July 2026: "Personal Transformation
+  // Self-Help" returned 0 items, but the simpler "self help" returned 30).
+  // So try the category leaf first, and if that comes back empty, fall
+  // back to the author's own primary backend keyword, which is a real
+  // search-style phrase a human chose. Each attempt is the same flat-ish
+  // DataForSEO cost, this only ever fires a second request on the rare
+  // book where the first seed dead-ends, so it does not change normal
+  // per-audit cost.
+  var categorySeed = String(input.category || '').trim();
+  if (categorySeed.indexOf('>') !== -1) {
+    var segments = categorySeed.split('>').map(function (s) { return s.trim(); }).filter(Boolean);
+    categorySeed = segments[segments.length - 1] || categorySeed;
   }
-  if (!seed) return null;
+  var primaryKeywordSeed = String(input.keywords || '').split(',').map(function (k) { return k.trim(); }).filter(Boolean)[0] || '';
+  var titleSeed = String(input.title || '').trim();
+
+  var candidates = [categorySeed, primaryKeywordSeed, titleSeed]
+    .filter(Boolean)
+    .filter(function (s, i, arr) { return arr.indexOf(s) === i; }); // dedupe, keep order
+  if (!candidates.length) return null;
 
   var auth = Buffer.from(login + ':' + password).toString('base64');
 
   var items = [];
   var totalFound = 0;
-  try {
-    var response = await fetch('https://api.dataforseo.com/v3/dataforseo_labs/amazon/related_keywords/live', {
-      method: 'POST',
-      headers: {
-        'Authorization': 'Basic ' + auth,
-        'Content-Type': 'application/json'
-      },
-      // Cost control (tightened again 29 July 2026): a 7-keyword KDP author
-      // never needs 60 candidates, 30 is plenty of choice while keeping the
-      // Anthropic classification step (which reads every keyword) smaller
-      // and faster. DataForSEO itself barely notices the difference, it is
-      // roughly a flat $0.01 per request plus $0.0001 per item, so 30 vs 60
-      // items is a difference of about half a cent per audit either way.
-      body: JSON.stringify([{
-        keyword: seed.toLowerCase(),
-        language_name: 'English',
-        location_code: 2840,
-        depth: 2,
-        limit: 30,
-        include_seed_keyword: true
-      }])
-    });
-    var data = await response.json();
-    if (!response.ok) return { _debug: { httpStatus: response.status, body: data } };
+  var seed = null;
 
-    var task = data.tasks && data.tasks[0];
-    var result = task && task.result && task.result[0];
-    if (!result) {
-      return {
-        _debug: {
-          httpStatus: response.status,
-          topStatusCode: data.status_code,
-          topStatusMessage: data.status_message,
-          taskStatusCode: task && task.status_code,
-          taskStatusMessage: task && task.status_message,
-          seed: seed
-        }
-      };
+  for (var c = 0; c < candidates.length; c++) {
+    seed = candidates[c];
+    try {
+      var response = await fetch('https://api.dataforseo.com/v3/dataforseo_labs/amazon/related_keywords/live', {
+        method: 'POST',
+        headers: {
+          'Authorization': 'Basic ' + auth,
+          'Content-Type': 'application/json'
+        },
+        // Cost control (tightened 29 July 2026): a 7-keyword KDP author
+        // never needs 60 candidates, 30 is plenty of choice while keeping
+        // the Anthropic classification step (which reads every keyword)
+        // smaller and faster. DataForSEO itself barely notices the
+        // difference, it is roughly a flat $0.01 per request plus $0.0001
+        // per item, so 30 vs 60 items is a difference of about half a cent
+        // per audit either way.
+        body: JSON.stringify([{
+          keyword: seed.toLowerCase(),
+          language_name: 'English',
+          location_code: 2840,
+          depth: 2,
+          limit: 30,
+          include_seed_keyword: true
+        }])
+      });
+      var data = await response.json();
+      if (!response.ok) continue;
+
+      var task = data.tasks && data.tasks[0];
+      var result = task && task.result && task.result[0];
+      if (!result) continue;
+
+      totalFound = result.total_count || (result.items ? result.items.length : 0);
+      items = (result.items || []).map(function (it) {
+        var kd = it.keyword_data || {};
+        var info = kd.keyword_info || {};
+        return { keyword: kd.keyword || null, volume: (typeof info.search_volume === 'number') ? info.search_volume : null };
+      }).filter(function (it) { return it.keyword; });
+
+      if (items.length) break; // this seed worked, stop trying further candidates
+    } catch (err) {
+      // try the next candidate seed
+      continue;
     }
-
-    totalFound = result.total_count || (result.items ? result.items.length : 0);
-    var rawResultKeysDebug = Object.keys(result);
-    var rawItemsLengthDebug = (result.items || []).length;
-    var firstRawItemDebug = (result.items || [])[0] || null;
-    items = (result.items || []).map(function (it) {
-      var kd = it.keyword_data || {};
-      var info = kd.keyword_info || {};
-      return { keyword: kd.keyword || null, volume: (typeof info.search_volume === 'number') ? info.search_volume : null };
-    }).filter(function (it) { return it.keyword; });
-  } catch (err) {
-    return { _debug: { fetchError: String(err && err.message || err) } };
   }
 
-  if (!items.length) return { _debug: { note: 'items array empty after mapping', seed: seed, rawResultKeys: rawResultKeysDebug, rawItemsLength: rawItemsLengthDebug, firstRawItem: firstRawItemDebug } };
+  if (!items.length) return null;
 
   var classified = await classifyKeywords(input, seed, items);
   if (classified) {
