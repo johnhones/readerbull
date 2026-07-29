@@ -208,6 +208,9 @@ async function findKeywordResearch(input) {
     }
 
     totalFound = result.total_count || (result.items ? result.items.length : 0);
+    var rawResultKeysDebug = Object.keys(result);
+    var rawItemsLengthDebug = (result.items || []).length;
+    var firstRawItemDebug = (result.items || [])[0] || null;
     items = (result.items || []).map(function (it) {
       var kd = it.keyword_data || {};
       var info = kd.keyword_info || {};
@@ -217,7 +220,7 @@ async function findKeywordResearch(input) {
     return { _debug: { fetchError: String(err && err.message || err) } };
   }
 
-  if (!items.length) return { _debug: { note: 'items array empty after mapping', seed: seed } };
+  if (!items.length) return { _debug: { note: 'items array empty after mapping', seed: seed, rawResultKeys: rawResultKeysDebug, rawItemsLength: rawItemsLengthDebug, firstRawItem: firstRawItemDebug } };
 
   var classified = await classifyKeywords(input, seed, items);
   if (classified) {
