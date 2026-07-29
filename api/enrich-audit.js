@@ -190,11 +190,22 @@ async function findKeywordResearch(input) {
       }])
     });
     var data = await response.json();
-    if (!response.ok) return null;
+    if (!response.ok) return { _debug: { httpStatus: response.status, body: data } };
 
     var task = data.tasks && data.tasks[0];
     var result = task && task.result && task.result[0];
-    if (!result) return null;
+    if (!result) {
+      return {
+        _debug: {
+          httpStatus: response.status,
+          topStatusCode: data.status_code,
+          topStatusMessage: data.status_message,
+          taskStatusCode: task && task.status_code,
+          taskStatusMessage: task && task.status_message,
+          seed: seed
+        }
+      };
+    }
 
     totalFound = result.total_count || (result.items ? result.items.length : 0);
     items = (result.items || []).map(function (it) {
@@ -203,10 +214,10 @@ async function findKeywordResearch(input) {
       return { keyword: kd.keyword || null, volume: (typeof info.search_volume === 'number') ? info.search_volume : null };
     }).filter(function (it) { return it.keyword; });
   } catch (err) {
-    return null;
+    return { _debug: { fetchError: String(err && err.message || err) } };
   }
 
-  if (!items.length) return null;
+  if (!items.length) return { _debug: { note: 'items array empty after mapping', seed: seed } };
 
   var classified = await classifyKeywords(input, seed, items);
   if (classified) {
