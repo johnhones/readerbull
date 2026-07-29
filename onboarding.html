@@ -297,6 +297,7 @@
         b.category = payload.category;
         b.categoryCount = payload.categoryCount;
         b.bestsellerRank = payload.bestsellerRank;
+        b.boughtTogether = payload.boughtTogether || [];
         b.status = 'imported';
         renderImportCard(b);
       } catch (err) {
@@ -492,6 +493,22 @@
     var competitorsJson = null;
     var pageRankJson = null;
     var narrativeJson = null;
+
+    // How many books this author has in total (including this one, already
+    // inserted at import time), so the narrative prompt can gate the
+    // single-book portfolio-expansion suggestion (see api/enrich-audit.js).
+    // Best-effort only, never invented if the count query fails.
+    var authorBookCount = null;
+    try {
+      var countResult = await readerbull.client
+        .from('books')
+        .select('id', { count: 'exact', head: true })
+        .eq('user_id', user.id);
+      authorBookCount = (typeof countResult.count === 'number') ? countResult.count : null;
+    } catch (err) {
+      // best-effort only
+    }
+
     try {
       var enrichResp = await fetch('/api/enrich-audit', {
         method: 'POST',
@@ -505,7 +522,10 @@
           price: b.price,
           rating: b.rating,
           reviewCount: b.reviewCount,
-          bestsellerRank: b.bestsellerRank
+          bestsellerRank: b.bestsellerRank,
+          boughtTogether: b.boughtTogether || [],
+          amazonAdsActive: amazonAdsActive,
+          authorBookCount: authorBookCount
         })
       });
       if (enrichResp.ok) {

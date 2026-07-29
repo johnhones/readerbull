@@ -558,20 +558,24 @@
     var rows = competitors.map(function (c) {
       return (
         '<tr>' +
-          '<td>' + escapeHtml(c.title || '') + '</td>' +
-          '<td>' + (c.rating ? (escapeHtml(String(c.rating)) + ' / 5') : 'Not available') + '</td>' +
-          '<td>' + (c.reviews != null ? escapeHtml(String(c.reviews)) : 'Not available') + '</td>' +
-          '<td>' + (c.price ? escapeHtml(String(c.price)) : 'Not available') + '</td>' +
-          '<td>' + (c.sponsored ? 'Running ads' : 'No ads seen') + '</td>' +
+          '<td style="padding:8px 6px;word-break:break-word;">' + escapeHtml(c.title || '') + '</td>' +
+          '<td style="padding:8px 6px;white-space:nowrap;">' + (c.rating ? (escapeHtml(String(c.rating)) + ' / 5') : 'Not available') + '</td>' +
+          '<td style="padding:8px 6px;white-space:nowrap;">' + (c.reviews != null ? escapeHtml(String(c.reviews)) : 'Not available') + '</td>' +
+          '<td style="padding:8px 6px;white-space:nowrap;">' + (c.price ? escapeHtml(String(c.price)) : 'Not available') + '</td>' +
+          '<td style="padding:8px 6px;white-space:nowrap;">' + (c.sponsored ? 'Running ads' : 'No ads seen') + '</td>' +
         '</tr>'
       );
     }).join('');
 
+    // Fixed column widths so a long competitor title wraps within its own
+    // column instead of squeezing rating/reviews/price/ads into an
+    // unreadable, wrapping mess (flagged as cramped/hard to read).
     return (
       '<div class="breakdown-card" style="margin-top:24px;overflow-x:auto;">' +
         '<h2>Who this book is competing with</h2>' +
         '<p>Real listings currently ranking for this book\'s category, pulled live.</p>' +
-        '<table style="width:100%;border-collapse:collapse;font-size:14px;margin-top:8px;">' +
+        '<table style="width:100%;min-width:520px;border-collapse:collapse;font-size:14px;margin-top:8px;table-layout:fixed;">' +
+          '<colgroup><col style="width:44%;"><col style="width:14%;"><col style="width:14%;"><col style="width:14%;"><col style="width:14%;"></colgroup>' +
           '<thead><tr style="text-align:left;border-bottom:1px solid var(--border);">' +
             '<th style="padding:8px 6px;">Book</th><th style="padding:8px 6px;">Rating</th>' +
             '<th style="padding:8px 6px;">Reviews</th><th style="padding:8px 6px;">Price</th>' +
@@ -645,7 +649,7 @@
     if ((reviews.points || 0) < (reviews.max || 20)) {
       steps.push({
         title: 'Build your reviews and ratings',
-        body: 'This is approximated from your total ratings count. Use an ARC service (BookSirens, Hidden Gems, NetGalley) to reach opted-in readers, and add a warm, compliant review request inside the book itself.'
+        body: 'This is approximated from your total ratings count. Launch or grow your Build Your ARC campaign (under Tools) to reach opted-in readers, it\'s free to start and reciprocal, and add a warm, compliant review request inside the book itself.'
       });
     }
     var starRating = breakdown.starRating || {};
@@ -728,9 +732,12 @@
       var inList = currentList.some(function (k) { return k.toLowerCase() === String(item.keyword || '').toLowerCase(); });
       return keywordRowHtml(item, inList, atCap && !inList);
     }).join('');
+    // Item count shown inline in the header ("Amazon Keywords 11"), matching
+    // the legacy Jordan Truehart dashboard's keyword table format (see
+    // ReaderBull_Next_Chat_Handover_Prompt.md item 9).
     return (
       '<div class="breakdown-card" style="margin-top:24px;overflow-x:auto;">' +
-        '<h2>' + title + '</h2><p>' + subtitle + '</p>' +
+        '<h2>' + title + ' <span style="font-weight:600;color:var(--muted);font-size:14px;">' + items.length + '</span></h2><p>' + subtitle + '</p>' +
         '<table style="width:100%;border-collapse:collapse;font-size:14px;margin-top:8px;">' +
           '<thead><tr style="text-align:left;border-bottom:1px solid var(--border);">' +
             '<th style="padding:8px 6px;">Keyword</th><th style="padding:8px 6px;">Volume</th>' +
@@ -738,6 +745,7 @@
           '</tr></thead>' +
           '<tbody>' + rows + '</tbody>' +
         '</table>' +
+        '<p style="font-size:12px;color:var(--muted);margin-top:10px;">Volume is the estimated number of times this keyword is searched on Amazon each month, not an exact or real-time figure.</p>' +
       '</div>'
     );
   }
@@ -757,12 +765,17 @@
     var researchHtml;
     if (research && Array.isArray(research.amazonKeywords) && research.amazonKeywords.length) {
       var recommended = Array.isArray(research.recommendedKeywords) ? research.recommendedKeywords : [];
+      // Table order matches the legacy Jordan Truehart dashboard's keyword
+      // section (Amazon Keywords first, Readerbull Recommended Keywords
+      // second), confirmed by re-opening
+      // johnhones.github.io/readabull-jordan-truehart and comparing structure
+      // directly, per ReaderBull_Next_Chat_Handover_Prompt.md item 9.
       researchHtml =
         (research.totalFound
           ? '<p style="font-size:13px;color:var(--muted);margin-top:16px;">Researched ' + escapeHtml(String(research.totalFound)) + ' keywords for "' + escapeHtml(research.seedKeyword || '') + '". Add any of them straight to your 7 KDP fields below.</p>'
           : '') +
-        keywordTableHtml('Readerbull Recommended Keywords', 'The strongest picks for your 7 KDP backend keyword fields, ranked by fit.', recommended, list) +
-        keywordTableHtml('Amazon Keywords', 'Every related keyword found for this niche, flagged Use or Skip.', research.amazonKeywords, list);
+        keywordTableHtml('Amazon Keywords', 'Every related keyword found for this niche, flagged Use or Skip.', research.amazonKeywords, list) +
+        keywordTableHtml('Readerbull Recommended Keywords', 'The strongest picks for your 7 KDP backend keyword fields, ranked by fit.', recommended, list);
     } else {
       researchHtml = '<p style="font-size:13px;color:var(--muted);margin-top:16px;">Keyword research for this book has not run yet, or turned up nothing usable. It runs automatically the next time this book is re-submitted through onboarding.</p>';
     }
@@ -891,7 +904,7 @@
 
       var actionText = {
         listing: 'Fill in all 7 backend keyword fields (scores are capped at 12/20 until they are), confirm your primary keyword is in the title, and check your categories and description.',
-        reviews: 'Launch an ARC campaign to build reviews and ratings, this is worth the most points and usually moves fastest.',
+        reviews: 'Launch or grow your Build Your ARC campaign (under Tools) to build reviews and ratings, it\'s free to start and reciprocal, and this is worth the most points and usually moves fastest.',
         starRating: 'Address anything recurring in critical reviews, star rating is scored separately from review volume.'
       };
 
