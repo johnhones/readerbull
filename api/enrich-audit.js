@@ -198,7 +198,7 @@ async function findKeywordResearch(input) {
     }
   }
 
-  if (!found.items.length) return null;
+  if (!found.items.length) return { _debugFind: { mechanicalCandidates: mechanicalCandidates, aiSeeds: aiSeeds, foundSeed: found.seed } };
 
   var classified = await classifyKeywords(input, found.seed, found.items);
   if (classified) {
