@@ -300,7 +300,7 @@ async function classifyKeywords(input, seed, items) {
     });
 
     var data = await response.json();
-    if (!response.ok) return null;
+    if (!response.ok) return { _debugClassify: { httpStatus: response.status, body: data } };
 
     var text = (data.content && data.content[0] && data.content[0].text) || '';
     var cleaned = text.trim().replace(/^```(json)?/i, '').replace(/```$/, '').trim();
@@ -309,14 +309,14 @@ async function classifyKeywords(input, seed, items) {
     try {
       parsed = JSON.parse(cleaned);
     } catch (e) {
-      return null;
+      return { _debugClassify: { parseError: String(e && e.message || e), stopReason: data.stop_reason, textLength: text.length, textTail: text.slice(-300) } };
     }
 
-    if (!parsed || !Array.isArray(parsed.amazonKeywords)) return null;
+    if (!parsed || !Array.isArray(parsed.amazonKeywords)) return { _debugClassify: { note: 'parsed but amazonKeywords not array', parsedKeys: parsed && Object.keys(parsed) } };
     parsed.recommendedKeywords = Array.isArray(parsed.recommendedKeywords) ? parsed.recommendedKeywords.slice(0, 8) : [];
     return parsed;
   } catch (err) {
-    return null;
+    return { _debugClassify: { fetchError: String(err && err.message || err) } };
   }
 }
 
