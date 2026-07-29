@@ -63,7 +63,7 @@
             <input type="text" id="author-name" placeholder="e.g. Jordan Truehart">
             <label for="email">Your email</label>
             <input type="email" id="email" placeholder="you@example.com" required>
-            <button type="submit" class="btn btn-primary" id="lead-submit">Get Readerbull Free</button>
+            <button type="submit" class="btn btn-primary" id="lead-submit">Get Started Free</button>
             <div class="fine">We'll email you a one-time code, no spam, ever. You'll add your book's Amazon link on the next step.</div>
             <div class="field-error" id="lead-error"></div>
           </form>
@@ -129,7 +129,7 @@ document.getElementById('lead-form').addEventListener('submit', async function (
   });
 
   submitBtn.disabled = false;
-  submitBtn.textContent = 'Get Readerbull Free';
+  submitBtn.textContent = 'Get Started Free';
 
   if (error) {
     errorEl.textContent = error.message || 'Something went wrong, please try again.';
