@@ -82,8 +82,8 @@
 
       <div id="detail-panels"></div>
 
-      <div style="margin-top:12px;text-align:right;">
-        <button class="btn btn-primary" id="finish-btn" style="display:none;">Go to my dashboard</button>
+      <div id="all-submitted-note" style="display:none;margin-top:12px;text-align:right;color:var(--mid);font-size:13px;">
+        <span class="spinner"></span>All books submitted, taking you to your dashboard&hellip;
       </div>
     </div>
   </div>
@@ -323,7 +323,17 @@
     var imported = BOOKS.filter(function (b) { return b.status === 'imported' || b.status === 'submitted'; });
     wrap.innerHTML = imported.map(renderDetailPanel).join('');
     imported.forEach(wireDetailPanel);
-    updateFinishButton();
+  }
+
+  // Auto-redirects once every imported book in this run has been submitted,
+  // no manual "Go to my dashboard" click required (ReaderBull_Next_Chat_
+  // Handover_Prompt.md item 4).
+  function redirectIfAllSubmitted() {
+    var imported = BOOKS.filter(function (b) { return b.status === 'imported' || b.status === 'submitted'; });
+    var allSubmitted = imported.length > 0 && imported.every(function (b) { return b.status === 'submitted'; });
+    if (!allSubmitted) return;
+    document.getElementById('all-submitted-note').style.display = 'block';
+    setTimeout(function () { window.location.href = 'dashboard.html'; }, 900);
   }
 
   function renderDetailPanel(b) {
@@ -352,16 +362,17 @@
         '<label class="field-label">Language</label>' +
         '<select id="lang-' + b.tempId + '" ' + (submitted ? 'disabled' : '') + '>' + langOptions + '</select>' +
 
-        '<label class="field-label">Book description</label>' +
+        '<label class="field-label">Book description <span style="font-weight:400;color:var(--muted);">(optional)</span></label>' +
         '<textarea id="desc-' + b.tempId + '" ' + (submitted ? 'disabled' : '') +
-          (b.description ? '' : ' placeholder="We couldn\'t pull a description for this book from Amazon, write one here (at least 100 characters)."') +
+          (b.description ? '' : ' placeholder="We couldn\'t pull a description for this book from Amazon. Optional, add one if you want it to inform your audit and listing."') +
           '>' + escapeHtml(b.description || '') + '</textarea>' +
-        '<div class="char-count" id="charcount-' + b.tempId + '"></div>' +
-        (b.description ? '' : '<div class="fine">No description was available from Amazon for this listing, please write one so your audit and listing have something to work with.</div>') +
+        (b.description
+          ? ''
+          : '<div class="fine">No description was available from Amazon for this listing. This is optional, leave it blank and we\'ll run your audit from your title and category alone.</div>') +
 
-        '<label class="field-label">KDP keywords <span style="font-weight:400;color:var(--muted);">(optional)</span></label>' +
+        '<label class="field-label">Keywords <span style="font-weight:400;color:var(--muted);">(optional)</span></label>' +
         '<input type="text" id="keywords-' + b.tempId + '" ' + (submitted ? 'disabled' : '') + ' placeholder="e.g. mindset, habits, self discipline">' +
-        '<div class="fine">Amazon doesn\'t make your backend keywords public, so we can\'t pull these. Add up to 7 if you have them, it improves your Keyword Coverage score. Skip if you\'re not sure, you can add these later from your dashboard.</div>' +
+        '<div class="fine">If you\'ve already added keywords to your KDP account (or another marketplace), add two or three here. Not sure? Just think about what a reader would actually type in to search for a book like yours, that works just as well. Skip if you\'re not sure, you can add these later from your dashboard.</div>' +
 
         '<label class="field-label">Monthly sales <span style="font-weight:400;color:var(--muted);">(optional, for your reference)</span></label>' +
         '<input type="number" min="0" id="sales-' + b.tempId + '" ' + (submitted ? 'disabled' : '') + ' placeholder="e.g. 40">' +
@@ -399,16 +410,6 @@
   function wireDetailPanel(b) {
     if (b.status === 'submitted') return;
 
-    var desc = document.getElementById('desc-' + b.tempId);
-    var charCount = document.getElementById('charcount-' + b.tempId);
-    function updateCharCount() {
-      var n = desc.value.length;
-      charCount.textContent = n + ' / 100 minimum';
-      charCount.style.color = n >= 100 ? 'var(--teal-d)' : 'var(--orange-d)';
-    }
-    desc.addEventListener('input', updateCharCount);
-    updateCharCount();
-
     var fileInput = document.getElementById('file-' + b.tempId);
     var fileRow = document.getElementById('filerow-' + b.tempId);
     if (fileInput) {
@@ -425,11 +426,6 @@
       var errorEl = document.getElementById('detail-error-' + b.tempId);
       errorEl.style.display = 'none';
 
-      if (desc.value.trim().length < 100) {
-        errorEl.textContent = 'Description must be at least 100 characters.';
-        errorEl.style.display = 'block';
-        return;
-      }
       if (!document.getElementById('confirm-' + b.tempId).checked) {
         errorEl.textContent = 'Please confirm the responsibility checkbox before submitting.';
         errorEl.style.display = 'block';
@@ -596,17 +592,7 @@
     var temp = document.createElement('div');
     temp.innerHTML = renderDetailPanel(b);
     panelWrap.replaceChild(temp.firstElementChild, document.getElementById('detail-panel-' + tempId));
-    updateFinishButton();
-  });
-
-  function updateFinishButton() {
-    var imported = BOOKS.filter(function (b) { return b.status === 'imported' || b.status === 'submitted'; });
-    var allSubmitted = imported.length > 0 && imported.every(function (b) { return b.status === 'submitted'; });
-    document.getElementById('finish-btn').style.display = allSubmitted ? 'inline-flex' : 'none';
-  }
-
-  document.getElementById('finish-btn').addEventListener('click', function () {
-    window.location.href = 'dashboard.html';
+    redirectIfAllSubmitted();
   });
 
   function escapeHtml(s) {

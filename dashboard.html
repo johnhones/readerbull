@@ -20,6 +20,20 @@
       readerbull
     </a>
 
+    <!-- Sidebar book switcher: replaces the "Your Books" card grid that used
+         to sit at the top of Overview (flagged as clumsy, and book count
+         drives pricing tier so surfacing "add another book" here has
+         commercial value too, see ReaderBull_Next_Chat_Handover_Prompt.md
+         item 5). Populated and wired up in the script below. -->
+    <div class="book-switcher" id="book-switcher">
+      <button type="button" class="book-switcher-trigger" id="book-switcher-trigger">
+        <span class="book-switcher-cover" id="book-switcher-cover"></span>
+        <span class="book-switcher-label" id="book-switcher-label">Loading&hellip;</span>
+        <i class="ti ti-chevron-down"></i>
+      </button>
+      <div class="book-switcher-menu" id="book-switcher-menu" style="display:none;"></div>
+    </div>
+
     <div class="shell-nav">
       <div class="shell-section-label">Navigate</div>
       <button class="shell-nav-item active" data-panel="overview"><i class="ti ti-layout-dashboard"></i> Overview</button>
@@ -245,6 +259,118 @@
 
   var overviewPanel = document.getElementById('panel-overview');
 
+  // Hoisted once, up front. Declared here (rather than further down this
+  // same synchronous script, where they used to live) so an early call to
+  // renderOverview()/selectBook() during the initial render pass can't have
+  // its values wiped out by a later `var ... = null;` re-declaration lower
+  // in the file, a real hoisting trap that existed here before this
+  // sidebar-switcher rework: `var` is function-scoped, so a `var x = null;`
+  // written later in the same synchronous run still executes in place and
+  // stomps whatever an earlier line already assigned to `x`.
+  var currentAuditBook = null;
+  var currentShowScoreDetail = null;
+  var booksById = {};
+
+  // ---------- SIDEBAR BOOK SWITCHER ----------
+  // Assigned and wired up here, before the render dispatch below, so
+  // renderOverview()/renderEmptyState() (which both touch these elements
+  // via refreshSwitcherTrigger) never run before switcherLabel etc. actually
+  // hold their DOM references. Chrome (trigger + outside-click-to-close) is
+  // wired exactly once. Content (label, cover, menu items) is refreshed on
+  // demand by refreshSwitcherTrigger()/renderSwitcherMenu(), called from
+  // renderEmptyState/renderOverview/selectBook below, so re-rendering the
+  // Overview panel never re-binds duplicate listeners onto the trigger.
+  var switcherTrigger = document.getElementById('book-switcher-trigger');
+  var switcherMenu = document.getElementById('book-switcher-menu');
+  var switcherLabel = document.getElementById('book-switcher-label');
+  var switcherCover = document.getElementById('book-switcher-cover');
+  var switcherMenuOpen = false;
+
+  function openSwitcherMenu() { switcherMenu.style.display = 'block'; switcherMenuOpen = true; }
+  function closeSwitcherMenu() { switcherMenu.style.display = 'none'; switcherMenuOpen = false; }
+
+  switcherTrigger.addEventListener('click', function (e) {
+    e.stopPropagation();
+    if (switcherMenuOpen) { closeSwitcherMenu(); return; }
+    renderSwitcherMenu();
+    openSwitcherMenu();
+  });
+  document.addEventListener('click', function (e) {
+    if (switcherMenuOpen && !e.target.closest('#book-switcher')) closeSwitcherMenu();
+  });
+
+  function refreshSwitcherTrigger() {
+    booksById = {};
+    books.forEach(function (b) { booksById[b.id] = b; });
+
+    if (!books.length) {
+      switcherLabel.textContent = 'No books yet';
+      switcherCover.innerHTML = '';
+      return;
+    }
+    if (currentAuditBook) {
+      switcherLabel.textContent = currentAuditBook.book_title || 'Untitled book';
+      switcherCover.innerHTML = currentAuditBook.cover_image_url
+        ? '<img src="' + currentAuditBook.cover_image_url + '" alt="">'
+        : escapeHtml((currentAuditBook.book_title || '?').slice(0, 2));
+    } else {
+      switcherLabel.textContent = 'Select a book';
+      switcherCover.innerHTML = '';
+    }
+  }
+
+  function renderSwitcherMenu() {
+    var itemsHtml = books.map(function (b) {
+      var scored = b.score !== null && b.score !== undefined;
+      var active = currentAuditBook && currentAuditBook.id === b.id;
+      var cover = b.cover_image_url
+        ? '<img src="' + b.cover_image_url + '" alt="">'
+        : escapeHtml((b.book_title || '?').slice(0, 2));
+      var right = scored
+        ? '<span class="book-switcher-item-score">' + b.score + '</span>'
+        : '<span class="status-pill needs-details" style="padding:2px 8px;font-size:9px;">Needs details</span>';
+      return (
+        '<div class="book-switcher-item' + (active ? ' active' : '') + '" data-switch-book-id="' + b.id + '" style="' + (scored ? '' : 'cursor:default;') + '">' +
+          '<span class="book-switcher-item-cover">' + cover + '</span>' +
+          '<span class="book-switcher-item-title">' + escapeHtml(b.book_title || 'Untitled book') + '</span>' +
+          right +
+          '<button type="button" class="book-switcher-item-delete" data-switch-delete-id="' + b.id + '" aria-label="Delete book" title="Delete book"><i class="ti ti-trash"></i></button>' +
+        '</div>'
+      );
+    }).join('');
+
+    switcherMenu.innerHTML = itemsHtml + '<a href="onboarding.html" class="book-switcher-add"><i class="ti ti-plus"></i> Add another book</a>';
+
+    switcherMenu.querySelectorAll('[data-switch-book-id]').forEach(function (item) {
+      item.addEventListener('click', function () {
+        var b = booksById[item.getAttribute('data-switch-book-id')];
+        if (!b || b.score === null || b.score === undefined) return;
+        selectBook(b);
+        closeSwitcherMenu();
+      });
+    });
+
+    switcherMenu.querySelectorAll('[data-switch-delete-id]').forEach(function (btn) {
+      btn.addEventListener('click', function (e) {
+        e.stopPropagation();
+        var b = booksById[btn.getAttribute('data-switch-delete-id')];
+        closeSwitcherMenu();
+        if (b) openDeleteModal(b);
+      });
+    });
+  }
+
+  // Selects a book, updates the sidebar switcher, and drives the score
+  // panel plus the Market Analysis / Marketing Strategy / Keywords / Quick
+  // Wins tabs. Hoisted (not nested in renderOverview) so the switcher menu
+  // can call it directly.
+  function selectBook(b) {
+    currentAuditBook = b;
+    refreshSwitcherTrigger();
+    if (currentShowScoreDetail) currentShowScoreDetail(b);
+    renderAuditPanels(b);
+  }
+
   if (legacyBook) {
     // Legacy, hand-built dashboard: it ships its own full navigation inside
     // the embedded page, so hide our sidebar entirely to avoid a duplicate
@@ -277,12 +403,14 @@
         '<a href="onboarding.html" style="color:var(--teal-d);font-weight:700;">Add a book</a> to unlock your dashboard.</p>' +
       '</div>';
     overviewPanel.appendChild(emptyPanel);
+    refreshSwitcherTrigger();
     renderAuditPanels(null);
   }
 
-  // Catalog: every book this author has added, plus an "add another" tile.
-  // Clicking a scored book shows its breakdown below the grid and drives the
-  // Market Analysis / Marketing Strategy / Keywords / Quick Wins panels.
+  // Overview now shows the selected book's score detail directly, no card
+  // grid at the top (that used to be here, flagged as clumsy, see
+  // ReaderBull_Next_Chat_Handover_Prompt.md item 5). Switching between books
+  // and adding another book both happen from the sidebar switcher above.
   // Rebuildable on demand (called again after a delete).
   function renderOverview() {
     overviewPanel.innerHTML = '';
@@ -292,60 +420,12 @@
       return;
     }
 
-    var catalogPanel = document.createElement('div');
-    catalogPanel.className = 'shell-panel';
+    var detailWrap = document.createElement('div');
+    detailWrap.className = 'shell-panel';
+    detailWrap.id = 'book-score-detail';
+    overviewPanel.appendChild(detailWrap);
 
-    var cardsHtml = books.map(function (b) {
-      var scored = b.score !== null && b.score !== undefined;
-      var cover = b.cover_image_url
-        ? '<img src="' + b.cover_image_url + '" alt="">'
-        : (b.book_title || '?').slice(0, 10);
-      return (
-        '<div class="book-card" data-book-id="' + b.id + '" style="' + (scored ? '' : 'cursor:default;') + '">' +
-          '<button type="button" class="book-card-delete" data-delete-book-id="' + b.id + '" aria-label="Delete book" title="Delete book"><i class="ti ti-trash"></i></button>' +
-          '<div class="cover-ph">' + cover + '</div>' +
-          '<h4>' + escapeHtml(b.book_title || 'Untitled book') + '</h4>' +
-          (scored
-            ? '<div class="score-badge">' + b.score + '<span> / 100</span></div><div style="font-size:11px;font-weight:600;color:var(--mid);margin-top:2px;">' + scoreBadge(b.score) + '</div>'
-            : '<span class="status-pill needs-details">Needs details</span>')
-        + '</div>'
-      );
-    }).join('');
-
-    cardsHtml += '<a href="onboarding.html" class="book-card add-book-card" style="text-decoration:none;"><i class="ti ti-plus"></i><span>Add another book</span></a>';
-
-    catalogPanel.innerHTML =
-      '<h1 style="font-size:20px;font-weight:800;color:var(--navy);margin-bottom:4px;">Your Books</h1>' +
-      '<p style="font-size:14px;color:var(--mid);margin-bottom:0;">Every book you\'ve added to Readerbull, in one place.</p>' +
-      '<div class="catalog-grid" id="catalog-grid">' + cardsHtml + '</div>' +
-      '<div id="book-score-detail" style="display:none;margin-top:32px;"></div>';
-
-    overviewPanel.appendChild(catalogPanel);
-
-    var booksById = {};
-    books.forEach(function (b) { booksById[b.id] = b; });
-
-    document.querySelectorAll('#catalog-grid .book-card[data-book-id]').forEach(function (card) {
-      card.addEventListener('click', function () {
-        var b = booksById[card.getAttribute('data-book-id')];
-        if (!b || b.score === null || b.score === undefined) return;
-        selectBook(b);
-      });
-    });
-
-    document.querySelectorAll('.book-card-delete[data-delete-book-id]').forEach(function (btn) {
-      btn.addEventListener('click', function (e) {
-        e.stopPropagation();
-        var b = booksById[btn.getAttribute('data-delete-book-id')];
-        if (b) openDeleteModal(b);
-      });
-    });
-
-    function selectBook(b) {
-      currentAuditBook = b;
-      showScoreDetail(b);
-      renderAuditPanels(b);
-    }
+    refreshSwitcherTrigger();
 
     // R27 display rules (scoring.js / ReaderBull_Scoring_Rebuild_Handover.md):
     // three visible bars (Listing, Reviews & Ratings, Star Rating), one
@@ -406,7 +486,12 @@
         '</div>';
 
       var badge = scoreBadge(b.score);
-      var adsPillHtml = '<span class="status-pill ' + (amazonAds.active ? 'imported' : 'error') + '" style="margin-left:8px;">Amazon Ads: ' + (amazonAds.active ? 'Active' : 'Not active') + '</span>';
+      // Discreet dot-plus-label pill, not a loud error-style badge, matching
+      // the legacy Jordan Truehart dashboard's treatment (see .ads-pill in
+      // style.css and ReaderBull_Next_Chat_Handover_Prompt.md item 6).
+      var adsPillHtml = '<span class="ads-pill ' + (amazonAds.active ? 'active' : 'inactive') + '" style="margin-left:10px;">' +
+        '<span class="dot"></span>Amazon Ads: ' + (amazonAds.active ? 'Active' : 'Not active') +
+      '</span>';
 
       detailWrap.style.display = 'block';
       detailWrap.innerHTML =
@@ -436,8 +521,18 @@
 
     // Show the first scored book's breakdown by default, if there is one.
     var firstScored = books.filter(function (b) { return b.score !== null && b.score !== undefined; })[0];
-    if (firstScored) selectBook(firstScored);
-    else renderAuditPanels(null);
+    if (firstScored) {
+      selectBook(firstScored);
+    } else {
+      detailWrap.innerHTML =
+        '<div class="shell-empty">' +
+          '<i class="ti ti-hourglass"></i>' +
+          '<h3>Finish your book details</h3>' +
+          '<p>Add the remaining details for your book to see its Discoverability Score. ' +
+          '<a href="onboarding.html" style="color:var(--teal-d);font-weight:700;">Continue onboarding</a>.</p>' +
+        '</div>';
+      renderAuditPanels(null);
+    }
   }
 
   function escapeHtml(s) {
@@ -502,11 +597,8 @@
   // First-pass, automated read built entirely from what we already pull live
   // from Amazon plus the Discoverability Score breakdown, no invented
   // competitor names or numbers, that deeper layer comes later.
-  var currentAuditBook = null;
-  // Hoisted out of renderOverview's closure so the Keywords tab (defined
-  // below, outside that closure) can refresh the score panel after an
-  // add/remove without a full catalog re-render.
-  var currentShowScoreDetail = null;
+  // (currentAuditBook and currentShowScoreDetail are declared once, up near
+  // overviewPanel, see the comment there.)
 
   function auditEmptyHtml(icon, title, body) {
     return '<div class="shell-empty"><i class="ti ti-' + icon + '"></i><h3>' + title + '</h3><p>' + body + '</p></div>';
@@ -835,16 +927,11 @@
     b.score = scoreResult.score;
     b.score_breakdown = scoreResult.breakdown;
 
-    // Targeted refresh: the catalog card's score number, the score panel,
-    // and the Keywords tab itself, without rebuilding the whole catalog
-    // grid (that would lose scroll position and re-run selectBook).
-    var card = document.querySelector('.book-card[data-book-id="' + b.id + '"]');
-    if (card) {
-      var badgeEl = card.querySelector('.score-badge');
-      if (badgeEl) badgeEl.innerHTML = b.score + '<span> / 100</span>';
-      var labelEl = card.querySelector('.score-badge + div');
-      if (labelEl) labelEl.textContent = scoreBadge(b.score);
-    }
+    // Targeted refresh: the score panel and the Keywords tab itself,
+    // without rebuilding the whole Overview. b is the same object referenced
+    // from the shared books array/booksById map, so the sidebar switcher
+    // menu already reflects the new score next time it's opened, no manual
+    // DOM patching needed there.
     if (currentShowScoreDetail) currentShowScoreDetail(b);
     // Refreshes all four audit panels (Market Analysis, Marketing Strategy,
     // Keywords, Quick Wins), not just Keywords, since Quick Wins in
