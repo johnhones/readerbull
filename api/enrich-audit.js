@@ -30,6 +30,14 @@
 // keywords from either table, which recomputes the score client-side
 // using this cached data, no repeat DataForSEO call per click.
 //
+// Standing rule (ReaderBull_Project_Rules.md, rule 12): keyword research
+// must never come back empty. findKeywordResearch tries category, then the
+// author's own keyword, then the book title against DataForSEO; if all of
+// those dead-end (or there was nothing to try), it asks Claude to guess two
+// natural shopper-style search phrases and retries with those before giving
+// up. This adds at most one extra cheap Anthropic call, only on the rare
+// book where every mechanical seed fails.
+//
 // POST { title, category, keywords, asin, price, rating, reviewCount,
 //        bestsellerRank }
 // -> { competitors: [...], pageRank: {...}, keywordResearch: {...}, narrative: {...} }
@@ -149,19 +157,17 @@ async function findKeywordResearch(input) {
   var password = process.env.DATAFORSEO_PASSWORD;
   if (!login || !password) return null;
 
-  // Build a short list of candidate seed terms to try, in order. Amazon's
-  // real category names (pulled by import-book.js) are often formal browse
-  // node labels like "Personal Transformation Self-Help" rather than
+  var auth = Buffer.from(login + ':' + password).toString('base64');
+
+  // Build a short list of mechanical candidate seed terms to try, in order.
+  // Amazon's real category names (pulled by import-book.js) are often formal
+  // browse node labels like "Personal Transformation Self-Help" rather than
   // something a reader would actually type into search, and DataForSEO's
   // related-keywords endpoint returns zero results for a lot of those
-  // (confirmed by a live test on 29 July 2026: "Personal Transformation
-  // Self-Help" returned 0 items, but the simpler "self help" returned 30).
-  // So try the category leaf first, and if that comes back empty, fall
-  // back to the author's own primary backend keyword, which is a real
-  // search-style phrase a human chose. Each attempt is the same flat-ish
-  // DataForSEO cost, this only ever fires a second request on the rare
-  // book where the first seed dead-ends, so it does not change normal
-  // per-audit cost.
+  // (confirmed live 29 July 2026: "Personal Transformation Self-Help"
+  // returned 0 items, "self help" returned 30). So try the category leaf
+  // first, then the author's own primary backend keyword if they gave one,
+  // then the book title as a last mechanical option.
   var categorySeed = String(input.category || '').trim();
   if (categorySeed.indexOf('>') !== -1) {
     var segments = categorySeed.split('>').map(function (s) { return s.trim(); }).filter(Boolean);
@@ -170,13 +176,52 @@ async function findKeywordResearch(input) {
   var primaryKeywordSeed = String(input.keywords || '').split(',').map(function (k) { return k.trim(); }).filter(Boolean)[0] || '';
   var titleSeed = String(input.title || '').trim();
 
-  var candidates = [categorySeed, primaryKeywordSeed, titleSeed]
+  var mechanicalCandidates = [categorySeed, primaryKeywordSeed, titleSeed]
     .filter(Boolean)
     .filter(function (s, i, arr) { return arr.indexOf(s) === i; }); // dedupe, keep order
-  if (!candidates.length) return null;
 
-  var auth = Buffer.from(login + ':' + password).toString('base64');
+  var found = await tryDataForSeoCandidates(mechanicalCandidates, auth);
 
+  // Standing rule (ReaderBull_Project_Rules.md, rule 12): keyword research
+  // must never come back empty to the author. If every mechanical seed
+  // (category, author keyword, title) failed to return anything, or there
+  // was no author keyword to try at all, ask Claude to guess a couple of
+  // short, natural phrases a reader would actually type into Amazon search
+  // for a book like this, then retry with those. One extra cheap AI call
+  // (well under a cent), it only fires on the book where every mechanical
+  // seed dead-ends, confirmed live 29 July 2026 this happens for real
+  // (a book categorised "Medical Child Psychology" with no author keyword).
+  if (!found.items.length) {
+    var aiSeeds = await generateSearchSeeds(input);
+    if (aiSeeds.length) {
+      found = await tryDataForSeoCandidates(aiSeeds, auth);
+    }
+  }
+
+  if (!found.items.length) return null;
+
+  var classified = await classifyKeywords(input, found.seed, found.items);
+  if (classified) {
+    classified.totalFound = found.totalFound;
+    classified.seedKeyword = found.seed;
+    return classified;
+  }
+
+  // Classification failed (e.g. no Anthropic key), fall back to the raw
+  // list with no Use/Skip judgment rather than losing the DataForSEO data
+  // entirely, dashboard.html treats missing status as "Use".
+  return {
+    seedKeyword: found.seed,
+    totalFound: found.totalFound,
+    amazonKeywords: found.items.slice(0, 30).map(function (it) { return { keyword: it.keyword, volume: it.volume, status: 'Use' }; }),
+    recommendedKeywords: []
+  };
+}
+
+// Tries each candidate seed against DataForSEO in order, stops at the first
+// one that returns at least one keyword. Shared by the mechanical-candidate
+// pass and the AI-guessed-candidate pass in findKeywordResearch above.
+async function tryDataForSeoCandidates(candidates, auth) {
   var items = [];
   var totalFound = 0;
   var seed = null;
@@ -227,24 +272,71 @@ async function findKeywordResearch(input) {
     }
   }
 
-  if (!items.length) return null;
+  return { items: items, totalFound: totalFound, seed: seed };
+}
 
-  var classified = await classifyKeywords(input, seed, items);
-  if (classified) {
-    classified.totalFound = totalFound;
-    classified.seedKeyword = seed;
-    return classified;
-  }
+// Last-resort seed guesser (ReaderBull_Project_Rules.md, rule 12). Asks
+// Claude to think like a shopper, not a librarian: short, natural search
+// phrases rather than the formal Amazon category label or the literal book
+// title, both of which have been confirmed live to return zero DataForSEO
+// results for some real books.
+async function generateSearchSeeds(input) {
+  var apiKey = process.env.ANTHROPIC_API_KEY;
+  if (!apiKey) return [];
 
-  // Classification failed (e.g. no Anthropic key), fall back to the raw
-  // list with no Use/Skip judgment rather than losing the DataForSEO data
-  // entirely, dashboard.html treats missing status as "Use".
-  return {
-    seedKeyword: seed,
-    totalFound: totalFound,
-    amazonKeywords: items.slice(0, 30).map(function (it) { return { keyword: it.keyword, volume: it.volume, status: 'Use' }; }),
-    recommendedKeywords: []
+  var systemPrompt =
+    'You help find real Amazon search phrases for a self-published book. Given the book\'s ' +
+    'title, category and description, suggest 2 short, natural phrases (2 to 4 words each) ' +
+    'that a reader would actually type into Amazon search to find a book like this. Think ' +
+    'like a shopper, not a librarian: do not just repeat the book title, and do not just ' +
+    'repeat the formal Amazon category label verbatim, especially if it reads like a stiff ' +
+    'catalogue term rather than something a person would type. Make the two phrases distinct ' +
+    'from each other so they cover different angles. ' +
+    'Respond with ONLY compact JSON on one line, no markdown fences, no commentary, no ' +
+    'indentation, matching exactly this shape: {"seeds": ["phrase one", "phrase two"]}.';
+
+  var payload = {
+    title: input.title || null,
+    category: input.category || null,
+    description: (input.description || '').slice(0, 500) || null
   };
+
+  try {
+    var response = await fetch('https://api.anthropic.com/v1/messages', {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'x-api-key': apiKey,
+        'anthropic-version': '2023-06-01'
+      },
+      body: JSON.stringify({
+        model: 'claude-haiku-4-5-20251001',
+        max_tokens: 200,
+        system: systemPrompt,
+        messages: [
+          { role: 'user', content: 'Here is the book:\n\n' + JSON.stringify(payload, null, 2) }
+        ]
+      })
+    });
+
+    var data = await response.json();
+    if (!response.ok) return [];
+
+    var text = (data.content && data.content[0] && data.content[0].text) || '';
+    var cleaned = text.trim().replace(/^```(json)?/i, '').replace(/```$/, '').trim();
+
+    var parsed;
+    try {
+      parsed = JSON.parse(cleaned);
+    } catch (e) {
+      return [];
+    }
+
+    if (!parsed || !Array.isArray(parsed.seeds)) return [];
+    return parsed.seeds.map(function (s) { return String(s || '').trim(); }).filter(Boolean).slice(0, 3);
+  } catch (err) {
+    return [];
+  }
 }
 
 async function classifyKeywords(input, seed, items) {
