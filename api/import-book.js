@@ -29,6 +29,7 @@ module.exports = async function handler(req, res) {
 
   var apiKey = process.env.SERPAPI_KEY;
   if (!apiKey) {
+    await sendErrorAlert('import-book', 'SERPAPI_KEY is missing in Vercel env vars, no imports can work until this is set.');
     res.status(500).json({ error: 'Import is not configured yet, SERPAPI_KEY is missing.' });
     return;
   }
@@ -138,6 +139,7 @@ module.exports = async function handler(req, res) {
       boughtTogether: boughtTogether
     });
   } catch (err) {
+    await sendErrorAlert('import-book', 'Amazon lookup threw an unexpected error: ' + (err && err.message ? err.message : String(err)));
     res.status(502).json({ error: 'Amazon lookup failed, please try again.' });
   }
 };
@@ -150,3 +152,5 @@ function extractAsin(input) {
   var match = trimmed.match(/\/(?:dp|gp\/product|ASIN)\/([A-Z0-9]{10})/i);
   return match ? match[1].toUpperCase() : null;
 }
+
+function sendErrorAlert(endpoint, detail) { var key = process.env.RESEND_API_KEY; if (!key) return Promise.resolve(); return fetch('https://api.resend.com/emails', { method: 'POST', headers: { 'Authorization': 'Bearer ' + key, 'Content-Type': 'application/json' }, body: JSON.stringify({ from: 'Readerbull Alerts <alerts@readerbull.com>', to: ['coastlvibes@gmail.com'], subject: 'Readerbull error: ' + endpoint, text: detail + '\n\nTime: ' + new Date().toISOString() }) }).catch(function () {}); }
