@@ -495,7 +495,7 @@ async function classifyKeywords(input, seed, items) {
 // ---------- Narrative generation (Anthropic Messages API) ----------
 async function generateNarrative(input, competitors) {
   var apiKey = process.env.ANTHROPIC_API_KEY;
-  if (!apiKey) return null;
+  if (!apiKey) { await sendErrorAlert('enrich-audit', 'ANTHROPIC_API_KEY is missing, narrative generation cannot run.'); return null; }
 
   var breakdown = input.breakdown || {};
   var payload = {
@@ -593,7 +593,7 @@ async function generateNarrative(input, competitors) {
     });
 
     var data = await response.json();
-    if (!response.ok) return null;
+    if (!response.ok) { await sendErrorAlert('enrich-audit', 'Anthropic narrative call returned an error status.'); return null; }
 
     var text = (data.content && data.content[0] && data.content[0].text) || '';
     var cleaned = text.trim().replace(/^```(json)?/i, '').replace(/```$/, '').trim();
@@ -608,6 +608,9 @@ async function generateNarrative(input, competitors) {
     if (!parsed || typeof parsed !== 'object') return null;
     return parsed;
   } catch (err) {
-    return null;
+    await sendErrorAlert('enrich-audit', 'Narrative generation threw an unexpected error: ' + (err && err.message ? err.message : String(err))); return null;
   }
 }
+
+
+function sendErrorAlert(endpoint, detail) { var key = process.env.RESEND_API_KEY; if (!key) return Promise.resolve(); return fetch('https://api.resend.com/emails', { method: 'POST', headers: { 'Authorization': 'Bearer ' + key, 'Content-Type': 'application/json' }, body: JSON.stringify({ from: 'Readerbull Alerts <alerts@readerbull.com>', to: ['coastlvibes@gmail.com'], subject: 'Readerbull error: ' + endpoint, text: detail + '\n\nTime: ' + new Date().toISOString() }) }).catch(function () {}); }
