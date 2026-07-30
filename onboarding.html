@@ -3,6 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
+<script src="analytics.js"></script>
 <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/@tabler/icons-webfont@latest/tabler-icons.min.css">
 <link rel="stylesheet" href="style.css">
 <title>Readerbull: Add Your Books</title>
@@ -126,7 +127,6 @@
   }
 
   var meta = user.user_metadata || {};
-  var sessionResult = await readerbull.client.auth.getSession(); var accessToken = (sessionResult.data && sessionResult.data.session && sessionResult.data.session.access_token) || '';
 
   // BOOKS holds only the entries added in *this* import run, so the user
   // sees a focused queue rather than every book they've ever added.
@@ -246,7 +246,7 @@
       try {
         var resp = await fetch('/api/import-book', {
           method: 'POST',
-          headers: { 'Content-Type': 'application/json' , 'Authorization': 'Bearer ' + accessToken},
+          headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({ input: b.input })
         });
         var payload = await resp.json();
@@ -509,7 +509,7 @@
     try {
       var enrichResp = await fetch('/api/enrich-audit', {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json', 'Authorization': 'Bearer ' + accessToken },
+        headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           title: b.title,
           category: b.category,
@@ -615,5 +615,5 @@
 })();
 </script>
 
-<script src="cookie-notice.js"></script></body>
+</body>
 </html>
