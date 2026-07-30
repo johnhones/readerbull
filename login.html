@@ -19,6 +19,12 @@
     <div class="nav-links">
       <a href="pricing.html">Pricing</a>
     </div>
+    <button type="button" class="mob-toggle" aria-label="Menu" aria-expanded="false">
+      <span></span><span></span><span></span>
+    </button>
+  </div>
+  <div class="mob-panel">
+    <a href="pricing.html">Pricing</a>
   </div>
 </div>
 
@@ -77,12 +83,13 @@
 <div class="ftr">
   <div class="wrap">
     <div class="ftr-logo"><span class="logo-mark"><img src="readerbull-icon.png" alt="Readerbull"></span>readerbull</div>
-    <div class="ftr-links"><a href="privacy.html">Privacy Policy</a><a href="terms.html">Terms of Service</a></div><small>&copy; 2026 Readerbull. A platform that helps you sell more books.</small>
+    <small>&copy; 2026 Readerbull. A platform that helps you sell more books.</small>
   </div>
 </div>
 
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.js"></script>
 <script src="supabase-client.js"></script>
+<script src="nav.js"></script>
 <script>
 var currentEmail = '';
 
@@ -212,5 +219,5 @@ document.getElementById('password-step').addEventListener('submit', async functi
 });
 </script>
 
-<script src="cookie-notice.js"></script></body>
+</body>
 </html>
