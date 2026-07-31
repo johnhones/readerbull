@@ -48,7 +48,8 @@ img { max-width: 100%; display: block; }
 .nav-links .nav-dropdown-top a { font-size: 13px; font-weight: 700; color: var(--orange); display: flex; align-items: center; gap: 4px; }
 .nav-dropdown-cols { display: grid; grid-template-columns: repeat(3, minmax(0,1fr)); gap: 20px; }
 .nav-dropdown-col .bulls { display: flex; align-items: center; gap: 4px; margin-bottom: 6px; }
-.nav-dropdown-col .bulls img, .step-bulls img, .eyebrow-bulls img { width: 16px; height: 16px; object-fit: contain; display: inline-block; }
+.nav-dropdown-col .bulls img, .step-bulls img { width: 32px; height: 32px; object-fit: contain; display: inline-block; }
+.eyebrow-bulls img { width: 16px; height: 16px; object-fit: contain; display: inline-block; }
 .step-bulls { display: flex; align-items: center; gap: 4px; margin-bottom: 16px; }
 .eyebrow-bulls { display: inline-flex; align-items: center; gap: 6px; }
 .nav-dropdown-col h4 { font-weight: 700; font-size: 14px; color: var(--navy); margin: 0 0 4px; }
