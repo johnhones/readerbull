@@ -102,7 +102,7 @@ img { max-width: 100%; display: block; }
 .split { display: grid; grid-template-columns: 1fr 1fr; gap: 56px; align-items: center; }
 .split p { font-size: 16px; color: var(--mid); line-height: 1.75; margin-bottom: 16px; }
 .check-list { list-style: none; margin-top: 22px; }
-.check-list li { display: flex; gap: 12px; align-items: flex-start; margin-bottom: 14px; font-size: 14px; color: var(--navy); font-weight: 600; }
+.check-list li { display: flex; gap: 12px; align-items: center; margin-bottom: 14px; font-size: 14px; color: var(--navy); font-weight: 600; }
 .check-list li i { color: var(--teal-d); font-size: 18px; flex-shrink: 0; margin-top: 1px; }
 
 .score-demo { background: var(--navy); border-radius: 12px; padding: 32px; box-shadow: 0 20px 50px rgba(27,58,72,.25); }
