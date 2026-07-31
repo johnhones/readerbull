@@ -124,6 +124,7 @@ img { max-width: 100%; display: block; }
 .step-card .step-num { width: 34px; height: 34px; border-radius: 50%; background: var(--teal); color: #fff; display: flex; align-items: center; justify-content: center; font-weight: 800; font-size: 14px; margin-bottom: 16px; }
 .step-card:nth-child(even) { border-top-color: var(--orange); }
 .step-card:nth-child(even) .step-num { background: var(--orange); }
+.step-card:nth-child(3) .step-num { background: var(--navy); }
 .step-card h3 { font-size: 16px; font-weight: 700; color: var(--navy); margin-bottom: 8px; }
 .step-card p { font-size: 13px; color: var(--mid); line-height: 1.6; }
 
