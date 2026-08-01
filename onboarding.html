@@ -126,6 +126,7 @@
   }
 
   var meta = user.user_metadata || {};
+  var sessionResult = await readerbull.client.auth.getSession(); var accessToken = (sessionResult.data && sessionResult.data.session && sessionResult.data.session.access_token) || '';
 
   // BOOKS holds only the entries added in *this* import run, so the user
   // sees a focused queue rather than every book they've ever added.
@@ -245,7 +246,7 @@
       try {
         var resp = await fetch('/api/import-book', {
           method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
+          headers: { 'Content-Type': 'application/json' , 'Authorization': 'Bearer ' + accessToken},
           body: JSON.stringify({ input: b.input })
         });
         var payload = await resp.json();
@@ -508,7 +509,7 @@
     try {
       var enrichResp = await fetch('/api/enrich-audit', {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
+        headers: { 'Content-Type': 'application/json', 'Authorization': 'Bearer ' + accessToken },
         body: JSON.stringify({
           title: b.title,
           category: b.category,
