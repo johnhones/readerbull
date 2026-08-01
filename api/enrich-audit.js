@@ -60,6 +60,8 @@ module.exports = async function handler(req, res) {
     return;
   }
 
+  var authToken = ((req.headers && req.headers.authorization) || '').replace(/^Bearer\s+/i, ''); if (!authToken) { res.status(401).json({ error: 'Please sign in again, your session could not be found.' }); return; } var authCheck = await fetch((process.env.SUPABASE_URL || 'https://tqkeqjisqqvxasyzrfax.supabase.co') + '/auth/v1/user', { headers: { apikey: 'sb_publishable_0L4W_eHRcnYNm5MR1gDDDg_Bn1d3nPm', Authorization: 'Bearer ' + authToken } }); if (!authCheck.ok) { res.status(401).json({ error: 'Your session has expired, please sign in again.' }); return; }
+
   var input = req.body || {};
   var result = { competitors: [], pageRank: null, keywordResearch: null, narrative: null };
 
