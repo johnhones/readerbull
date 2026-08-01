@@ -47,7 +47,11 @@ img { max-width: 100%; display: block; }
 .nav-dropdown-top { display: flex; justify-content: flex-end; margin-bottom: 16px; }
 .nav-links .nav-dropdown-top a { font-size: 13px; font-weight: 700; color: var(--orange); display: flex; align-items: center; gap: 4px; }
 .nav-dropdown-cols { display: grid; grid-template-columns: repeat(3, minmax(0,1fr)); gap: 20px; }
-.nav-dropdown-col .bulls { font-size: 13px; margin-bottom: 6px; letter-spacing: 1px; }
+.nav-dropdown-col .bulls { display: flex; align-items: center; gap: 4px; margin-bottom: 6px; }
+.nav-dropdown-col .bulls img, .step-bulls img { width: 32px; height: 32px; object-fit: contain; display: inline-block; }
+.eyebrow-bulls img { width: 16px; height: 16px; object-fit: contain; display: inline-block; }
+.step-bulls { display: flex; align-items: center; gap: 4px; margin-bottom: 16px; }
+.eyebrow-bulls { display: inline-flex; align-items: center; gap: 6px; }
 .nav-dropdown-col h4 { font-weight: 700; font-size: 14px; color: var(--navy); margin: 0 0 4px; }
 .nav-dropdown-col p { font-size: 13px; color: var(--mid); margin: 0; line-height: 1.5; }
 
@@ -98,7 +102,7 @@ img { max-width: 100%; display: block; }
 .split { display: grid; grid-template-columns: 1fr 1fr; gap: 56px; align-items: center; }
 .split p { font-size: 16px; color: var(--mid); line-height: 1.75; margin-bottom: 16px; }
 .check-list { list-style: none; margin-top: 22px; }
-.check-list li { display: flex; gap: 12px; align-items: flex-start; margin-bottom: 14px; font-size: 14px; color: var(--navy); font-weight: 600; }
+.check-list li { display: flex; gap: 12px; align-items: center; margin-bottom: 14px; font-size: 14px; color: var(--navy); font-weight: 600; }
 .check-list li i { color: var(--teal-d); font-size: 18px; flex-shrink: 0; margin-top: 1px; }
 
 .score-demo { background: var(--navy); border-radius: 12px; padding: 32px; box-shadow: 0 20px 50px rgba(27,58,72,.25); }
@@ -120,6 +124,7 @@ img { max-width: 100%; display: block; }
 .step-card .step-num { width: 34px; height: 34px; border-radius: 50%; background: var(--teal); color: #fff; display: flex; align-items: center; justify-content: center; font-weight: 800; font-size: 14px; margin-bottom: 16px; }
 .step-card:nth-child(even) { border-top-color: var(--orange); }
 .step-card:nth-child(even) .step-num { background: var(--orange); }
+.step-card:nth-child(3) .step-num { background: var(--navy); }
 .step-card h3 { font-size: 16px; font-weight: 700; color: var(--navy); margin-bottom: 8px; }
 .step-card p { font-size: 13px; color: var(--mid); line-height: 1.6; }
 

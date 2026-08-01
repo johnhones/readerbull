@@ -17,6 +17,7 @@ module.exports = async function handler(req, res) {
     res.status(405).json({ error: 'Method not allowed' });
     return;
   }
+  var authToken = ((req.headers && req.headers.authorization) || '').replace(/^Bearer\s+/i, ''); if (!authToken) { res.status(401).json({ error: 'Please sign in again, your session could not be found.' }); return; } var authCheck = await fetch((process.env.SUPABASE_URL || 'https://tqkeqjisqqvxasyzrfax.supabase.co') + '/auth/v1/user', { headers: { apikey: 'sb_publishable_0L4W_eHRcnYNm5MR1gDDDg_Bn1d3nPm', Authorization: 'Bearer ' + authToken } }); if (!authCheck.ok) { res.status(401).json({ error: 'Your session has expired, please sign in again.' }); return; }
 
   var authToken = ((req.headers && req.headers.authorization) || '').replace(/^Bearer\s+/i, ''); if (!authToken) { res.status(401).json({ error: 'Please sign in again, your session could not be found.' }); return; } var authCheck = await fetch((process.env.SUPABASE_URL || 'https://tqkeqjisqqvxasyzrfax.supabase.co') + '/auth/v1/user', { headers: { apikey: 'sb_publishable_0L4W_eHRcnYNm5MR1gDDDg_Bn1d3nPm', Authorization: 'Bearer ' + authToken } }); if (!authCheck.ok) { res.status(401).json({ error: 'Your session has expired, please sign in again.' }); return; }
 
@@ -30,6 +31,7 @@ module.exports = async function handler(req, res) {
 
   var apiKey = process.env.SERPAPI_KEY;
   if (!apiKey) {
+    await sendErrorAlert('import-book', 'SERPAPI_KEY is missing in Vercel env vars, no imports can work until this is set.');
     res.status(500).json({ error: 'Import is not configured yet, SERPAPI_KEY is missing.' });
     return;
   }
@@ -139,6 +141,7 @@ module.exports = async function handler(req, res) {
       boughtTogether: boughtTogether
     });
   } catch (err) {
+    await sendErrorAlert('import-book', 'Amazon lookup threw an unexpected error: ' + (err && err.message ? err.message : String(err)));
     res.status(502).json({ error: 'Amazon lookup failed, please try again.' });
   }
 };
@@ -151,3 +154,5 @@ function extractAsin(input) {
   var match = trimmed.match(/\/(?:dp|gp\/product|ASIN)\/([A-Z0-9]{10})/i);
   return match ? match[1].toUpperCase() : null;
 }
+
+function sendErrorAlert(endpoint, detail) { var key = process.env.RESEND_API_KEY; if (!key) return Promise.resolve(); return fetch('https://api.resend.com/emails', { method: 'POST', headers: { 'Authorization': 'Bearer ' + key, 'Content-Type': 'application/json' }, body: JSON.stringify({ from: 'Readerbull Alerts <alerts@readerbull.com>', to: ['coastlvibes@gmail.com'], subject: 'Readerbull error: ' + endpoint, text: detail + '\n\nTime: ' + new Date().toISOString() }) }).catch(function () {}); }
