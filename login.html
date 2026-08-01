@@ -3,6 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
+<script src="analytics.js"></script>
 <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/@tabler/icons-webfont@latest/tabler-icons.min.css">
 <link rel="stylesheet" href="style.css">
 <title>Readerbull: Log in</title>
@@ -17,14 +18,42 @@
       readerbull
     </a>
     <div class="nav-links">
+      <a href="index.html#how-it-works">How It Works</a>
+      <div class="nav-item-dropdown">
+        <a href="features.html">Product <i class="ti ti-chevron-down" style="font-size:13px;"></i></a>
+        <div class="nav-dropdown-panel">
+          <div class="nav-dropdown-top"><a href="features.html">See all features <i class="ti ti-arrow-right"></i></a></div>
+          <div class="nav-dropdown-cols">
+            <div class="nav-dropdown-col">
+              <div class="bulls"><img src="readerbull-icon.png" alt=""></div>
+              <h4>Upload</h4>
+              <p>That's all you need to do.</p>
+            </div>
+            <div class="nav-dropdown-col">
+              <div class="bulls"><img src="readerbull-icon.png" alt=""><img src="readerbull-icon.png" alt=""></div>
+              <h4>Unleash</h4>
+              <p>readerbull helps you unlock your book's full sales potential.</p>
+            </div>
+            <div class="nav-dropdown-col">
+              <div class="bulls"><img src="readerbull-icon.png" alt=""><img src="readerbull-icon.png" alt=""><img src="readerbull-icon.png" alt=""></div>
+              <h4>Ol&eacute;!</h4>
+              <p>Launch AI-powered book marketing campaigns that drive consistent monthly sales.</p>
+            </div>
+          </div>
+        </div>
+      </div>
       <a href="pricing.html">Pricing</a>
+      <a href="signup.html" class="btn btn-primary">Get Started Free</a>
     </div>
     <button type="button" class="mob-toggle" aria-label="Menu" aria-expanded="false">
       <span></span><span></span><span></span>
     </button>
   </div>
   <div class="mob-panel">
+    <a href="index.html#how-it-works">How It Works</a>
+    <a href="features.html">Product</a>
     <a href="pricing.html">Pricing</a>
+    <a href="signup.html" class="btn btn-primary">Get Started Free</a>
   </div>
 </div>
 
@@ -43,7 +72,7 @@
         <input type="email" id="email" placeholder="Enter your email address..." required>
         <div class="fine" style="text-align:left;margin-top:6px;">We'll email you a one-time code to sign in.</div>
         <button type="submit" class="btn btn-primary" id="email-submit">Continue</button>
-        <div class="fine">Don't have an account yet? <a href="signup.html" style="color:var(--teal-d);font-weight:700;">Get your free audit</a> instead.</div>
+        <div class="fine">Don't have an account yet? <a href="signup.html" style="color:var(--teal-d);font-weight:700;">Get your free score</a> instead.</div>
         <div class="fine"><a href="#" id="use-password-link" style="color:var(--teal-d);font-weight:700;">Log in with a password instead</a></div>
         <div class="field-error" id="email-error"></div>
       </form>
@@ -126,7 +155,7 @@ document.getElementById('email-step').addEventListener('submit', async function 
 
   if (error) {
     errorEl.textContent = /signup|not.*found|not.*allowed/i.test(error.message)
-      ? "We couldn't find an account with that email. Try the free audit instead."
+      ? "We couldn't find an account with that email. Try the free score instead."
       : (error.message || 'Something went wrong, please try again.');
     errorEl.style.display = 'block';
     return;
