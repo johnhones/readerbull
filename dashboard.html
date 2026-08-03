@@ -329,7 +329,7 @@
         : escapeHtml((b.book_title || '?').slice(0, 2));
       var right = scored
         ? '<span class="book-switcher-item-score">' + b.score + '</span>'
-        : '<span class="status-pill needs-details" style="padding:2px 8px;font-size:9px;">Needs details</span>';
+        : '<span class="status-pill needs-details" style="padding:2px 8px;font-size:9px;" title="Import was started but never finished. Delete it and add the book again to retry.">Incomplete</span>';
       return (
         '<div class="book-switcher-item' + (active ? ' active' : '') + '" data-switch-book-id="' + b.id + '" style="' + (scored ? '' : 'cursor:default;') + '">' +
           '<span class="book-switcher-item-cover">' + cover + '</span>' +
