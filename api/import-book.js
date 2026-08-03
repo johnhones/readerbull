@@ -72,6 +72,18 @@ module.exports = async function handler(req, res) {
       return;
     }
 
+    // Temporary diagnostic (3 August 2026, same pattern as the description
+    // diagnostic above): checking whether SerpApi already surfaces A+
+    // content, format availability (hardback/paperback/Kindle) or Kindle
+    // Unlimited enrolment anywhere in the raw payload, ahead of building
+    // the Overview "Professional Assessment" block. Only fires when the
+    // caller explicitly passes { debug: true }, so it never affects a
+    // normal import. Remove once the real fields are confirmed and wired.
+    if (input && input.debug === true) {
+      res.status(200).json({ debug: true, raw: data });
+      return;
+    }
+
     var product = data.product_results || {};
     var details = data.product_details || {};
     var ranks = details.best_sellers_rank || [];
