@@ -53,14 +53,20 @@
 // same seed-fallback pattern already proven for findKeywordResearch:
 // category leaf, then the author's own primary keyword, then the book
 // title, then an AI-guessed shopper phrase as a last resort.
+//
+// Duplicate auth-check fix (3 August 2026): this handler's session
+// verification block (Bearer token check, Supabase /auth/v1/user call)
+// was accidentally pasted in twice in a row, the same bug already fixed
+// in api/import-book.js. Harmless but wasteful, every audit was making an
+// extra, unneeded network call to Supabase to check the same token twice.
+// Reduced to a single check, same logic and error messages, no other
+// behaviour changed.
 
 module.exports = async function handler(req, res) {
   if (req.method !== 'POST') {
     res.status(405).json({ error: 'Method not allowed' });
     return;
   }
-  var authToken = ((req.headers && req.headers.authorization) || '').replace(/^Bearer\s+/i, ''); if (!authToken) { res.status(401).json({ error: 'Please sign in again, your session could not be found.' }); return; } var authCheck = await fetch((process.env.SUPABASE_URL || 'https://tqkeqjisqqvxasyzrfax.supabase.co') + '/auth/v1/user', { headers: { apikey: 'sb_publishable_0L4W_eHRcnYNm5MR1gDDDg_Bn1d3nPm', Authorization: 'Bearer ' + authToken } }); if (!authCheck.ok) { res.status(401).json({ error: 'Your session has expired, please sign in again.' }); return; }
-
   var authToken = ((req.headers && req.headers.authorization) || '').replace(/^Bearer\s+/i, ''); if (!authToken) { res.status(401).json({ error: 'Please sign in again, your session could not be found.' }); return; } var authCheck = await fetch((process.env.SUPABASE_URL || 'https://tqkeqjisqqvxasyzrfax.supabase.co') + '/auth/v1/user', { headers: { apikey: 'sb_publishable_0L4W_eHRcnYNm5MR1gDDDg_Bn1d3nPm', Authorization: 'Bearer ' + authToken } }); if (!authCheck.ok) { res.status(401).json({ error: 'Your session has expired, please sign in again.' }); return; }
 
   var input = req.body || {};
