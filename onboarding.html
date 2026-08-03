@@ -35,7 +35,7 @@
 
 <!-- STEP 1: ADD BOOKS -->
 <section id="section-paste" style="display:none;">
-  <div class="sec" style="padding:40px 0 60px;background:var(--light);">
+  <div class="sec" style="padding:40px 0 100px;background:var(--light);">
     <div class="wrap" style="max-width:560px;text-align:center;">
       <div class="sec-eyebrow" style="justify-content:center;display:flex;">Almost there</div>
       <h1 style="font-size:28px;font-weight:800;color:var(--navy);margin-bottom:10px;">Add your books</h1>
@@ -75,7 +75,7 @@
 
 <!-- STEP 3: BOOK DETAILS -->
 <section id="section-details" style="display:none;">
-  <div class="sec" style="padding:48px 0;">
+  <div class="sec" style="padding:48px 0 100px;">
     <div class="wrap" style="max-width:760px;">
       <div class="sec-eyebrow">Step 3 of 3</div>
       <h2 style="font-size:26px;color:var(--navy);margin-bottom:8px;">Finish each book</h2>
@@ -93,11 +93,18 @@
 <!-- SUBMIT CONFIRM MODAL -->
 <div class="modal-overlay" id="submit-modal">
   <div class="modal-card">
-    <h3>Submit book?</h3>
-    <p>Are you sure you want to submit <strong id="submit-modal-title"></strong>? This locks in the description and manuscript for this book.</p>
-    <div class="modal-actions">
-      <button class="btn btn-outline" id="submit-cancel">Cancel</button>
-      <button class="btn btn-primary" id="submit-confirm">Yes, submit</button>
+    <div id="submit-modal-confirm-view">
+      <h3>Submit book?</h3>
+      <p>Are you sure you want to submit <strong id="submit-modal-title"></strong>? This locks in the description and manuscript for this book.</p>
+      <div class="modal-actions">
+        <button class="btn btn-outline" id="submit-cancel">Cancel</button>
+        <button class="btn btn-primary" id="submit-confirm">Yes, submit</button>
+      </div>
+    </div>
+    <div id="submit-modal-loading-view" class="submit-loading" style="display:none;">
+      <div class="submit-loading-icon"><img src="readerbull-icon.png" alt=""></div>
+      <p class="submit-loading-message" id="submit-loading-message">Checking your competitors&hellip;</p>
+      <p class="submit-loading-timer" id="submit-loading-timer">0s</p>
     </div>
   </div>
 </div>
@@ -335,7 +342,59 @@
     var allSubmitted = imported.length > 0 && imported.every(function (b) { return b.status === 'submitted'; });
     if (!allSubmitted) return;
     document.getElementById('all-submitted-note').style.display = 'block';
-    setTimeout(function () { window.location.href = 'dashboard.html'; }, 900);
+    launchFireworks();
+    // Longer than the old 900ms so the celebration is actually visible
+    // before the redirect fires.
+    setTimeout(function () { window.location.href = 'dashboard.html'; }, 2200);
+  }
+
+  // Brand-colour firework bursts (teal/orange, matching style.css), fired
+  // once when every book in this onboarding run has been submitted. Pure
+  // CSS-transition particles, no canvas or external library, so there's
+  // nothing to load and nothing that can fail silently.
+  function launchFireworks() {
+    var colors = ['#00B5AD', '#F47421', '#007A75', '#C05A10', '#1B3A48'];
+    var layer = document.createElement('div');
+    layer.id = 'firework-layer';
+    document.body.appendChild(layer);
+
+    function burst(x, y) {
+      var count = 26;
+      for (var i = 0; i < count; i++) {
+        var p = document.createElement('span');
+        p.className = 'firework-particle';
+        p.style.left = x + 'px';
+        p.style.top = y + 'px';
+        p.style.background = colors[Math.floor(Math.random() * colors.length)];
+        var size = 5 + Math.random() * 5;
+        p.style.width = size + 'px';
+        p.style.height = size + 'px';
+        layer.appendChild(p);
+
+        var angle = (Math.PI * 2) * (i / count) + (Math.random() * 0.3);
+        var distance = 70 + Math.random() * 110;
+        var dx = Math.cos(angle) * distance;
+        var dy = Math.sin(angle) * distance + 40; // slight gravity drop
+
+        (function (el, tx, ty) {
+          requestAnimationFrame(function () {
+            requestAnimationFrame(function () {
+              el.style.transform = 'translate(' + tx + 'px,' + ty + 'px)';
+              el.style.opacity = '0';
+            });
+          });
+        })(p, dx, dy);
+
+        setTimeout((function (el) { return function () { el.remove(); }; })(p), 1000);
+      }
+    }
+
+    var w = window.innerWidth, h = window.innerHeight;
+    burst(w * 0.3, h * 0.35);
+    setTimeout(function () { burst(w * 0.7, h * 0.3); }, 250);
+    setTimeout(function () { burst(w * 0.5, h * 0.45); }, 500);
+
+    setTimeout(function () { layer.remove(); }, 1500);
   }
 
   function renderDetailPanel(b) {
@@ -368,17 +427,14 @@
         '<textarea id="desc-' + b.tempId + '" ' + (submitted ? 'disabled' : '') +
           (b.description ? '' : ' placeholder="We couldn\'t pull a description for this book from Amazon. Optional, add one if you want it to inform your audit and listing."') +
           '>' + escapeHtml(b.description || '') + '</textarea>' +
-        (b.description
-          ? ''
-          : '<div class="fine">No description was available from Amazon for this listing. This is optional, leave it blank and we\'ll run your audit from your title and category alone.</div>') +
 
         '<label class="field-label">Keywords <span style="font-weight:400;color:var(--muted);">(optional)</span></label>' +
         '<input type="text" id="keywords-' + b.tempId + '" ' + (submitted ? 'disabled' : '') + ' placeholder="e.g. mindset, habits, self discipline">' +
-        '<div class="fine">If you\'ve already added keywords to your KDP account (or another marketplace), add two or three here. Not sure? Just think about what a reader would actually type in to search for a book like yours, that works just as well. Skip if you\'re not sure, you can add these later from your dashboard.</div>' +
+        '<div class="fine">What keywords do you think readers will use to find your book?</div>' +
 
         '<label class="field-label">Monthly sales <span style="font-weight:400;color:var(--muted);">(optional, for your reference)</span></label>' +
         '<input type="number" min="0" id="sales-' + b.tempId + '" ' + (submitted ? 'disabled' : '') + ' placeholder="e.g. 40">' +
-        '<div class="fine">Roughly how many copies you sell a month. We now estimate your Sales/mo score automatically from your bestseller rank, so this figure is stored for your own reference only and still won\'t affect your Discoverability Score.</div>' +
+        '<div class="fine">For your reference only, doesn\'t affect your Discoverability Score.</div>' +
 
         '<div class="confirm-row">' +
           '<input type="checkbox" id="ads-' + b.tempId + '" ' + (submitted ? 'disabled' : '') + '>' +
@@ -454,6 +510,35 @@
     confirmBtn.disabled = true;
     confirmBtn.textContent = 'Submitting...';
 
+    // This step runs several live API calls server-side (competitor
+    // lookup, keyword research, page-rank check, AI narrative) and can
+    // genuinely take 15-30+ seconds, so swap the modal to a loading view
+    // with an elapsed timer and rotating status lines rather than leaving
+    // the author staring at a disabled button with no feedback.
+    document.getElementById('submit-modal-confirm-view').style.display = 'none';
+    var loadingView = document.getElementById('submit-modal-loading-view');
+    loadingView.style.display = 'block';
+    var loadingMessages = ['Checking your competitors…', 'Researching keywords…', 'Writing your strategy…', 'Almost there…'];
+    var loadingMsgIndex = 0;
+    var loadingMessageEl = document.getElementById('submit-loading-message');
+    var loadingTimerEl = document.getElementById('submit-loading-timer');
+    loadingMessageEl.textContent = loadingMessages[0];
+    loadingTimerEl.textContent = '0s';
+    var loadingStart = Date.now();
+    var loadingMessageInterval = setInterval(function () {
+      loadingMsgIndex = (loadingMsgIndex + 1) % loadingMessages.length;
+      loadingMessageEl.textContent = loadingMessages[loadingMsgIndex];
+    }, 4000);
+    var loadingTimerInterval = setInterval(function () {
+      loadingTimerEl.textContent = Math.floor((Date.now() - loadingStart) / 1000) + 's';
+    }, 1000);
+    function stopLoadingView() {
+      clearInterval(loadingMessageInterval);
+      clearInterval(loadingTimerInterval);
+      document.getElementById('submit-modal-confirm-view').style.display = 'block';
+      loadingView.style.display = 'none';
+    }
+
     var language = document.getElementById('lang-' + tempId).value;
     var description = document.getElementById('desc-' + tempId).value;
     var keywords = document.getElementById('keywords-' + tempId).value;
@@ -470,6 +555,7 @@
         .from('manuscripts')
         .upload(path, file, { upsert: true, contentType: 'application/pdf' });
       if (uploadError) {
+        stopLoadingView();
         var errorEl = document.getElementById('detail-error-' + tempId);
         errorEl.textContent = 'Manuscript upload failed: ' + uploadError.message;
         errorEl.style.display = 'block';
@@ -576,6 +662,7 @@
       })
       .eq('id', b.rowId);
 
+    stopLoadingView();
     confirmBtn.disabled = false;
     confirmBtn.textContent = 'Yes, submit';
     modal.classList.remove('active');
