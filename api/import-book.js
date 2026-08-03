@@ -79,7 +79,7 @@ module.exports = async function handler(req, res) {
     // the Overview "Professional Assessment" block. Only fires when the
     // caller explicitly passes { debug: true }, so it never affects a
     // normal import. Remove once the real fields are confirmed and wired.
-    if (input && input.debug === true) {
+    if (req.body && req.body.debug === true) {
       res.status(200).json({ debug: true, raw: data });
       return;
     }
