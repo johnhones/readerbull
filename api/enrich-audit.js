@@ -540,6 +540,12 @@ async function generateNarrative(input, competitors) {
     book: {
       title: input.title || null,
       category: input.category || null,
+      // Added 3 August 2026: previously pulled into the payload for
+      // keyword classification only (classifyKeywords below), never
+      // reached this prompt, so a pasted description had no effect on
+      // Market Analysis, Marketing Strategy or Quick Wins. Truncated to
+      // 500 chars, same limit already used elsewhere in this file.
+      description: (input.description || '').slice(0, 500) || null,
       price: input.price || null,
       rating: input.rating || null,
       reviewCount: input.reviewCount || null,
@@ -572,6 +578,9 @@ async function generateNarrative(input, competitors) {
     'a platform that helps self-published authors sell more books. You are writing for one specific ' +
     'author about their one specific book, using only the structured data given to you below. ' +
     'Never invent competitor names, numbers, ranks, prices or reviews beyond what is in the data. ' +
+    'If book.description is given, use it to understand the book\'s actual subject, angle and ' +
+    'audience so marketAnalysis and strategySteps are grounded in what the book really is, not ' +
+    'generic filler, but never quote it at length or treat it as marketing copy to reproduce. ' +
     'If a field is missing, write around it honestly rather than guessing. Use British spelling ' +
     '(optimise, personalise, recognise). Never use the em dash character. Keep the tone direct, ' +
     'encouraging and specific, not generic SaaS filler. ' +

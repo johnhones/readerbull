@@ -144,6 +144,28 @@ module.exports = async function handler(req, res) {
       || (Array.isArray(product.feature_bullets) ? product.feature_bullets.join(' ') : null)
       || null;
 
+    // Temporary diagnostic (3 August 2026, matches the same debug-then-fix
+    // pattern used 28 July to confirm the Kindle description gap above):
+    // a paperback (ASIN 1998449416) came back with no description despite
+    // having a real one on its actual Amazon page, which the existing
+    // Kindle-only gap doesn't explain. Emails the raw shape of whichever
+    // description-bearing fields SerpApi actually returned, only when
+    // description ends up null, so the next real import that hits this
+    // reveals what field the text is actually sitting in. Remove this
+    // block once that's confirmed and the real fallback is added.
+    if (!description) {
+      var diagnosticShape = {
+        asin: asin,
+        hasProductDescription: !!product.description,
+        productDescriptionBlockCount: Array.isArray(data.product_description) ? data.product_description.length : 0,
+        productDescriptionSample: Array.isArray(data.product_description) ? JSON.stringify(data.product_description).slice(0, 1500) : null,
+        hasFeatureBullets: Array.isArray(product.feature_bullets),
+        featureBulletsSample: Array.isArray(product.feature_bullets) ? JSON.stringify(product.feature_bullets).slice(0, 800) : null,
+        topLevelProductKeys: Object.keys(product).join(', ')
+      };
+      await sendErrorAlert('import-book (description diagnostic)', JSON.stringify(diagnosticShape, null, 2));
+    }
+
     res.status(200).json({
       asin: asin,
       title: product.title || null,
