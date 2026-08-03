@@ -12,94 +12,101 @@
 
 <!-- NAV -->
 <div class="nav">
-  <div class="nav-inner">
-    <a href="index.html" class="nav-logo">
-      <span class="logo-mark"><img src="readerbull-icon.png" alt="Readerbull"></span>
-      readerbull
-    </a>
-  </div>
+<div class="nav-inner">
+<a href="index.html" class="nav-logo">
+<span class="logo-mark"><img src="readerbull-icon.png" alt="Readerbull"></span>
+readerbull
+</a>
+</div>
 </div>
 
 <div id="loading-state" class="loading-state">Checking your magic link...</div>
 
 <div id="no-session-state" style="display:none;">
-  <div class="form-page">
-    <div class="form-page-inner">
-      <div class="sec-eyebrow">Almost there</div>
-      <h1>Check your email</h1>
-      <p>Click the magic link we sent you to verify your email and continue. You can close this tab once you've clicked it from your inbox.</p>
-      <div style="margin-top:24px;"><a href="index.html" class="btn btn-outline">Back to homepage</a></div>
-    </div>
-  </div>
+<div class="form-page">
+<div class="form-page-inner">
+<div class="sec-eyebrow">Almost there</div>
+<h1>Check your email</h1>
+<p>Click the magic link we sent you to verify your email and continue. You can close this tab once you've clicked it from your inbox.</p>
+<div style="margin-top:24px;"><a href="index.html" class="btn btn-outline">Back to homepage</a></div>
+</div>
+</div>
 </div>
 
 <!-- STEP 1: ADD BOOKS -->
 <section id="section-paste" style="display:none;">
-  <div class="sec" style="padding:40px 0 60px;background:var(--light);">
-    <div class="wrap" style="max-width:560px;text-align:center;">
-      <div class="sec-eyebrow" style="justify-content:center;display:flex;">Almost there</div>
-      <h1 style="font-size:28px;font-weight:800;color:var(--navy);margin-bottom:10px;">Add your books</h1>
-      <p style="font-size:15px;color:var(--mid);margin-bottom:8px;">Paste one or more Amazon ASINs or listing URLs below, one per line. We'll pull the real listing data for each, no manuscript needed for this step.</p>
+<div class="sec" style="padding:40px 0 100px;background:var(--light);">
+<div class="wrap" style="max-width:560px;text-align:center;">
+<div class="sec-eyebrow" style="justify-content:center;display:flex;">Almost there</div>
+<h1 style="font-size:28px;font-weight:800;color:var(--navy);margin-bottom:10px;">Add your books</h1>
+<p style="font-size:15px;color:var(--mid);margin-bottom:8px;">Paste one or more Amazon ASINs or listing URLs below, one per line. We'll pull the real listing data for each, no manuscript needed for this step.</p>
 
-      <div class="audit-form standalone" style="max-width:none;text-align:left;">
-        <label class="field-label" style="margin-top:0;">ASINs or Amazon URLs</label>
-        <textarea class="paste-box" id="paste-input" placeholder="B0H2CZYD6R&#10;https://www.amazon.com/dp/B0XYZRN201"></textarea>
-        <div class="paste-meta">
-          <span>Accepts ASIN or full listing URL, one per line</span>
-          <span class="detected" id="detected-count">0 entries detected</span>
-        </div>
-        <button class="btn btn-primary" id="start-import-btn" style="width:100%;justify-content:center;margin-top:20px;">Start Import</button>
-        <div class="fine">Each entry costs one lookup against our Amazon data provider.</div>
-        <div class="field-error" id="paste-error" style="display:none;"></div>
-      </div>
-    </div>
-  </div>
+<div class="audit-form standalone" style="max-width:none;text-align:left;">
+<label class="field-label" style="margin-top:0;">ASINs or Amazon URLs</label>
+<textarea class="paste-box" id="paste-input" placeholder="B0H2CZYD6R&#10;https://www.amazon.com/dp/B0XYZRN201"></textarea>
+<div class="paste-meta">
+<span>Accepts ASIN or full listing URL, one per line</span>
+<span class="detected" id="detected-count">0 entries detected</span>
+</div>
+<button class="btn btn-primary" id="start-import-btn" style="width:100%;justify-content:center;margin-top:20px;">Start Import</button>
+<div class="fine">Each entry costs one lookup against our Amazon data provider.</div>
+<div class="field-error" id="paste-error" style="display:none;"></div>
+</div>
+</div>
+</div>
 </section>
 
 <!-- STEP 2: IMPORT QUEUE -->
 <section id="section-queue" style="display:none;">
-  <div class="sec" style="padding:48px 0;">
-    <div class="wrap" style="max-width:760px;">
-      <div class="sec-eyebrow">Step 2 of 3</div>
-      <h2 style="font-size:26px;color:var(--navy);margin-bottom:8px;">Pulling your listing data</h2>
-      <p style="color:var(--mid);font-size:14px;margin-bottom:8px;">This usually takes a few seconds per book.</p>
+<div class="sec" style="padding:48px 0;">
+<div class="wrap" style="max-width:760px;">
+<div class="sec-eyebrow">Step 2 of 3</div>
+<h2 style="font-size:26px;color:var(--navy);margin-bottom:8px;">Pulling your listing data</h2>
+<p style="color:var(--mid);font-size:14px;margin-bottom:8px;">This usually takes a few seconds per book.</p>
 
-      <div class="import-list" id="import-list"></div>
+<div class="import-list" id="import-list"></div>
 
-      <div style="margin-top:28px;text-align:right;">
-        <button class="btn btn-primary" id="continue-to-details-btn" style="display:none;">Continue</button>
-      </div>
-    </div>
-  </div>
+<div style="margin-top:28px;text-align:right;">
+<button class="btn btn-primary" id="continue-to-details-btn" style="display:none;">Continue</button>
+</div>
+</div>
+</div>
 </section>
 
 <!-- STEP 3: BOOK DETAILS -->
 <section id="section-details" style="display:none;">
-  <div class="sec" style="padding:48px 0;">
-    <div class="wrap" style="max-width:760px;">
-      <div class="sec-eyebrow">Step 3 of 3</div>
-      <h2 style="font-size:26px;color:var(--navy);margin-bottom:8px;">Finish each book</h2>
-      <p style="color:var(--mid);font-size:14px;margin-bottom:8px;">Confirm the language, polish your description and upload the full reader copy.</p>
+<div class="sec" style="padding:48px 0 100px;">
+<div class="wrap" style="max-width:760px;">
+<div class="sec-eyebrow">Step 3 of 3</div>
+<h2 style="font-size:26px;color:var(--navy);margin-bottom:8px;">Finish each book</h2>
+<p style="color:var(--mid);font-size:14px;margin-bottom:8px;">Confirm the language, polish your description and upload the full reader copy.</p>
 
-      <div id="detail-panels"></div>
+<div id="detail-panels"></div>
 
-      <div id="all-submitted-note" style="display:none;margin-top:12px;text-align:right;color:var(--mid);font-size:13px;">
-        <span class="spinner"></span>All books submitted, taking you to your dashboard&hellip;
-      </div>
-    </div>
-  </div>
+<div id="all-submitted-note" style="display:none;margin-top:12px;text-align:right;color:var(--mid);font-size:13px;">
+<span class="spinner"></span>All books submitted, taking you to your dashboard&hellip;
+</div>
+</div>
+</div>
 </section>
 
 <!-- SUBMIT CONFIRM MODAL -->
 <div class="modal-overlay" id="submit-modal">
-  <div class="modal-card">
-    <h3>Submit book?</h3>
-    <p>Are you sure you want to submit <strong id="submit-modal-title"></strong>? This locks in the description and manuscript for this book.</p>
-    <div class="modal-actions">
-      <button class="btn btn-outline" id="submit-cancel">Cancel</button>
-      <button class="btn btn-primary" id="submit-confirm">Yes, submit</button>
-    </div>
-  </div>
+<div class="modal-card">
+<div id="submit-modal-confirm-view">
+<h3>Submit book?</h3>
+<p>Are you sure you want to submit <strong id="submit-modal-title"></strong>? This locks in the description and manuscript for this book.</p>
+<div class="modal-actions">
+<button class="btn btn-outline" id="submit-cancel">Cancel</button>
+<button class="btn btn-primary" id="submit-confirm">Yes, submit</button>
+</div>
+</div>
+<div id="submit-modal-loading-view" class="submit-loading" style="display:none;">
+<div class="submit-loading-icon"><img src="readerbull-icon.png" alt=""></div>
+<p class="submit-loading-message" id="submit-loading-message">Checking your competitors&hellip;</p>
+<p class="submit-loading-timer" id="submit-loading-timer">0s</p>
+</div>
+</div>
 </div>
 
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.js"></script>
@@ -107,519 +114,592 @@
 <script src="scoring.js"></script>
 <script>
 (async function () {
-  var loadingState = document.getElementById('loading-state');
-  var noSessionState = document.getElementById('no-session-state');
-  var LANGUAGES = ['English', 'Spanish', 'French', 'German', 'Italian', 'Portuguese'];
+var loadingState = document.getElementById('loading-state');
+var noSessionState = document.getElementById('no-session-state');
+var LANGUAGES = ['English', 'Spanish', 'French', 'German', 'Italian', 'Portuguese'];
 
-  // Give supabase-js a moment to parse the magic-link tokens out of the URL.
-  var user = null;
-  for (var attempt = 0; attempt < 10; attempt++) {
-    var { data } = await readerbull.client.auth.getUser();
-    if (data && data.user) { user = data.user; break; }
-    await new Promise(function (r) { setTimeout(r, 300); });
-  }
+// Give supabase-js a moment to parse the magic-link tokens out of the URL.
+var user = null;
+for (var attempt = 0; attempt < 10; attempt++) {
+var { data } = await readerbull.client.auth.getUser();
+if (data && data.user) { user = data.user; break; }
+await new Promise(function (r) { setTimeout(r, 300); });
+}
 
-  loadingState.style.display = 'none';
+loadingState.style.display = 'none';
 
-  if (!user) {
-    noSessionState.style.display = 'block';
-    return;
-  }
+if (!user) {
+noSessionState.style.display = 'block';
+return;
+}
 
-  var meta = user.user_metadata || {};
+var meta = user.user_metadata || {};
+var sessionResult = await readerbull.client.auth.getSession(); var accessToken = (sessionResult.data && sessionResult.data.session && sessionResult.data.session.access_token) || '';
 
-  // BOOKS holds only the entries added in *this* import run, so the user
-  // sees a focused queue rather than every book they've ever added.
-  var BOOKS = [];
+// BOOKS holds only the entries added in *this* import run, so the user
+// sees a focused queue rather than every book they've ever added.
+var BOOKS = [];
 
-  function byId(id) { return BOOKS.filter(function (b) { return b.tempId === id; })[0]; }
+function byId(id) { return BOOKS.filter(function (b) { return b.tempId === id; })[0]; }
 
-  function goToSection(name) {
-    ['paste', 'queue', 'details'].forEach(function (s) {
-      document.getElementById('section-' + s).style.display = (s === name) ? 'block' : 'none';
-    });
-    window.scrollTo({ top: 0, behavior: 'smooth' });
-  }
+function goToSection(name) {
+['paste', 'queue', 'details'].forEach(function (s) {
+document.getElementById('section-' + s).style.display = (s === name) ? 'block' : 'none';
+});
+window.scrollTo({ top: 0, behavior: 'smooth' });
+}
 
-  // ---------- STEP 1: paste ----------
-  var pasteInput = document.getElementById('paste-input');
-  var detectedCount = document.getElementById('detected-count');
-  var pasteError = document.getElementById('paste-error');
+// ---------- STEP 1: paste ----------
+var pasteInput = document.getElementById('paste-input');
+var detectedCount = document.getElementById('detected-count');
+var pasteError = document.getElementById('paste-error');
 
-  function parsedEntries() {
-    return pasteInput.value.split('\n').map(function (l) { return l.trim(); }).filter(Boolean);
-  }
-  function updateDetected() {
-    var n = parsedEntries().length;
-    detectedCount.textContent = n + ' ' + (n === 1 ? 'entry' : 'entries') + ' detected';
-  }
-  pasteInput.addEventListener('input', updateDetected);
-  updateDetected();
+function parsedEntries() {
+return pasteInput.value.split('\n').map(function (l) { return l.trim(); }).filter(Boolean);
+}
+function updateDetected() {
+var n = parsedEntries().length;
+detectedCount.textContent = n + ' ' + (n === 1 ? 'entry' : 'entries') + ' detected';
+}
+pasteInput.addEventListener('input', updateDetected);
+updateDetected();
 
-  document.getElementById('start-import-btn').addEventListener('click', function () {
-    var entries = parsedEntries();
-    if (!entries.length) {
-      pasteError.textContent = 'Add at least one ASIN or Amazon URL.';
-      pasteError.style.display = 'block';
-      return;
-    }
-    pasteError.style.display = 'none';
+document.getElementById('start-import-btn').addEventListener('click', function () {
+var entries = parsedEntries();
+if (!entries.length) {
+pasteError.textContent = 'Add at least one ASIN or Amazon URL.';
+pasteError.style.display = 'block';
+return;
+}
+pasteError.style.display = 'none';
 
-    // de-dupe identical pasted lines
-    var seen = {};
-    entries = entries.filter(function (e) {
-      var key = e.toLowerCase();
-      if (seen[key]) return false;
-      seen[key] = true;
-      return true;
-    });
+// de-dupe identical pasted lines
+var seen = {};
+entries = entries.filter(function (e) {
+var key = e.toLowerCase();
+if (seen[key]) return false;
+seen[key] = true;
+return true;
+});
 
-    BOOKS = entries.map(function (input, i) {
-      return { tempId: 't' + i + '-' + Date.now(), input: input, status: 'importing' };
-    });
+BOOKS = entries.map(function (input, i) {
+return { tempId: 't' + i + '-' + Date.now(), input: input, status: 'importing' };
+});
 
-    goToSection('queue');
-    runImportQueue();
-  });
+goToSection('queue');
+runImportQueue();
+});
 
-  loadingState.style.display = 'none';
-  goToSection('paste');
+loadingState.style.display = 'none';
+goToSection('paste');
 
-  // ---------- STEP 2: import queue ----------
-  function renderImportList() {
-    var list = document.getElementById('import-list');
-    list.innerHTML = BOOKS.map(function (b) {
-      return '<div class="import-card" id="import-card-' + b.tempId + '"></div>';
-    }).join('');
-    BOOKS.forEach(renderImportCard);
-  }
+// ---------- STEP 2: import queue ----------
+function renderImportList() {
+var list = document.getElementById('import-list');
+list.innerHTML = BOOKS.map(function (b) {
+return '<div class="import-card" id="import-card-' + b.tempId + '"></div>';
+}).join('');
+BOOKS.forEach(renderImportCard);
+}
 
-  function renderImportCard(b) {
-    var el = document.getElementById('import-card-' + b.tempId);
-    if (!el) return;
+function renderImportCard(b) {
+var el = document.getElementById('import-card-' + b.tempId);
+if (!el) return;
 
-    var label = displayLabel(b.input);
+var label = displayLabel(b.input);
 
-    if (b.status === 'importing') {
-      el.innerHTML =
-        '<div class="cover-ph">' + escapeHtml(label.slice(0, 12)) + '</div>' +
-        '<div class="import-card-body">' +
-          '<h4>' + escapeHtml(label) + '</h4>' +
-          '<p style="font-size:13px;color:var(--mid);"><span class="spinner"></span>Pulling listing data from Amazon&hellip;</p>' +
-        '</div>' +
-        '<div class="status-pill importing">Importing</div>';
-      return;
-    }
+if (b.status === 'importing') {
+el.innerHTML =
+'<div class="cover-ph">' + escapeHtml(label.slice(0, 12)) + '</div>' +
+'<div class="import-card-body">' +
+'<h4>' + escapeHtml(label) + '</h4>' +
+'<p style="font-size:13px;color:var(--mid);"><span class="spinner"></span>Pulling listing data from Amazon&hellip;</p>' +
+'</div>' +
+'<div class="status-pill importing">Importing</div>';
+return;
+}
 
-    if (b.status === 'error') {
-      el.innerHTML =
-        '<div class="cover-ph" style="background:var(--muted);">?</div>' +
-        '<div class="import-card-body">' +
-          '<h4>' + escapeHtml(label) + '</h4>' +
-          '<p style="font-size:13px;color:var(--orange-d);">' + escapeHtml(b.error || 'Could not import this one.') + '</p>' +
-        '</div>' +
-        '<div class="status-pill error">Failed</div>';
-      return;
-    }
+if (b.status === 'error') {
+el.innerHTML =
+'<div class="cover-ph" style="background:var(--muted);">?</div>' +
+'<div class="import-card-body">' +
+'<h4>' + escapeHtml(label) + '</h4>' +
+'<p style="font-size:13px;color:var(--orange-d);">' + escapeHtml(b.error || 'Could not import this one.') + '</p>' +
+'</div>' +
+'<div class="status-pill error">Failed</div>';
+return;
+}
 
-    var chip = function (t) { return '<span class="tag">' + t + '</span>'; };
-    var chips = '';
-    if (b.rating) chips += chip('&#9733; ' + b.rating + (b.reviewCount ? ' (' + b.reviewCount + ')' : ''));
-    if (b.price) chips += chip(escapeHtml(b.price));
-    if (b.category) chips += chip('Category: ' + escapeHtml(b.category));
+var chip = function (t) { return '<span class="tag">' + t + '</span>'; };
+var chips = '';
+if (b.rating) chips += chip('&#9733; ' + b.rating + (b.reviewCount ? ' (' + b.reviewCount + ')' : ''));
+if (b.price) chips += chip(escapeHtml(b.price));
+if (b.category) chips += chip('Category: ' + escapeHtml(b.category));
 
-    el.innerHTML =
-      '<div class="cover-ph">' + (b.coverImage ? '<img src="' + escapeHtml(b.coverImage) + '" alt="">' : escapeHtml((b.title || b.asin || '').slice(0, 10))) + '</div>' +
-      '<div class="import-card-body">' +
-        '<h4>' + escapeHtml(b.title || b.asin) + '</h4>' +
-        '<div class="asin" style="font-size:12px;color:var(--muted);margin-bottom:8px;">ASIN: ' + escapeHtml(b.asin) + '</div>' +
-        '<div class="tag-grid" style="margin-top:0;">' + chips + '</div>' +
-      '</div>' +
-      '<div><span class="status-pill imported">Imported</span></div>';
-  }
+el.innerHTML =
+'<div class="cover-ph">' + (b.coverImage ? '<img src="' + escapeHtml(b.coverImage) + '" alt="">' : escapeHtml((b.title || b.asin || '').slice(0, 10))) + '</div>' +
+'<div class="import-card-body">' +
+'<h4>' + escapeHtml(b.title || b.asin) + '</h4>' +
+'<div class="asin" style="font-size:12px;color:var(--muted);margin-bottom:8px;">ASIN: ' + escapeHtml(b.asin) + '</div>' +
+'<div class="tag-grid" style="margin-top:0;">' + chips + '</div>' +
+'</div>' +
+'<div><span class="status-pill imported">Imported</span></div>';
+}
 
-  async function runImportQueue() {
-    renderImportList();
+async function runImportQueue() {
+renderImportList();
 
-    for (var i = 0; i < BOOKS.length; i++) {
-      var b = BOOKS[i];
-      try {
-        var { data: importSession } = await readerbull.client.auth.getSession();
-        var resp = await fetch('/api/import-book', {
-          method: 'POST',
-          headers: {
-            'Content-Type': 'application/json',
-            'Authorization': 'Bearer ' + ((importSession && importSession.session && importSession.session.access_token) || '')
-          },
-          body: JSON.stringify({ input: b.input })
-        });
-        var payload = await resp.json();
+for (var i = 0; i < BOOKS.length; i++) {
+var b = BOOKS[i];
+try {
+var resp = await fetch('/api/import-book', {
+method: 'POST',
+headers: { 'Content-Type': 'application/json', 'Authorization': 'Bearer ' + accessToken },
+body: JSON.stringify({ input: b.input })
+});
+var payload = await resp.json();
 
-        if (!resp.ok) {
-          b.status = 'error';
-          b.error = payload.error || 'Import failed.';
-          renderImportCard(b);
-          continue;
-        }
+if (!resp.ok) {
+b.status = 'error';
+b.error = payload.error || 'Import failed.';
+renderImportCard(b);
+continue;
+}
 
-        // Create the books row now, while we have the pulled data, so a
-        // failure in step 3 never loses the import work already done.
-        var { data: inserted, error: insertError } = await readerbull.client
-          .from('books')
-          .insert({
-            user_id: user.id,
-            author_name: meta.author_name || null,
-            book_title: payload.title || null,
-            amazon_link: payload.amazonUrl || b.input,
-            email: user.email,
-            asin: payload.asin,
-            cover_image_url: payload.coverImage,
-            live_price: payload.price,
-            live_rating: payload.rating,
-            live_review_count: payload.reviewCount,
-            amazon_category: payload.category,
-            bestseller_rank: payload.bestsellerRankText,
-            bestseller_rank_number: payload.bestsellerRank
-          })
-          .select('id')
-          .single();
+// Create the books row now, while we have the pulled data, so a
+// failure in step 3 never loses the import work already done.
+var { data: inserted, error: insertError } = await readerbull.client
+.from('books')
+.insert({
+user_id: user.id,
+author_name: meta.author_name || null,
+book_title: payload.title || null,
+amazon_link: payload.amazonUrl || b.input,
+email: user.email,
+asin: payload.asin,
+cover_image_url: payload.coverImage,
+live_price: payload.price,
+live_rating: payload.rating,
+live_review_count: payload.reviewCount,
+amazon_category: payload.category,
+bestseller_rank: payload.bestsellerRankText,
+bestseller_rank_number: payload.bestsellerRank
+})
+.select('id')
+.single();
 
-        if (insertError) {
-          b.status = 'error';
-          b.error = insertError.message;
-          renderImportCard(b);
-          continue;
-        }
+if (insertError) {
+b.status = 'error';
+b.error = insertError.message;
+renderImportCard(b);
+continue;
+}
 
-        b.rowId = inserted.id;
-        b.asin = payload.asin;
-        b.title = payload.title;
-        b.description = payload.description || '';
-        b.rating = payload.rating;
-        b.reviewCount = payload.reviewCount;
-        b.price = payload.price;
-        b.coverImage = payload.coverImage;
-        b.category = payload.category;
-        b.categoryCount = payload.categoryCount;
-        b.bestsellerRank = payload.bestsellerRank;
-        b.boughtTogether = payload.boughtTogether || [];
-        b.status = 'imported';
-        renderImportCard(b);
-      } catch (err) {
-        b.status = 'error';
-        b.error = 'Import failed, please try again.';
-        renderImportCard(b);
-      }
-    }
+b.rowId = inserted.id;
+b.asin = payload.asin;
+b.title = payload.title;
+b.description = payload.description || '';
+b.rating = payload.rating;
+b.reviewCount = payload.reviewCount;
+b.price = payload.price;
+b.coverImage = payload.coverImage;
+b.category = payload.category;
+b.categoryCount = payload.categoryCount;
+b.bestsellerRank = payload.bestsellerRank;
+b.boughtTogether = payload.boughtTogether || [];
+b.status = 'imported';
+renderImportCard(b);
+} catch (err) {
+b.status = 'error';
+b.error = 'Import failed, please try again.';
+renderImportCard(b);
+}
+}
 
-    if (BOOKS.some(function (b) { return b.status === 'imported'; })) {
-      document.getElementById('continue-to-details-btn').style.display = 'inline-flex';
-    }
-  }
+if (BOOKS.some(function (b) { return b.status === 'imported'; })) {
+document.getElementById('continue-to-details-btn').style.display = 'inline-flex';
+}
+}
 
-  document.getElementById('continue-to-details-btn').addEventListener('click', function () {
-    goToSection('details');
-    renderDetailPanels();
-  });
+document.getElementById('continue-to-details-btn').addEventListener('click', function () {
+goToSection('details');
+renderDetailPanels();
+});
 
-  // ---------- STEP 3: details ----------
-  function renderDetailPanels() {
-    var wrap = document.getElementById('detail-panels');
-    var imported = BOOKS.filter(function (b) { return b.status === 'imported' || b.status === 'submitted'; });
-    wrap.innerHTML = imported.map(renderDetailPanel).join('');
-    imported.forEach(wireDetailPanel);
-  }
+// ---------- STEP 3: details ----------
+function renderDetailPanels() {
+var wrap = document.getElementById('detail-panels');
+var imported = BOOKS.filter(function (b) { return b.status === 'imported' || b.status === 'submitted'; });
+wrap.innerHTML = imported.map(renderDetailPanel).join('');
+imported.forEach(wireDetailPanel);
+}
 
-  // Auto-redirects once every imported book in this run has been submitted,
-  // no manual "Go to my dashboard" click required (ReaderBull_Next_Chat_
-  // Handover_Prompt.md item 4).
-  function redirectIfAllSubmitted() {
-    var imported = BOOKS.filter(function (b) { return b.status === 'imported' || b.status === 'submitted'; });
-    var allSubmitted = imported.length > 0 && imported.every(function (b) { return b.status === 'submitted'; });
-    if (!allSubmitted) return;
-    document.getElementById('all-submitted-note').style.display = 'block';
-    setTimeout(function () { window.location.href = 'dashboard.html'; }, 900);
-  }
+// Auto-redirects once every imported book in this run has been submitted,
+// no manual "Go to my dashboard" click required (ReaderBull_Next_Chat_
+// Handover_Prompt.md item 4).
+function redirectIfAllSubmitted() {
+var imported = BOOKS.filter(function (b) { return b.status === 'imported' || b.status === 'submitted'; });
+var allSubmitted = imported.length > 0 && imported.every(function (b) { return b.status === 'submitted'; });
+if (!allSubmitted) return;
+document.getElementById('all-submitted-note').style.display = 'block';
+launchFireworks();
+// Longer than the old 900ms so the celebration is actually visible
+// before the redirect fires.
+setTimeout(function () { window.location.href = 'dashboard.html'; }, 2200);
+}
 
-  function renderDetailPanel(b) {
-    var submitted = b.status === 'submitted';
-    var langOptions = LANGUAGES.map(function (l) { return '<option' + (l === 'English' ? ' selected' : '') + '>' + l + '</option>'; }).join('');
-    var chip = function (t) { return '<span class="tag">' + t + '</span>'; };
-    var chips = '';
-    if (b.rating) chips += chip('&#9733; ' + b.rating + (b.reviewCount ? ' (' + b.reviewCount + ')' : ''));
-    if (b.price) chips += chip(escapeHtml(b.price));
-    if (b.category) chips += chip('Category: ' + escapeHtml(b.category) + ' (auto-detected)');
+// Brand-colour firework bursts (teal/orange, matching style.css), fired
+// once when every book in this onboarding run has been submitted. Pure
+// CSS-transition particles, no canvas or external library, so there's
+// nothing to load and nothing that can fail silently.
+function launchFireworks() {
+var colors = ['#00B5AD', '#F47421', '#007A75', '#C05A10', '#1B3A48'];
+var layer = document.createElement('div');
+layer.id = 'firework-layer';
+document.body.appendChild(layer);
 
-    return (
-      '<div class="detail-panel" id="detail-panel-' + b.tempId + '" style="' + (submitted ? 'opacity:.6;' : '') + '">' +
-        '<div class="detail-head">' +
-          '<div class="cover-ph" style="width:56px;height:80px;">' + (b.coverImage ? '<img src="' + escapeHtml(b.coverImage) + '" alt="">' : '') + '</div>' +
-          '<div>' +
-            '<h3>' + escapeHtml(b.title || b.asin) + '</h3>' +
-            '<div class="asin">ASIN: ' + escapeHtml(b.asin) + '</div>' +
-          '</div>' +
-          '<div style="margin-left:auto;">' + (submitted ? '<span class="status-pill submitted">Submitted</span>' : '') + '</div>' +
-        '</div>' +
+function burst(x, y) {
+var count = 26;
+for (var i = 0; i < count; i++) {
+var p = document.createElement('span');
+p.className = 'firework-particle';
+p.style.left = x + 'px';
+p.style.top = y + 'px';
+p.style.background = colors[Math.floor(Math.random() * colors.length)];
+var size = 5 + Math.random() * 5;
+p.style.width = size + 'px';
+p.style.height = size + 'px';
+layer.appendChild(p);
 
-        '<div class="tag-grid" style="margin-top:0;margin-bottom:4px;">' + chips + '</div>' +
-        '<div class="fine" style="margin-bottom:4px;">Rating, price and category pulled from Amazon, not editable here.</div>' +
+var angle = (Math.PI * 2) * (i / count) + (Math.random() * 0.3);
+var distance = 70 + Math.random() * 110;
+var dx = Math.cos(angle) * distance;
+var dy = Math.sin(angle) * distance + 40; // slight gravity drop
 
-        '<label class="field-label">Language</label>' +
-        '<select id="lang-' + b.tempId + '" ' + (submitted ? 'disabled' : '') + '>' + langOptions + '</select>' +
+(function (el, tx, ty) {
+requestAnimationFrame(function () {
+requestAnimationFrame(function () {
+el.style.transform = 'translate(' + tx + 'px,' + ty + 'px)';
+el.style.opacity = '0';
+});
+});
+})(p, dx, dy);
 
-        '<label class="field-label">Book description <span style="font-weight:400;color:var(--muted);">(optional)</span></label>' +
-        '<textarea id="desc-' + b.tempId + '" ' + (submitted ? 'disabled' : '') +
-          (b.description ? '' : ' placeholder="Your description didn\'t pull through from Amazon for this listing. Paste it in here, it helps us pick more accurate keywords for your book."') +
-          '>' + escapeHtml(b.description || '') + '</textarea>' +
-        (b.description
-          ? ''
-          : '<div class="fine">We couldn\'t pull a description from Amazon for this listing. If you have one, from your KDP listing or elsewhere, paste it in: it helps us classify which keywords actually fit your book. Optional, we\'ll still run your audit without it.</div>') +
+setTimeout((function (el) { return function () { el.remove(); }; })(p), 1000);
+}
+}
 
-        '<label class="field-label">Keywords <span style="font-weight:400;color:var(--muted);">(optional)</span></label>' +
-        '<input type="text" id="keywords-' + b.tempId + '" ' + (submitted ? 'disabled' : '') + ' placeholder="e.g. mindset, habits, self discipline">' +
-        '<div class="fine">If you\'ve already added keywords to your KDP account (or another marketplace), add two or three here. Not sure? Just think about what a reader would actually type in to search for a book like yours, that works just as well. Skip if you\'re not sure, you can add these later from your dashboard.</div>' +
+var w = window.innerWidth, h = window.innerHeight;
+burst(w * 0.3, h * 0.35);
+setTimeout(function () { burst(w * 0.7, h * 0.3); }, 250);
+setTimeout(function () { burst(w * 0.5, h * 0.45); }, 500);
 
-        '<label class="field-label">Monthly sales <span style="font-weight:400;color:var(--muted);">(optional, for your reference)</span></label>' +
-        '<input type="number" min="0" id="sales-' + b.tempId + '" ' + (submitted ? 'disabled' : '') + ' placeholder="e.g. 40">' +
-        '<div class="fine">Roughly how many copies you sell a month. We now estimate your Sales/mo score automatically from your bestseller rank, so this figure is stored for your own reference only and still won\'t affect your Discoverability Score.</div>' +
+setTimeout(function () { layer.remove(); }, 1500);
+}
 
-        '<div class="confirm-row">' +
-          '<input type="checkbox" id="ads-' + b.tempId + '" ' + (submitted ? 'disabled' : '') + '>' +
-          '<label for="ads-' + b.tempId + '">I\'m currently running Amazon Ads for this book</label>' +
-        '</div>' +
-        '<div class="fine">Shown as a status pill on your dashboard, doesn\'t affect your Discoverability Score.</div>' +
+function renderDetailPanel(b) {
+var submitted = b.status === 'submitted';
+var langOptions = LANGUAGES.map(function (l) { return '<option' + (l === 'English' ? ' selected' : '') + '>' + l + '</option>'; }).join('');
+var chip = function (t) { return '<span class="tag">' + t + '</span>'; };
+var chips = '';
+if (b.rating) chips += chip('&#9733; ' + b.rating + (b.reviewCount ? ' (' + b.reviewCount + ')' : ''));
+if (b.price) chips += chip(escapeHtml(b.price));
+if (b.category) chips += chip('Category: ' + escapeHtml(b.category) + ' (auto-detected)');
 
-        '<label class="field-label">PDF reader copy <span style="font-weight:400;color:var(--muted);">(optional for now)</span></label>' +
-        '<div class="upload-drop">' +
-          '<i class="ti ti-cloud-upload"></i>' +
-          '<p>Drag &amp; drop your PDF here, or click to browse</p>' +
-          '<div class="fine">Upload the full book, not a chapter, summary or excerpt. Max 50MB.</div>' +
-          (submitted ? '' : '<input type="file" accept="application/pdf" id="file-' + b.tempId + '">') +
-        '</div>' +
-        '<div class="upload-file-row" id="filerow-' + b.tempId + '"><span></span><span>&#10003; attached</span></div>' +
+return (
+'<div class="detail-panel" id="detail-panel-' + b.tempId + '" style="' + (submitted ? 'opacity:.6;' : '') + '">' +
+'<div class="detail-head">' +
+'<div class="cover-ph" style="width:56px;height:80px;">' + (b.coverImage ? '<img src="' + escapeHtml(b.coverImage) + '" alt="">' : '') + '</div>' +
+'<div>' +
+'<h3>' + escapeHtml(b.title || b.asin) + '</h3>' +
+'<div class="asin">ASIN: ' + escapeHtml(b.asin) + '</div>' +
+'</div>' +
+'<div style="margin-left:auto;">' + (submitted ? '<span class="status-pill submitted">Submitted</span>' : '') + '</div>' +
+'</div>' +
 
-        '<div class="confirm-row">' +
-          '<input type="checkbox" id="confirm-' + b.tempId + '" ' + (submitted ? 'disabled checked' : '') + '>' +
-          '<label for="confirm-' + b.tempId + '">I confirm this is the complete manuscript (if attached) and I\'m responsible for what I upload.</label>' +
-        '</div>' +
+'<div class="tag-grid" style="margin-top:0;margin-bottom:4px;">' + chips + '</div>' +
+'<div class="fine" style="margin-bottom:4px;">Rating, price and category pulled from Amazon, not editable here.</div>' +
 
-        '<div class="detail-error" id="detail-error-' + b.tempId + '" style="display:none;"></div>' +
+'<label class="field-label">Language</label>' +
+'<select id="lang-' + b.tempId + '" ' + (submitted ? 'disabled' : '') + '>' + langOptions + '</select>' +
 
-        '<div class="detail-actions">' +
-          '<button class="btn btn-primary" id="submit-' + b.tempId + '" ' + (submitted ? 'disabled' : '') + '>' + (submitted ? 'Submitted' : 'Submit book') + '</button>' +
-        '</div>' +
-      '</div>'
-    );
-  }
+'<label class="field-label">Book description <span style="font-weight:400;color:var(--muted);">(optional)</span></label>' +
+'<textarea id="desc-' + b.tempId + '" ' + (submitted ? 'disabled' : '') +
+(b.description ? '' : ' placeholder="Your description didn\'t pull through from Amazon. Paste it in, it helps us pick more accurate keywords for your book."') +
+'>' + escapeHtml(b.description || '') + '</textarea>' +
 
-  function wireDetailPanel(b) {
-    if (b.status === 'submitted') return;
+'<label class="field-label">Keywords <span style="font-weight:400;color:var(--muted);">(optional)</span></label>' +
+'<input type="text" id="keywords-' + b.tempId + '" ' + (submitted ? 'disabled' : '') + ' placeholder="e.g. mindset, habits, self discipline">' +
+'<div class="fine">What keywords do you think readers will use to find your book?</div>' +
 
-    var fileInput = document.getElementById('file-' + b.tempId);
-    var fileRow = document.getElementById('filerow-' + b.tempId);
-    if (fileInput) {
-      fileInput.addEventListener('change', function () {
-        if (fileInput.files && fileInput.files[0]) {
-          var f = fileInput.files[0];
-          fileRow.style.display = 'flex';
-          fileRow.querySelector('span').textContent = f.name + ' (' + (f.size / 1024 / 1024).toFixed(1) + ' MB)';
-        }
-      });
-    }
+'<label class="field-label">Monthly sales <span style="font-weight:400;color:var(--muted);">(optional, for your reference)</span></label>' +
+'<input type="number" min="0" id="sales-' + b.tempId + '" ' + (submitted ? 'disabled' : '') + ' placeholder="e.g. 40">' +
+'<div class="fine">For your reference only, doesn\'t affect your Discoverability Score.</div>' +
 
-    document.getElementById('submit-' + b.tempId).addEventListener('click', function () {
-      var errorEl = document.getElementById('detail-error-' + b.tempId);
-      errorEl.style.display = 'none';
+'<div class="confirm-row">' +
+'<input type="checkbox" id="ads-' + b.tempId + '" ' + (submitted ? 'disabled' : '') + '>' +
+'<label for="ads-' + b.tempId + '">I\'m currently running Amazon Ads for this book</label>' +
+'</div>' +
+'<div class="fine">Shown as a status pill on your dashboard, doesn\'t affect your Discoverability Score.</div>' +
 
-      if (!document.getElementById('confirm-' + b.tempId).checked) {
-        errorEl.textContent = 'Please confirm the responsibility checkbox before submitting.';
-        errorEl.style.display = 'block';
-        return;
-      }
+'<label class="field-label">PDF reader copy <span style="font-weight:400;color:var(--muted);">(optional for now)</span></label>' +
+'<div class="upload-drop">' +
+'<i class="ti ti-cloud-upload"></i>' +
+'<p>Drag &amp; drop your PDF here, or click to browse</p>' +
+'<div class="fine">Upload the full book, not a chapter, summary or excerpt. Max 50MB.</div>' +
+(submitted ? '' : '<input type="file" accept="application/pdf" id="file-' + b.tempId + '">') +
+'</div>' +
+'<div class="upload-file-row" id="filerow-' + b.tempId + '"><span></span><span>&#10003; attached</span></div>' +
 
-      document.getElementById('submit-modal-title').textContent = b.title || b.asin;
-      document.getElementById('submit-modal').classList.add('active');
-      document.getElementById('submit-modal').setAttribute('data-book', b.tempId);
-    });
-  }
+'<div class="confirm-row">' +
+'<input type="checkbox" id="confirm-' + b.tempId + '" ' + (submitted ? 'disabled checked' : '') + '>' +
+'<label for="confirm-' + b.tempId + '">I confirm this is the complete manuscript (if attached) and I\'m responsible for what I upload.</label>' +
+'</div>' +
 
-  document.getElementById('submit-cancel').addEventListener('click', function () {
-    document.getElementById('submit-modal').classList.remove('active');
-  });
+'<div class="detail-error" id="detail-error-' + b.tempId + '" style="display:none;"></div>' +
 
-  document.getElementById('submit-confirm').addEventListener('click', async function () {
-    var modal = document.getElementById('submit-modal');
-    var tempId = modal.getAttribute('data-book');
-    var b = byId(tempId);
-    if (!b) return;
+'<div class="detail-actions">' +
+'<button class="btn btn-primary" id="submit-' + b.tempId + '" ' + (submitted ? 'disabled' : '') + '>' + (submitted ? 'Submitted' : 'Submit book') + '</button>' +
+'</div>' +
+'</div>'
+);
+}
 
-    var confirmBtn = document.getElementById('submit-confirm');
-    confirmBtn.disabled = true;
-    confirmBtn.textContent = 'Submitting...';
+function wireDetailPanel(b) {
+if (b.status === 'submitted') return;
 
-    var language = document.getElementById('lang-' + tempId).value;
-    var description = document.getElementById('desc-' + tempId).value;
-    var keywords = document.getElementById('keywords-' + tempId).value;
-    var monthlySalesRaw = document.getElementById('sales-' + tempId).value;
-    var monthlySales = monthlySalesRaw === '' ? null : Number(monthlySalesRaw);
-    var amazonAdsActive = document.getElementById('ads-' + tempId).checked;
-    var fileInput = document.getElementById('file-' + tempId);
-    var file = fileInput && fileInput.files && fileInput.files[0];
+var fileInput = document.getElementById('file-' + b.tempId);
+var fileRow = document.getElementById('filerow-' + b.tempId);
+if (fileInput) {
+fileInput.addEventListener('change', function () {
+if (fileInput.files && fileInput.files[0]) {
+var f = fileInput.files[0];
+fileRow.style.display = 'flex';
+fileRow.querySelector('span').textContent = f.name + ' (' + (f.size / 1024 / 1024).toFixed(1) + ' MB)';
+}
+});
+}
 
-    var manuscriptPath = null;
-    if (file) {
-      var path = user.id + '/' + b.rowId + '.pdf';
-      var { error: uploadError } = await readerbull.client.storage
-        .from('manuscripts')
-        .upload(path, file, { upsert: true, contentType: 'application/pdf' });
-      if (uploadError) {
-        var errorEl = document.getElementById('detail-error-' + tempId);
-        errorEl.textContent = 'Manuscript upload failed: ' + uploadError.message;
-        errorEl.style.display = 'block';
-        confirmBtn.disabled = false;
-        confirmBtn.textContent = 'Yes, submit';
-        modal.classList.remove('active');
-        return;
-      }
-      manuscriptPath = path;
-    }
+document.getElementById('submit-' + b.tempId).addEventListener('click', function () {
+var errorEl = document.getElementById('detail-error-' + b.tempId);
+errorEl.style.display = 'none';
 
-    // Best-effort deep audit content: real competitor data, the R27
-    // organic-page-rank check, and an LLM narrative, built once here and
-    // stored on the row. Runs BEFORE scoring now, because Price vs Niche
-    // and the Listing page-rank sub-factor both need this endpoint's
-    // output as scoring inputs (see api/enrich-audit.js). Never blocks
-    // submit, if this fails or times out, scoring.js and dashboard.html
-    // both fall back gracefully when competitors/pageRank are missing.
-    var competitorsJson = null;
-    var pageRankJson = null;
-    var narrativeJson = null;
+if (!document.getElementById('confirm-' + b.tempId).checked) {
+errorEl.textContent = 'Please confirm the responsibility checkbox before submitting.';
+errorEl.style.display = 'block';
+return;
+}
 
-    // How many books this author has in total (including this one, already
-    // inserted at import time), so the narrative prompt can gate the
-    // single-book portfolio-expansion suggestion (see api/enrich-audit.js).
-    // Best-effort only, never invented if the count query fails.
-    var authorBookCount = null;
-    try {
-      var countResult = await readerbull.client
-        .from('books')
-        .select('id', { count: 'exact', head: true })
-        .eq('user_id', user.id);
-      authorBookCount = (typeof countResult.count === 'number') ? countResult.count : null;
-    } catch (err) {
-      // best-effort only
-    }
+document.getElementById('submit-modal-title').textContent = b.title || b.asin;
+document.getElementById('submit-modal').classList.add('active');
+document.getElementById('submit-modal').setAttribute('data-book', b.tempId);
+});
+}
 
-    try {
-      var { data: enrichSession } = await readerbull.client.auth.getSession();
-      var enrichResp = await fetch('/api/enrich-audit', {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          'Authorization': 'Bearer ' + ((enrichSession && enrichSession.session && enrichSession.session.access_token) || '')
-        },
-        body: JSON.stringify({
-          title: b.title,
-          category: b.category,
-          keywords: keywords,
-          description: description,
-          asin: b.asin,
-          price: b.price,
-          rating: b.rating,
-          reviewCount: b.reviewCount,
-          bestsellerRank: b.bestsellerRank,
-          boughtTogether: b.boughtTogether || [],
-          amazonAdsActive: amazonAdsActive,
-          authorBookCount: authorBookCount
-        })
-      });
-      if (enrichResp.ok) {
-        var enrichData = await enrichResp.json();
-        competitorsJson = enrichData.competitors || null;
-        pageRankJson = enrichData.pageRank || null;
-        narrativeJson = enrichData.narrative || null;
-        // Keyword research (DataForSEO Amazon Related Keywords + Use/Skip,
-        // Priority/Best Fit classification) rides along inside
-        // audit_narrative_json rather than a new DB column, dashboard.html's
-        // Keywords tab reads it back out from there.
-        if (enrichData.keywordResearch) {
-          narrativeJson = narrativeJson || {};
-          narrativeJson.keywordResearch = enrichData.keywordResearch;
-        }
-      }
-    } catch (err) {
-      // swallow, this step is best-effort
-    }
+document.getElementById('submit-cancel').addEventListener('click', function () {
+document.getElementById('submit-modal').classList.remove('active');
+});
 
-    var scoreResult = computeDiscoverabilityScore({
-      title: b.title,
-      reviewCount: b.reviewCount,
-      rating: b.rating,
-      keywords: keywords,
-      description: description,
-      category: b.category,
-      categoryCount: b.categoryCount,
-      bestsellerRank: b.bestsellerRank,
-      price: b.price,
-      coverImage: b.coverImage,
-      pageRank: pageRankJson,
-      competitors: competitorsJson,
-      amazonAdsActive: amazonAdsActive
-    });
+document.getElementById('submit-confirm').addEventListener('click', async function () {
+var modal = document.getElementById('submit-modal');
+var tempId = modal.getAttribute('data-book');
+var b = byId(tempId);
+if (!b) return;
 
-    var { error: updateError } = await readerbull.client
-      .from('books')
-      .update({
-        language: language,
-        book_title: b.title,
-        description: description,
-        keywords: keywords,
-        monthly_sales: monthlySales,
-        manuscript_url: manuscriptPath,
-        score: scoreResult.score,
-        score_breakdown: scoreResult.breakdown,
-        competitors_json: competitorsJson,
-        audit_narrative_json: narrativeJson
-      })
-      .eq('id', b.rowId);
+var confirmBtn = document.getElementById('submit-confirm');
+confirmBtn.disabled = true;
+confirmBtn.textContent = 'Submitting...';
 
-    confirmBtn.disabled = false;
-    confirmBtn.textContent = 'Yes, submit';
-    modal.classList.remove('active');
+// This step runs several live API calls server-side (competitor
+// lookup, keyword research, page-rank check, AI narrative) and can
+// genuinely take 15-30+ seconds, so swap the modal to a loading view
+// with an elapsed timer and rotating status lines rather than leaving
+// the author staring at a disabled button with no feedback.
+document.getElementById('submit-modal-confirm-view').style.display = 'none';
+var loadingView = document.getElementById('submit-modal-loading-view');
+loadingView.style.display = 'block';
+var loadingMessages = ['Checking your competitors…', 'Researching keywords…', 'Writing your strategy…', 'Almost there…'];
+var loadingMsgIndex = 0;
+var loadingMessageEl = document.getElementById('submit-loading-message');
+var loadingTimerEl = document.getElementById('submit-loading-timer');
+loadingMessageEl.textContent = loadingMessages[0];
+loadingTimerEl.textContent = '0s';
+var loadingStart = Date.now();
+var loadingMessageInterval = setInterval(function () {
+loadingMsgIndex = (loadingMsgIndex + 1) % loadingMessages.length;
+loadingMessageEl.textContent = loadingMessages[loadingMsgIndex];
+}, 4000);
+var loadingTimerInterval = setInterval(function () {
+loadingTimerEl.textContent = Math.floor((Date.now() - loadingStart) / 1000) + 's';
+}, 1000);
+function stopLoadingView() {
+clearInterval(loadingMessageInterval);
+clearInterval(loadingTimerInterval);
+document.getElementById('submit-modal-confirm-view').style.display = 'block';
+loadingView.style.display = 'none';
+}
 
-    if (updateError) {
-      var errorEl2 = document.getElementById('detail-error-' + tempId);
-      errorEl2.textContent = updateError.message;
-      errorEl2.style.display = 'block';
-      return;
-    }
+var language = document.getElementById('lang-' + tempId).value;
+var description = document.getElementById('desc-' + tempId).value;
+var keywords = document.getElementById('keywords-' + tempId).value;
+var monthlySalesRaw = document.getElementById('sales-' + tempId).value;
+var monthlySales = monthlySalesRaw === '' ? null : Number(monthlySalesRaw);
+var amazonAdsActive = document.getElementById('ads-' + tempId).checked;
+var fileInput = document.getElementById('file-' + tempId);
+var file = fileInput && fileInput.files && fileInput.files[0];
 
-    b.status = 'submitted';
-    // Only swap this one panel to its submitted state, so anything the
-    // author was mid-typing on a different book's panel isn't lost.
-    var panelWrap = document.getElementById('detail-panels');
-    var temp = document.createElement('div');
-    temp.innerHTML = renderDetailPanel(b);
-    panelWrap.replaceChild(temp.firstElementChild, document.getElementById('detail-panel-' + tempId));
-    redirectIfAllSubmitted();
-  });
+var manuscriptPath = null;
+if (file) {
+var path = user.id + '/' + b.rowId + '.pdf';
+var { error: uploadError } = await readerbull.client.storage
+.from('manuscripts')
+.upload(path, file, { upsert: true, contentType: 'application/pdf' });
+if (uploadError) {
+stopLoadingView();
+var errorEl = document.getElementById('detail-error-' + tempId);
+errorEl.textContent = 'Manuscript upload failed: ' + uploadError.message;
+errorEl.style.display = 'block';
+confirmBtn.disabled = false;
+confirmBtn.textContent = 'Yes, submit';
+modal.classList.remove('active');
+return;
+}
+manuscriptPath = path;
+}
 
-  function escapeHtml(s) {
-    return String(s == null ? '' : s)
-      .replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;')
-      .replace(/"/g, '&quot;').replace(/'/g, '&#39;');
-  }
+// Best-effort deep audit content: real competitor data, the R27
+// organic-page-rank check, and an LLM narrative, built once here and
+// stored on the row. Runs BEFORE scoring now, because Price vs Niche
+// and the Listing page-rank sub-factor both need this endpoint's
+// output as scoring inputs (see api/enrich-audit.js). Never blocks
+// submit, if this fails or times out, scoring.js and dashboard.html
+// both fall back gracefully when competitors/pageRank are missing.
+var competitorsJson = null;
+var pageRankJson = null;
+var narrativeJson = null;
 
-  // Amazon listing URLs come with a pile of tracking query params that make
-  // for a messy, wrapping card while we're still waiting on the real title.
-  // Show the bare ASIN if we can pull one out, otherwise just truncate.
-  function displayLabel(input) {
-    var trimmed = String(input || '').trim();
-    if (/^[A-Z0-9]{10}$/i.test(trimmed)) return trimmed.toUpperCase();
-    var match = trimmed.match(/\/(?:dp|gp\/product|ASIN)\/([A-Z0-9]{10})/i);
-    if (match) return 'ASIN: ' + match[1].toUpperCase();
-    return trimmed.length > 60 ? trimmed.slice(0, 60) + '…' : trimmed;
-  }
+// How many books this author has in total (including this one, already
+// inserted at import time), so the narrative prompt can gate the
+// single-book portfolio-expansion suggestion (see api/enrich-audit.js).
+// Best-effort only, never invented if the count query fails.
+var authorBookCount = null;
+try {
+var countResult = await readerbull.client
+.from('books')
+.select('id', { count: 'exact', head: true })
+.eq('user_id', user.id);
+authorBookCount = (typeof countResult.count === 'number') ? countResult.count : null;
+} catch (err) {
+// best-effort only
+}
+
+try {
+var enrichResp = await fetch('/api/enrich-audit', {
+method: 'POST',
+headers: { 'Content-Type': 'application/json', 'Authorization': 'Bearer ' + accessToken },
+body: JSON.stringify({
+title: b.title,
+category: b.category,
+keywords: keywords,
+description: description,
+asin: b.asin,
+price: b.price,
+rating: b.rating,
+reviewCount: b.reviewCount,
+bestsellerRank: b.bestsellerRank,
+boughtTogether: b.boughtTogether || [],
+amazonAdsActive: amazonAdsActive,
+authorBookCount: authorBookCount
+})
+});
+if (enrichResp.ok) {
+var enrichData = await enrichResp.json();
+competitorsJson = enrichData.competitors || null;
+pageRankJson = enrichData.pageRank || null;
+narrativeJson = enrichData.narrative || null;
+// Keyword research (DataForSEO Amazon Related Keywords + Use/Skip,
+// Priority/Best Fit classification) rides along inside
+// audit_narrative_json rather than a new DB column, dashboard.html's
+// Keywords tab reads it back out from there.
+if (enrichData.keywordResearch) {
+narrativeJson = narrativeJson || {};
+narrativeJson.keywordResearch = enrichData.keywordResearch;
+}
+}
+} catch (err) {
+// swallow, this step is best-effort
+}
+
+var scoreResult = computeDiscoverabilityScore({
+title: b.title,
+reviewCount: b.reviewCount,
+rating: b.rating,
+keywords: keywords,
+description: description,
+category: b.category,
+categoryCount: b.categoryCount,
+bestsellerRank: b.bestsellerRank,
+price: b.price,
+coverImage: b.coverImage,
+pageRank: pageRankJson,
+competitors: competitorsJson,
+amazonAdsActive: amazonAdsActive
+});
+
+var { error: updateError } = await readerbull.client
+.from('books')
+.update({
+language: language,
+book_title: b.title,
+description: description,
+keywords: keywords,
+monthly_sales: monthlySales,
+manuscript_url: manuscriptPath,
+score: scoreResult.score,
+score_breakdown: scoreResult.breakdown,
+competitors_json: competitorsJson,
+audit_narrative_json: narrativeJson
+})
+.eq('id', b.rowId);
+
+stopLoadingView();
+confirmBtn.disabled = false;
+confirmBtn.textContent = 'Yes, submit';
+modal.classList.remove('active');
+
+if (updateError) {
+var errorEl2 = document.getElementById('detail-error-' + tempId);
+errorEl2.textContent = updateError.message;
+errorEl2.style.display = 'block';
+return;
+}
+
+b.status = 'submitted';
+// Only swap this one panel to its submitted state, so anything the
+// author was mid-typing on a different book's panel isn't lost.
+var panelWrap = document.getElementById('detail-panels');
+var temp = document.createElement('div');
+temp.innerHTML = renderDetailPanel(b);
+panelWrap.replaceChild(temp.firstElementChild, document.getElementById('detail-panel-' + tempId));
+redirectIfAllSubmitted();
+});
+
+function escapeHtml(s) {
+return String(s == null ? '' : s)
+.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;')
+.replace(/"/g, '&quot;').replace(/'/g, '&#39;');
+}
+
+// Amazon listing URLs come with a pile of tracking query params that make
+// for a messy, wrapping card while we're still waiting on the real title.
+// Show the bare ASIN if we can pull one out, otherwise just truncate.
+function displayLabel(input) {
+var trimmed = String(input || '').trim();
+if (/^[A-Z0-9]{10}$/i.test(trimmed)) return trimmed.toUpperCase();
+var match = trimmed.match(/\/(?:dp|gp\/product|ASIN)\/([A-Z0-9]{10})/i);
+if (match) return 'ASIN: ' + match[1].toUpperCase();
+return trimmed.length > 60 ? trimmed.slice(0, 60) + '…' : trimmed;
+}
 })();
 </script>
 
