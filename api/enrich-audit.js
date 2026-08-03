@@ -42,6 +42,15 @@
 //        bestsellerRank, boughtTogether }
 // -> { competitors: [...], pageRank: {...}, keywordResearch: {...}, narrative: {...} }
 //
+// Requires a valid Supabase session (Authorization: Bearer <access_token>)
+// and is capped at MAX_PER_HOUR calls per signed-in author per hour, see
+// api/_auth.js for why this was added 3 August 2026. This endpoint in
+// particular had no rate protection: its fallback chains (findCompetitors,
+// findKeywordResearch) mean a garbage or empty request walks every
+// fallback before giving up, so one unauthenticated hit could previously
+// trigger far more paid SerpApi/DataForSEO/Anthropic calls than a real,
+// valid audit does.
+//
 // Competitor accuracy fix (29 July 2026): findCompetitors now prefers
 // boughtTogether (Amazon's own "frequently bought together" data for this
 // exact ASIN, passed through from api/import-book.js where it was pulled
@@ -53,21 +62,28 @@
 // same seed-fallback pattern already proven for findKeywordResearch:
 // category leaf, then the author's own primary keyword, then the book
 // title, then an AI-guessed shopper phrase as a last resort.
-//
-// Duplicate auth-check fix (3 August 2026): this handler's session
-// verification block (Bearer token check, Supabase /auth/v1/user call)
-// was accidentally pasted in twice in a row, the same bug already fixed
-// in api/import-book.js. Harmless but wasteful, every audit was making an
-// extra, unneeded network call to Supabase to check the same token twice.
-// Reduced to a single check, same logic and error messages, no other
-// behaviour changed.
+
+var auth = require('./_auth');
+
+var MAX_PER_HOUR = 15;
 
 module.exports = async function handler(req, res) {
   if (req.method !== 'POST') {
     res.status(405).json({ error: 'Method not allowed' });
     return;
   }
-  var authToken = ((req.headers && req.headers.authorization) || '').replace(/^Bearer\s+/i, ''); if (!authToken) { res.status(401).json({ error: 'Please sign in again, your session could not be found.' }); return; } var authCheck = await fetch((process.env.SUPABASE_URL || 'https://tqkeqjisqqvxasyzrfax.supabase.co') + '/auth/v1/user', { headers: { apikey: 'sb_publishable_0L4W_eHRcnYNm5MR1gDDDg_Bn1d3nPm', Authorization: 'Bearer ' + authToken } }); if (!authCheck.ok) { res.status(401).json({ error: 'Your session has expired, please sign in again.' }); return; }
+
+  var authedUser = await auth.requireAuthedUser(req);
+  if (!authedUser) {
+    res.status(401).json({ error: 'Please sign in again, your session could not be verified.' });
+    return;
+  }
+
+  var withinLimit = await auth.checkRateLimit(authedUser, 'enrich-audit', MAX_PER_HOUR);
+  if (!withinLimit) {
+    res.status(429).json({ error: 'Too many audit requests, please wait a bit and try again.' });
+    return;
+  }
 
   var input = req.body || {};
   var result = { competitors: [], pageRank: null, keywordResearch: null, narrative: null };
@@ -503,7 +519,7 @@ async function classifyKeywords(input, seed, items) {
 // ---------- Narrative generation (Anthropic Messages API) ----------
 async function generateNarrative(input, competitors) {
   var apiKey = process.env.ANTHROPIC_API_KEY;
-  if (!apiKey) { await sendErrorAlert('enrich-audit', 'ANTHROPIC_API_KEY is missing, narrative generation cannot run.'); return null; }
+  if (!apiKey) return null;
 
   var breakdown = input.breakdown || {};
   var payload = {
@@ -601,7 +617,7 @@ async function generateNarrative(input, competitors) {
     });
 
     var data = await response.json();
-    if (!response.ok) { await sendErrorAlert('enrich-audit', 'Anthropic narrative call returned an error status.'); return null; }
+    if (!response.ok) return null;
 
     var text = (data.content && data.content[0] && data.content[0].text) || '';
     var cleaned = text.trim().replace(/^```(json)?/i, '').replace(/```$/, '').trim();
@@ -616,9 +632,6 @@ async function generateNarrative(input, competitors) {
     if (!parsed || typeof parsed !== 'object') return null;
     return parsed;
   } catch (err) {
-    await sendErrorAlert('enrich-audit', 'Narrative generation threw an unexpected error: ' + (err && err.message ? err.message : String(err))); return null;
+    return null;
   }
 }
-
-
-function sendErrorAlert(endpoint, detail) { var key = process.env.RESEND_API_KEY; if (!key) return Promise.resolve(); return fetch('https://api.resend.com/emails', { method: 'POST', headers: { 'Authorization': 'Bearer ' + key, 'Content-Type': 'application/json' }, body: JSON.stringify({ from: 'Readerbull Alerts <alerts@readerbull.com>', to: ['coastlvibes@gmail.com'], subject: 'Readerbull error: ' + endpoint, text: detail + '\n\nTime: ' + new Date().toISOString() }) }).catch(function () {}); }

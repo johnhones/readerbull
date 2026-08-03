@@ -11,6 +11,14 @@
 // boughtTogether rides along on this same call at no extra cost (see below),
 // onboarding.html carries it through to api/enrich-audit.js at submit time,
 // where findCompetitors prefers it over a fresh category search.
+//
+// Requires a valid Supabase session (Authorization: Bearer <access_token>)
+// and is capped at MAX_PER_HOUR calls per signed-in author per hour, see
+// api/_auth.js for why. Before 3 August 2026 this endpoint had neither.
+
+var auth = require('./_auth');
+
+var MAX_PER_HOUR = 30;
 
 module.exports = async function handler(req, res) {
   if (req.method !== 'POST') {
@@ -18,21 +26,20 @@ module.exports = async function handler(req, res) {
     return;
   }
 
-  var authToken = ((req.headers && req.headers.authorization) || '').replace(/^Bearer\s+/i, '');
-  if (!authToken) {
-    res.status(401).json({ error: 'Please sign in again, your session could not be found.' });
+  var authedUser = await auth.requireAuthedUser(req);
+  if (!authedUser) {
+    res.status(401).json({ error: 'Please sign in again, your session could not be verified.' });
     return;
   }
-  var authCheck = await fetch((process.env.SUPABASE_URL || 'https://tqkeqjisqqvxasyzrfax.supabase.co') + '/auth/v1/user', {
-    headers: { apikey: 'sb_publishable_0L4W_eHRcnYNm5MR1gDDDg_Bn1d3nPm', Authorization: 'Bearer ' + authToken }
-  });
-  if (!authCheck.ok) {
-    res.status(401).json({ error: 'Your session has expired, please sign in again.' });
+
+  var withinLimit = await auth.checkRateLimit(authedUser, 'import-book', MAX_PER_HOUR);
+  if (!withinLimit) {
+    res.status(429).json({ error: 'Too many import requests, please wait a bit and try again.' });
     return;
   }
 
   var input = (req.body && req.body.input) || '';
-  var asin = await resolveAsin(input);
+  var asin = extractAsin(input);
 
   if (!asin) {
     res.status(400).json({ error: 'Could not find a valid Amazon ASIN in "' + input + '". Paste the ASIN itself or a full Amazon listing URL.' });
@@ -41,7 +48,6 @@ module.exports = async function handler(req, res) {
 
   var apiKey = process.env.SERPAPI_KEY;
   if (!apiKey) {
-    await sendErrorAlert('import-book', 'SERPAPI_KEY is missing in Vercel env vars, no imports can work until this is set.');
     res.status(500).json({ error: 'Import is not configured yet, SERPAPI_KEY is missing.' });
     return;
   }
@@ -151,34 +157,9 @@ module.exports = async function handler(req, res) {
       boughtTogether: boughtTogether
     });
   } catch (err) {
-    await sendErrorAlert('import-book', 'Amazon lookup threw an unexpected error: ' + (err && err.message ? err.message : String(err)));
     res.status(502).json({ error: 'Amazon lookup failed, please try again.' });
   }
 };
-
-// Amazon's mobile app "Share" button (and some desktop share links) don't
-// hand out a normal /dp/ or /gp/product/ URL, they hand out a shortened
-// redirect link instead: amzn.eu/d/xxxxxxxx, amzn.to/xxxxxxxx, a.co/d/xxxxxxxx.
-// The token after /d/ isn't an ASIN, it's a short-link code, so extractAsin
-// never matches it and every mobile-app share link failed to import. Fixed
-// by following the redirect server-side first (fetch() follows redirects by
-// default and response.url is the final, real Amazon listing URL), then
-// running the normal extraction on that resolved URL. Confirmed against
-// https://amzn.eu/d/03aL2ssM, 1 August 2026.
-async function resolveAsin(input) {
-  var asin = extractAsin(input);
-  if (asin) return asin;
-
-  var trimmed = String(input || '').trim();
-  if (!/^https?:\/\//i.test(trimmed)) return null;
-
-  try {
-    var resolved = await fetch(trimmed, { method: 'GET', redirect: 'follow' });
-    return extractAsin(resolved.url || '');
-  } catch (err) {
-    return null;
-  }
-}
 
 function extractAsin(input) {
   var trimmed = String(input || '').trim();
@@ -187,19 +168,4 @@ function extractAsin(input) {
   // full Amazon URL, e.g. .../dp/B0H2CZYD6R/ or .../gp/product/B0H2CZYD6R
   var match = trimmed.match(/\/(?:dp|gp\/product|ASIN)\/([A-Z0-9]{10})/i);
   return match ? match[1].toUpperCase() : null;
-}
-
-function sendErrorAlert(endpoint, detail) {
-  var key = process.env.RESEND_API_KEY;
-  if (!key) return Promise.resolve();
-  return fetch('https://api.resend.com/emails', {
-    method: 'POST',
-    headers: { 'Authorization': 'Bearer ' + key, 'Content-Type': 'application/json' },
-    body: JSON.stringify({
-      from: 'Readerbull Alerts <alerts@readerbull.com>',
-      to: ['coastlvibes@gmail.com'],
-      subject: 'Readerbull error: ' + endpoint,
-      text: detail + '\n\nTime: ' + new Date().toISOString()
-    })
-  }).catch(function () {});
 }
