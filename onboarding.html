@@ -358,7 +358,7 @@
             '<h3>' + escapeHtml(b.title || b.asin) + '</h3>' +
             '<div class="asin">ASIN: ' + escapeHtml(b.asin) + '</div>' +
           '</div>' +
-          '<div style="margin-left:auto;"><span class="status-pill ' + (submitted ? 'submitted' : 'needs-details') + '">' + (submitted ? 'Submitted' : 'Needs details') + '</span></div>' +
+          '<div style="margin-left:auto;">' + (submitted ? '<span class="status-pill submitted">Submitted</span>' : '') + '</div>' +
         '</div>' +
 
         '<div class="tag-grid" style="margin-top:0;margin-bottom:4px;">' + chips + '</div>' +
@@ -369,11 +369,11 @@
 
         '<label class="field-label">Book description <span style="font-weight:400;color:var(--muted);">(optional)</span></label>' +
         '<textarea id="desc-' + b.tempId + '" ' + (submitted ? 'disabled' : '') +
-          (b.description ? '' : ' placeholder="We couldn\'t pull a description for this book from Amazon. Optional, add one if you want it to inform your audit and listing."') +
+          (b.description ? '' : ' placeholder="Your description didn\'t pull through from Amazon for this listing. Paste it in here, it helps us pick more accurate keywords for your book."') +
           '>' + escapeHtml(b.description || '') + '</textarea>' +
         (b.description
           ? ''
-          : '<div class="fine">No description was available from Amazon for this listing. This is optional, leave it blank and we\'ll run your audit from your title and category alone.</div>') +
+          : '<div class="fine">We couldn\'t pull a description from Amazon for this listing. If you have one, from your KDP listing or elsewhere, paste it in: it helps us classify which keywords actually fit your book. Optional, we\'ll still run your audit without it.</div>') +
 
         '<label class="field-label">Keywords <span style="font-weight:400;color:var(--muted);">(optional)</span></label>' +
         '<input type="text" id="keywords-' + b.tempId + '" ' + (submitted ? 'disabled' : '') + ' placeholder="e.g. mindset, habits, self discipline">' +
