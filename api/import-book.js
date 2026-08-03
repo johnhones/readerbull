@@ -17,12 +17,22 @@ module.exports = async function handler(req, res) {
     res.status(405).json({ error: 'Method not allowed' });
     return;
   }
-  var authToken = ((req.headers && req.headers.authorization) || '').replace(/^Bearer\s+/i, ''); if (!authToken) { res.status(401).json({ error: 'Please sign in again, your session could not be found.' }); return; } var authCheck = await fetch((process.env.SUPABASE_URL || 'https://tqkeqjisqqvxasyzrfax.supabase.co') + '/auth/v1/user', { headers: { apikey: 'sb_publishable_0L4W_eHRcnYNm5MR1gDDDg_Bn1d3nPm', Authorization: 'Bearer ' + authToken } }); if (!authCheck.ok) { res.status(401).json({ error: 'Your session has expired, please sign in again.' }); return; }
 
-  var authToken = ((req.headers && req.headers.authorization) || '').replace(/^Bearer\s+/i, ''); if (!authToken) { res.status(401).json({ error: 'Please sign in again, your session could not be found.' }); return; } var authCheck = await fetch((process.env.SUPABASE_URL || 'https://tqkeqjisqqvxasyzrfax.supabase.co') + '/auth/v1/user', { headers: { apikey: 'sb_publishable_0L4W_eHRcnYNm5MR1gDDDg_Bn1d3nPm', Authorization: 'Bearer ' + authToken } }); if (!authCheck.ok) { res.status(401).json({ error: 'Your session has expired, please sign in again.' }); return; }
+  var authToken = ((req.headers && req.headers.authorization) || '').replace(/^Bearer\s+/i, '');
+  if (!authToken) {
+    res.status(401).json({ error: 'Please sign in again, your session could not be found.' });
+    return;
+  }
+  var authCheck = await fetch((process.env.SUPABASE_URL || 'https://tqkeqjisqqvxasyzrfax.supabase.co') + '/auth/v1/user', {
+    headers: { apikey: 'sb_publishable_0L4W_eHRcnYNm5MR1gDDDg_Bn1d3nPm', Authorization: 'Bearer ' + authToken }
+  });
+  if (!authCheck.ok) {
+    res.status(401).json({ error: 'Your session has expired, please sign in again.' });
+    return;
+  }
 
   var input = (req.body && req.body.input) || '';
-  var asin = extractAsin(input);
+  var asin = await resolveAsin(input);
 
   if (!asin) {
     res.status(400).json({ error: 'Could not find a valid Amazon ASIN in "' + input + '". Paste the ASIN itself or a full Amazon listing URL.' });
@@ -146,6 +156,30 @@ module.exports = async function handler(req, res) {
   }
 };
 
+// Amazon's mobile app "Share" button (and some desktop share links) don't
+// hand out a normal /dp/ or /gp/product/ URL, they hand out a shortened
+// redirect link instead: amzn.eu/d/xxxxxxxx, amzn.to/xxxxxxxx, a.co/d/xxxxxxxx.
+// The token after /d/ isn't an ASIN, it's a short-link code, so extractAsin
+// never matches it and every mobile-app share link failed to import. Fixed
+// by following the redirect server-side first (fetch() follows redirects by
+// default and response.url is the final, real Amazon listing URL), then
+// running the normal extraction on that resolved URL. Confirmed against
+// https://amzn.eu/d/03aL2ssM, 1 August 2026.
+async function resolveAsin(input) {
+  var asin = extractAsin(input);
+  if (asin) return asin;
+
+  var trimmed = String(input || '').trim();
+  if (!/^https?:\/\//i.test(trimmed)) return null;
+
+  try {
+    var resolved = await fetch(trimmed, { method: 'GET', redirect: 'follow' });
+    return extractAsin(resolved.url || '');
+  } catch (err) {
+    return null;
+  }
+}
+
 function extractAsin(input) {
   var trimmed = String(input || '').trim();
   // bare ASIN pasted directly, e.g. B0H2CZYD6R
@@ -155,4 +189,17 @@ function extractAsin(input) {
   return match ? match[1].toUpperCase() : null;
 }
 
-function sendErrorAlert(endpoint, detail) { var key = process.env.RESEND_API_KEY; if (!key) return Promise.resolve(); return fetch('https://api.resend.com/emails', { method: 'POST', headers: { 'Authorization': 'Bearer ' + key, 'Content-Type': 'application/json' }, body: JSON.stringify({ from: 'Readerbull Alerts <alerts@readerbull.com>', to: ['coastlvibes@gmail.com'], subject: 'Readerbull error: ' + endpoint, text: detail + '\n\nTime: ' + new Date().toISOString() }) }).catch(function () {}); }
+function sendErrorAlert(endpoint, detail) {
+  var key = process.env.RESEND_API_KEY;
+  if (!key) return Promise.resolve();
+  return fetch('https://api.resend.com/emails', {
+    method: 'POST',
+    headers: { 'Authorization': 'Bearer ' + key, 'Content-Type': 'application/json' },
+    body: JSON.stringify({
+      from: 'Readerbull Alerts <alerts@readerbull.com>',
+      to: ['coastlvibes@gmail.com'],
+      subject: 'Readerbull error: ' + endpoint,
+      text: detail + '\n\nTime: ' + new Date().toISOString()
+    })
+  }).catch(function () {});
+}
