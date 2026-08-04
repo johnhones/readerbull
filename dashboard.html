@@ -515,8 +515,101 @@
             '<p>Here\'s exactly where your points came from. Two more factors (Sales/mo and Price vs Niche) also feed your total score but aren\'t broken out point-by-point here.</p>' +
             '<div>' + listHtml + '</div>' +
           '</div>' +
-        '</div>';
+        '</div>' +
+        nicheAssessmentHtml(b);
       detailWrap.scrollIntoView({ behavior: 'smooth', block: 'start' });
+    }
+
+    // ---------- Niche revenue + Best Seller Rank + Professional Assessment ----------
+    // Added 3 August 2026: the Overview block confirmed present on the
+    // legacy hand-built reference dashboards (Silver Ramsay, Soul Truth)
+    // but never carried over to this rebuild. Reads data already stored
+    // on the book row inside audit_narrative_json (nicheStats,
+    // assessmentTags, professionalAssessment, see api/enrich-audit.js),
+    // nothing computed client-side. Renders nothing at all when that data
+    // is missing (an older book audited before this shipped, or the
+    // enrichment step failed for this book), same graceful-fallback
+    // convention as competitorTableHtml above, rather than showing a
+    // broken-looking empty block.
+    function fmtRank(n) {
+      return (typeof n === 'number') ? ('#' + n.toLocaleString()) : 'Unknown';
+    }
+
+    function nicheAssessmentHtml(b) {
+      var narrative = b.audit_narrative_json;
+      if (!narrative) return '';
+
+      var stats = narrative.nicheStats;
+      var tags = narrative.assessmentTags;
+      var assessment = narrative.professionalAssessment;
+      if (!stats && !assessment) return '';
+
+      var statCardsHtml = '';
+      if (stats && (stats.booksSellingWell || stats.estimatedNicheRevenue)) {
+        statCardsHtml =
+          '<div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(140px,1fr));gap:12px;margin-top:16px;">' +
+            '<div style="background:var(--light);border-radius:10px;padding:14px;text-align:center;">' +
+              '<div style="font-size:22px;font-weight:800;color:var(--orange-d);">' + (stats.booksSellingWell != null ? stats.booksSellingWell : '—') + '</div>' +
+              '<div style="font-size:12px;color:var(--muted);margin-top:2px;">Books Selling Well In This Niche</div>' +
+            '</div>' +
+            '<div style="background:var(--light);border-radius:10px;padding:14px;text-align:center;">' +
+              '<div style="font-size:22px;font-weight:800;color:var(--teal-d);">' + (stats.estimatedNicheRevenue != null ? ('~$' + Math.round(stats.estimatedNicheRevenue).toLocaleString() + '/mo') : 'Not enough data') + '</div>' +
+              '<div style="font-size:12px;color:var(--muted);margin-top:2px;">Estimated KDP Niche Revenue</div>' +
+            '</div>' +
+          '</div>' +
+          '<div style="font-size:11px;color:var(--muted);margin-top:8px;">Estimated from bestseller rank across ' + (stats.sampleSize || 0) + ' comparable listing' + (stats.sampleSize === 1 ? '' : 's') + ', not a reported figure.</div>';
+      }
+
+      var bsrHtml = '';
+      if (stats && stats.bestSellerRank && (stats.bestSellerRank.yours || stats.bestSellerRank.nicheAverage || stats.bestSellerRank.topCompetitor)) {
+        bsrHtml =
+          '<div class="breakdown-card" style="margin-top:16px;">' +
+            '<h2>Best Seller Rank</h2>' +
+            '<div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(120px,1fr));gap:12px;margin-top:12px;">' +
+              '<div style="background:var(--light);border-radius:10px;padding:14px;text-align:center;">' +
+                '<div style="font-size:11px;letter-spacing:.05em;text-transform:uppercase;color:var(--muted);">Your BSR</div>' +
+                '<div style="font-size:18px;font-weight:800;color:var(--navy);margin-top:4px;">' + fmtRank(stats.bestSellerRank.yours) + '</div>' +
+              '</div>' +
+              '<div style="background:var(--light);border-radius:10px;padding:14px;text-align:center;">' +
+                '<div style="font-size:11px;letter-spacing:.05em;text-transform:uppercase;color:var(--muted);">Niche Average</div>' +
+                '<div style="font-size:18px;font-weight:800;color:var(--navy);margin-top:4px;">' + fmtRank(stats.bestSellerRank.nicheAverage) + '</div>' +
+              '</div>' +
+              '<div style="background:var(--light);border-radius:10px;padding:14px;text-align:center;">' +
+                '<div style="font-size:11px;letter-spacing:.05em;text-transform:uppercase;color:var(--muted);">Top Competitor</div>' +
+                '<div style="font-size:18px;font-weight:800;color:var(--teal-d);margin-top:4px;">' + fmtRank(stats.bestSellerRank.topCompetitor) + '</div>' +
+              '</div>' +
+            '</div>' +
+            '<div style="font-size:11px;color:var(--muted);margin-top:8px;">A lower rank means more sales. Niche average and top competitor are based on the comparable listings found for this book.</div>' +
+          '</div>';
+      }
+
+      var tagsHtml = (Array.isArray(tags) && tags.length)
+        ? '<div style="display:flex;flex-wrap:wrap;gap:8px;margin-top:16px;">' +
+            tags.map(function (t) {
+              return '<span style="background:var(--light);color:var(--navy);font-size:12px;font-weight:600;padding:5px 10px;border-radius:999px;">' + escapeHtml(t) + '</span>';
+            }).join('') +
+          '</div>'
+        : '';
+
+      var assessmentHtml = assessment
+        ? '<div class="breakdown-card" style="margin-top:16px;">' +
+            '<h2>Professional Assessment</h2>' +
+            narrativeHtml(assessment) +
+            tagsHtml +
+          '</div>'
+        : '';
+
+      if (!statCardsHtml && !bsrHtml && !assessmentHtml) return '';
+
+      // Only wrap statCardsHtml in its own "Book Summary" card when there's
+      // actually a stat to show, otherwise this renders an empty card with
+      // just a heading (confirmed with a synthetic no-nicheStats case
+      // where only professionalAssessment was present).
+      var bookSummaryHtml = statCardsHtml
+        ? '<div class="breakdown-card" style="margin-top:16px;"><h2>Book Summary</h2>' + statCardsHtml + '</div>'
+        : '';
+
+      return bookSummaryHtml + bsrHtml + assessmentHtml;
     }
     currentShowScoreDetail = showScoreDetail;
 

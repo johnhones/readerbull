@@ -307,6 +307,11 @@ b.category = payload.category;
 b.categoryCount = payload.categoryCount;
 b.bestsellerRank = payload.bestsellerRank;
 b.boughtTogether = payload.boughtTogether || [];
+// Added 3 August 2026 for the Overview "Professional Assessment" block
+// (see api/enrich-audit.js buildAssessmentTags): format availability and
+// the enhanced-content proxy, both already free on this same import call.
+b.formats = payload.formats || [];
+b.hasEnhancedContent = !!payload.hasEnhancedContent;
 b.status = 'imported';
 renderImportCard(b);
 } catch (err) {
@@ -609,7 +614,9 @@ reviewCount: b.reviewCount,
 bestsellerRank: b.bestsellerRank,
 boughtTogether: b.boughtTogether || [],
 amazonAdsActive: amazonAdsActive,
-authorBookCount: authorBookCount
+authorBookCount: authorBookCount,
+formats: b.formats || [],
+hasEnhancedContent: !!b.hasEnhancedContent
 })
 });
 if (enrichResp.ok) {
