@@ -332,53 +332,115 @@ failures (e.g. a failed import), which is what made this feel loud. */
 .ads-pill.inactive { border-color: rgba(244,116,33,.25); }
 .ads-pill.inactive .dot { background: var(--orange); }
 
-/* ---- rb-* dashboard component classes (added 4 August 2026) ----
-   Phase 1 of ReaderBull_Dashboard_Visual_Rebuild_Plan.md /
-   ReaderBull_Dashboard_Component_Catalogue.md's recommended build order:
-   named classes for the pieces the Overview rebuild shipped as one-off
-   inline styles (bookSummaryHtml's stat cards, professionalAssessmentCardHtml's
-   tag pills, revenueInsightHtml's pills, all in dashboard.html), plus the
-   pieces still needed for Market Analysis/Marketing Strategy/Quick Wins.
-   .rb-card itself is deliberately not defined here, .breakdown-card
-   already is that exact white bordered card shell (confirmed no clash
-   exists), reused as-is rather than duplicated under a new name. Written
-   against the shell's existing @media(max-width:900px)/@media(max-width:640px)
-   breakpoints only, no new breakpoint introduced (ReaderBull_Dashboard_
-   Visual_Rebuild_Plan.md's explicit instruction on this). */
-.rb-stat-strip { display: grid; grid-template-columns: repeat(auto-fit, minmax(130px, 1fr)); gap: 12px; margin-top: 12px; }
-.rb-stat-cell { background: var(--light); border-radius: 10px; padding: 14px; text-align: center; }
-.rb-stat-v { font-size: 20px; font-weight: 800; color: var(--navy); }
-.rb-stat-l { font-size: 11px; color: var(--mid); margin-top: 4px; }
+/* ---- Ported from MASTER-TEMPLATE.html (added 5 August 2026) ----
+   The real reference John hand-built the successful legacy dashboards
+   from (/Users/johnhones/Claude/Projects/KDP Author Audit/MASTER-TEMPLATE.html),
+   confirmed as the source of truth for what "the successful mvp" should
+   look like, distinct from and more precise than the live GitHub Pages
+   examples used for the 4 August rb-* pass above. Class names and values
+   below are ported as close to verbatim as possible for real parity, not
+   reinterpreted under the rb- naming. Checked against style.css and every
+   .html file in this folder first, no collisions (index.html's existing
+   .step-card .step-num rule is more specific than the bare .step-num
+   added here, so the homepage's "How It Works" numbers are unaffected).
+   The rb-* set above will be migrated to these names and removed once
+   Overview's render functions are updated to match (see dashboard.html). */
+.sec-label { font-size: 13px; font-weight: 700; letter-spacing: 2.5px; text-transform: uppercase; color: var(--orange); margin: 0 0 16px; display: flex; align-items: center; gap: 12px; }
+.sec-label::after { content: ''; flex: 1; height: 1px; background: var(--border); }
 
-.rb-badge { display: inline-block; font-size: 10px; font-weight: 700; padding: 3px 8px; border-radius: 999px; white-space: nowrap; }
-.rb-b-teal { background: var(--teal-l); color: var(--teal-d); }
-.rb-b-orange { background: var(--orange-l); color: var(--orange-d); }
-.rb-b-navy { background: var(--light); color: var(--navy); }
-.rb-b-muted { background: var(--light); color: var(--mid); }
+.g2 { display: grid; grid-template-columns: 1fr 1fr; gap: 24px; }
+.mb { margin-bottom: 24px; }
+@media(max-width: 900px) {
+  .g2 { grid-template-columns: 1fr; gap: 16px; }
+}
 
-/* Left-border highlight box for a key takeaway sentence inside a card
-   (Market Analysis's bookInsight line), distinct from the full-width navy
-   Revenue Reality callout in dashboard.html's revenueInsightHtml, which
-   stays a bespoke block since nothing else on the page shares its shape. */
-.rb-callout { border-left: 3px solid var(--teal); background: var(--light); border-radius: 0 8px 8px 0; padding: 14px 18px; margin: 4px 0 16px; font-size: 14px; font-weight: 600; color: var(--navy); line-height: 1.6; }
-.rb-callout-orange { border-left-color: var(--orange); }
+.card { background: var(--white); border-radius: 10px; padding: 28px 32px; border: 1px solid var(--border); }
+.card-hdr { font-size: 10px; font-weight: 700; letter-spacing: 2px; text-transform: uppercase; color: var(--orange); margin-bottom: 18px; padding-bottom: 10px; border-bottom: 1px solid var(--border); }
+.card-title { font-size: 15px; font-weight: 700; color: var(--teal-d); margin-bottom: 10px; line-height: 1.3; }
+.card > p, .hb-card > p { font-size: 13px; color: var(--mid); line-height: 1.7; margin-bottom: 12px; }
+.card > p:last-child, .hb-card > p:last-child { margin-bottom: 0; }
 
-.rb-item { display: flex; gap: 12px; align-items: flex-start; padding: 14px 0; border-bottom: 1px solid var(--border); }
-.rb-item:last-child { border-bottom: none; }
-.rb-item-icon { width: 24px; height: 24px; border-radius: 50%; background: var(--teal-l); color: var(--teal-d); display: flex; align-items: center; justify-content: center; flex-shrink: 0; font-size: 13px; }
-.rb-item-t { font-size: 14px; font-weight: 700; color: var(--navy); margin-bottom: 2px; }
-.rb-item-b { font-size: 14px; color: var(--mid); line-height: 1.6; }
+.stat-strip { display: grid; grid-template-columns: repeat(3,1fr); gap: 1px; background: var(--border); border: 1px solid var(--border); border-radius: 6px; overflow: hidden; margin-top: 20px; }
+.stat-cell { background: var(--white); padding: 16px; text-align: center; display: flex; flex-direction: column; align-items: center; }
+.stat-cell > div:last-child { margin-top: auto; padding-top: 6px; }
+.stat-v { font-size: 22px; font-weight: 800; color: var(--orange); }
+.stat-l { font-size: 12px; color: var(--mid); margin-top: 3px; line-height: 1.4; }
 
-.rb-step { display: flex; gap: 14px; align-items: flex-start; padding: 16px 0; border-bottom: 1px solid var(--border); }
-.rb-step:last-child { border-bottom: none; }
-.rb-step-num { width: 26px; height: 26px; border-radius: 50%; font-weight: 800; font-size: 12px; display: flex; align-items: center; justify-content: center; flex-shrink: 0; }
-.rb-step-orange .rb-step-num { background: var(--orange-l); color: var(--orange-d); }
-.rb-step-teal .rb-step-num { background: var(--teal-l); color: var(--teal-d); }
-.rb-step-t { font-size: 15px; font-weight: 700; color: var(--navy); margin-bottom: 4px; }
-.rb-step-b { font-size: 14px; color: var(--mid); line-height: 1.6; }
+.badge { display: inline-block; padding: 3px 9px; border-radius: 3px; font-size: 10px; font-weight: 700; text-transform: uppercase; letter-spacing: .4px; }
+.b-teal   { background: var(--teal-l);   color: var(--teal-d); }
+.b-orange { background: var(--orange-l); color: var(--orange-d); }
+.b-navy   { background: rgba(27,58,72,.08); color: var(--navy); }
+.b-muted  { background: var(--light);    color: var(--muted); }
 
+.item { display: flex; gap: 14px; align-items: flex-start; margin-bottom: 20px; }
+.item:last-child { margin-bottom: 0; }
+.item-icon { width: 28px; height: 28px; border-radius: 50%; display: flex; align-items: center; justify-content: center; font-size: 12px; font-weight: 800; flex-shrink: 0; margin-top: 1px; }
+.icon-teal   { background: var(--teal-l);   color: var(--teal-d); }
+.icon-orange { background: var(--orange-l); color: var(--orange-d); }
+.item-t { font-size: 15px; font-weight: 700; color: var(--teal-d); margin-bottom: 3px; }
+.item-b { font-size: 13px; color: var(--mid); line-height: 1.6; }
+
+.callout { border-left: 3px solid var(--teal); background: var(--teal-l); padding: 14px 18px; border-radius: 0 4px 4px 0; font-size: 13px; color: var(--navy); line-height: 1.65; }
+.callout-orange { border-left-color: var(--orange); background: var(--orange-l); }
+.callout strong { color: var(--black); }
+
+.step { display: flex; gap: 16px; align-items: flex-start; padding: 18px 20px; border-radius: 4px; margin-bottom: 10px; }
+.step:last-child { margin-bottom: 0; }
+.step-teal   { background: var(--teal-l);   border-left: 4px solid var(--teal); }
+.step-orange { background: var(--orange-l); border-left: 4px solid var(--orange); }
+.step-num { width: 30px; height: 30px; border-radius: 50%; display: flex; align-items: center; justify-content: center; font-weight: 800; font-size: 12px; flex-shrink: 0; color: #fff; }
+.num-teal   { background: var(--teal); }
+.num-orange { background: var(--orange); }
+.step-t { font-size: 13px; font-weight: 700; color: var(--teal-d); margin-bottom: 4px; }
+.step-b { font-size: 13px; color: var(--mid); line-height: 1.55; }
+
+.hb-card { background: var(--white); border: 1px solid var(--border); border-top: 4px solid var(--teal); border-radius: 10px; padding: 28px 32px; margin-bottom: 24px; }
+.hb-eyebrow { font-size: 17px; font-weight: 700; letter-spacing: 1px; color: var(--teal-d); margin-bottom: 8px; }
+
+.banner { background: var(--navy); color: #fff; border-radius: 10px; padding: 24px 32px; margin-bottom: 24px; }
+.banner h3 { font-size: 15px; font-weight: 700; margin-bottom: 6px; color: #fff; }
+.banner p  { font-size: 12px; color: rgba(255,255,255,.7); line-height: 1.65; }
+.banner-stat { display: inline-block; background: var(--teal); border: 1px solid var(--teal-d); color: #fff; padding: 8px 18px; border-radius: 3px; font-size: 13px; font-weight: 400; margin: 8px 6px 0 0; }
+
+.dash-table { width: 100%; border-collapse: collapse; font-size: 13px; }
+.dash-table th { background: var(--navy); color: rgba(255,255,255,.85); padding: 9px 12px; text-align: left; font-weight: 600; font-size: 10px; letter-spacing: .5px; text-transform: uppercase; }
+.dash-table td { padding: 9px 12px; border-bottom: 1px solid var(--border); color: var(--mid); }
+.dash-table tr:last-child td { border-bottom: none; }
+.dash-table tr:nth-child(even) td { background: var(--light); }
+.dash-table .tc { text-align: center; } .dash-table .tr { text-align: right; }
+
+.kw-tool { display: grid; grid-template-columns: 1fr 1fr; gap: 20px; margin-bottom: 24px; }
+.kw-panel { background: var(--white); border: 1px solid var(--border); border-radius: 10px; overflow: hidden; }
+.kw-panel-hdr { background: #0d1f35; color: #fff; padding: 14px 18px; display: flex; align-items: center; justify-content: space-between; min-height: 60px; box-sizing: border-box; }
+.kw-panel-hdr span { font-size: 13px; font-weight: 700; }
+.kw-count { background: var(--teal); color: #fff; font-size: 10px; font-weight: 700; padding: 2px 8px; border-radius: 20px; }
+.kw-panel-hdr.rec .kw-count { background: var(--orange); }
+.kw-search { padding: 12px 14px; border-bottom: 1px solid var(--border); display: flex; gap: 8px; }
+.kw-search input { flex: 1; border: 1px solid var(--border); border-radius: 4px; padding: 7px 10px; font-size: 12px; outline: none; color: var(--black); }
+.kw-search input:focus { border-color: var(--teal); }
+.kw-table { width: 100%; border-collapse: collapse; font-size: 12px; }
+.kw-table th { background: var(--light); color: var(--mid); padding: 8px 12px; text-align: left; font-size: 10px; font-weight: 700; letter-spacing: .5px; text-transform: uppercase; border-bottom: 1px solid var(--border); }
+.kw-table td { padding: 9px 12px; border-bottom: 1px solid var(--border); color: var(--mid); }
+.kw-table tr:last-child td { border-bottom: none; }
+.kw-table tr:hover td { background: var(--light); }
+.kw-table .kw-word { color: var(--navy); font-weight: 500; }
+.kw-vol { font-weight: 600; color: var(--navy); }
+.comp-high { display: inline-block; background: #FEE2E2; color: #B91C1C; font-size: 10px; font-weight: 700; padding: 2px 8px; border-radius: 3px; }
+.comp-med  { display: inline-block; background: #FEF3C7; color: #92400E; font-size: 10px; font-weight: 700; padding: 2px 8px; border-radius: 3px; }
+.comp-low  { display: inline-block; background: var(--teal-l); color: var(--teal-d); font-size: 10px; font-weight: 700; padding: 2px 8px; border-radius: 3px; }
+.kw-add { background: none; border: 1px solid var(--border); border-radius: 3px; padding: 3px 8px; font-size: 10px; color: var(--muted); cursor: pointer; transition: all .15s; }
+.kw-add:hover { border-color: var(--teal); color: var(--teal); background: var(--teal-l); }
+.kw-add.added { border-color: var(--teal); color: var(--teal-d); background: var(--teal-l); cursor: default; }
+
+@media(max-width: 900px) {
+  .kw-tool { grid-template-columns: 1fr; }
+}
 @media(max-width: 640px) {
-  .rb-stat-strip { grid-template-columns: 1fr 1fr; }
+  .stat-strip { grid-template-columns: 1fr; }
+  .card { padding: 18px 16px; }
+  .hb-card { padding: 18px 16px; }
+  .hb-eyebrow { font-size: 15px; }
+  .step { padding: 12px 14px; }
 }
 
 .spinner { width: 16px; height: 16px; border: 2px solid var(--border); border-top-color: var(--teal); border-radius: 50%; display: inline-block; animation: spin .8s linear infinite; margin-right: 6px; vertical-align: middle; }

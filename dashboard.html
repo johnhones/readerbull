@@ -633,19 +633,17 @@
       return n >= 1000 ? ('~$' + Math.round(n / 1000) + 'k/mo') : ('~$' + Math.round(n) + '/mo');
     }
 
-    // Uses the .rb-stat-cell/.rb-stat-v/.rb-stat-l/.rb-badge classes
-    // (style.css, added 4 August 2026, Phase 1 of ReaderBull_Dashboard_
-    // Visual_Rebuild_Plan.md) rather than the one-off inline styles this
-    // shipped with earlier the same day, closes out the tech debt flagged
-    // in ReaderBull_Dashboard_Component_Catalogue.md section B. Same
-    // visual output, just a reusable class instead of an inline style.
+    // Uses .stat-cell/.stat-v/.stat-l/.badge (style.css, ported 5 August
+    // 2026 from MASTER-TEMPLATE.html, the real hand-built reference),
+    // replacing yesterday's rb-stat-* classes so Overview shares the same
+    // component system as the other tabs instead of two overlapping ones.
     function statCardHtml(value, label, badge) {
       if (value == null || value === '') return '';
       return (
-        '<div class="rb-stat-cell">' +
-          '<div class="rb-stat-v">' + escapeHtml(String(value)) + '</div>' +
-          '<div class="rb-stat-l">' + escapeHtml(label) + '</div>' +
-          (badge ? '<div style="margin-top:8px;"><span class="rb-badge rb-b-teal">&check; ' + escapeHtml(badge) + '</span></div>' : '') +
+        '<div class="stat-cell">' +
+          '<div class="stat-v">' + escapeHtml(String(value)) + '</div>' +
+          '<div class="stat-l">' + escapeHtml(label) + '</div>' +
+          (badge ? '<div><span class="badge b-teal">&check; ' + escapeHtml(badge) + '</span></div>' : '') +
         '</div>'
       );
     }
@@ -684,7 +682,7 @@
           statCardHtml(fmtNicheRevenue(revenue), 'KDP Niche Revenue', revenue != null ? 'Real Demand' : null) +
           statCardHtml(contentType, 'Content Type', contentType === 'Evergreen' ? 'Stays Relevant' : (contentType === 'Trending' ? 'Act Fast' : (contentType === 'Seasonal' ? 'Plan The Window' : null)));
         cardsHtml =
-          '<div class="rb-stat-strip">' + cards + '</div>' +
+          '<div class="stat-strip">' + cards + '</div>' +
           (revenue != null ? '<div style="font-size:11px;color:var(--muted);margin-top:8px;">Niche revenue is estimated from Amazon rank and price data, not a reported figure.</div>' : '');
       }
 
@@ -692,14 +690,24 @@
       // beside the score card exactly like the legacy dashboards, no
       // margin-top needed here any more, .split's align-items:stretch
       // matches its height to score-demo automatically. Always renders a
-      // card, even with nothing but the title, so the split never ends up
-      // with an empty-looking second column.
+      // card/card-hdr (style.css, ported 5 August 2026 from MASTER-
+      // TEMPLATE.html) instead of .breakdown-card's large <h2>, matching
+      // the reference's small uppercase-orange card label treatment.
+      // Title/author sizing also matches the reference (22px title, orange
+      // "by [author]" line), the one deliberate difference from the
+      // reference is content, not style: no raw Amazon description and no
+      // bold insight text, both removed 4 August 2026 on John's direct
+      // instruction ("we dont need to repeat the whole description from
+      // amazon"), that content decision still stands, only the chrome
+      // around it changed.
       return (
-        '<div class="breakdown-card">' +
-          '<h2>Book Summary</h2>' +
-          '<h3 style="font-size:14px;font-weight:400;color:var(--navy);margin:8px 0 2px;">' + escapeHtml(b.book_title || '') + '</h3>' +
-          (b.author_name ? '<div style="font-size:13px;color:var(--muted);margin-bottom:2px;">by ' + escapeHtml(b.author_name) + '</div>' : '') +
-          starsHtml +
+        '<div class="card">' +
+          '<div class="card-hdr">Book Summary</div>' +
+          '<div style="margin-bottom:16px;padding-bottom:12px;border-bottom:1px solid var(--border);">' +
+            '<div style="font-size:20px;font-weight:400;color:#111;line-height:1.35;margin-bottom:4px;">' + escapeHtml(b.book_title || '') + '</div>' +
+            (b.author_name ? '<div style="font-size:14px;color:var(--orange);margin-bottom:8px;">by ' + escapeHtml(b.author_name) + '</div>' : '') +
+            starsHtml +
+          '</div>' +
           descHtml +
           insightHtml +
           cardsHtml +
@@ -781,22 +789,25 @@
       var assessment = narrative && narrative.professionalAssessment;
       if (!assessment) return '';
 
-      // .rb-badge/.rb-b-navy (style.css) instead of the inline pill style
-      // this shipped with earlier the same day, same tech-debt cleanup as
-      // statCardHtml above. Slightly larger than the base .rb-badge size
-      // (12px vs 10px) to match what was already live, kept as an inline
-      // font-size override rather than a new modifier class for one field.
+      // .badge/.b-teal/.b-orange (style.css, ported 5 August 2026 from
+      // MASTER-TEMPLATE.html), colour-coded the same way the reference
+      // does: the Ads-status and review-count tags stand out in orange,
+      // everything else (organic rank, formats, categories, enhanced
+      // content) reads as a positive teal signal. Based on the real tag
+      // text already produced by buildAssessmentTags in
+      // api/enrich-audit.js, not a new data field.
       var tagsHtml = (Array.isArray(tags) && tags.length)
-        ? '<div style="display:flex;flex-wrap:wrap;gap:8px;margin-top:16px;">' +
+        ? '<div style="display:flex;flex-wrap:wrap;gap:6px;margin-top:16px;">' +
             tags.map(function (t) {
-              return '<span class="rb-badge rb-b-navy" style="font-size:12px;padding:5px 10px;">' + escapeHtml(t) + '</span>';
+              var attention = /no ads running/i.test(t) || /written review/i.test(t);
+              return '<span class="badge ' + (attention ? 'b-orange' : 'b-teal') + '">' + escapeHtml(t) + '</span>';
             }).join('') +
           '</div>'
         : '';
 
       return (
-        '<div class="breakdown-card">' +
-          '<h2>Professional Assessment</h2>' +
+        '<div class="card">' +
+          '<div class="card-hdr">Professional Assessment</div>' +
           narrativeHtml(assessment) +
           tagsHtml +
         '</div>'
@@ -1182,34 +1193,57 @@
     '</div>';
   }
 
-  function competitorTableHtml(competitors) {
+  // Formats a rank/revenue value the way MASTER-TEMPLATE.html's Niche Data
+  // table does: "Not available" rather than a guess whenever the source
+  // data (attachCompetitorBsr in api/enrich-audit.js, capped at the top 2
+  // competitors to bound paid-call cost) doesn't cover this row.
+  function fmtBsrCell(n) { return (typeof n === 'number') ? n.toLocaleString() : 'Not available'; }
+  function fmtRevCell(n) { return (typeof n === 'number') ? ('$' + n.toLocaleString()) : 'Not available'; }
+
+  // Niche Data table (restyled 5 August 2026 to match MASTER-TEMPLATE.html,
+  // the real reference the legacy dashboards were hand-built from, see
+  // dashboard.html's task list this session). BSR and Rev/Mo columns are
+  // only ever populated from real data: BSR comes from attachCompetitorBsr
+  // (top 2 competitors only, a bounded extra SerpApi call per book, see
+  // api/enrich-audit.js), Rev/Mo from that same file's estimateNicheStats,
+  // which now persists each competitor's own storeWideRank-plus-price
+  // estimate directly on the competitor object (added this session)
+  // instead of only folding it into the aggregate range. Competitors
+  // without either value show "Not available", never a guess. "Your Book"
+  // row uses the same real fields already computed for Overview
+  // (b.bestseller_rank_number, nicheStats.yourEstimatedRevenue).
+  function competitorTableHtml(b) {
+    var competitors = b.competitors_json;
     if (!competitors || !competitors.length) return '';
+    var nicheStats = (b.audit_narrative_json && b.audit_narrative_json.nicheStats) || {};
+
     var rows = competitors.map(function (c) {
       return (
         '<tr>' +
-          '<td style="padding:8px 6px;word-break:break-word;">' + escapeHtml(c.title || '') + '</td>' +
-          '<td style="padding:8px 6px;white-space:nowrap;">' + (c.rating ? (escapeHtml(String(c.rating)) + ' / 5') : 'Not available') + '</td>' +
-          '<td style="padding:8px 6px;white-space:nowrap;">' + (c.reviews != null ? escapeHtml(String(c.reviews)) : 'Not available') + '</td>' +
-          '<td style="padding:8px 6px;white-space:nowrap;">' + (c.price ? escapeHtml(String(c.price)) : 'Not available') + '</td>' +
-          '<td style="padding:8px 6px;white-space:nowrap;"><span class="rb-badge ' + (c.sponsored ? 'rb-b-orange' : 'rb-b-muted') + '">' + (c.sponsored ? 'Running ads' : 'No ads seen') + '</span></td>' +
+          '<td>' + escapeHtml(c.title || '') + '</td>' +
+          '<td class="tc">' + fmtBsrCell(c.bestsellerRank) + '</td>' +
+          '<td class="tr">' + fmtRevCell(c.estimatedRevenue) + '</td>' +
+          '<td class="tc">' + (c.reviews != null ? escapeHtml(String(c.reviews)) : 'Not available') + '</td>' +
+          '<td class="tc"><span class="badge ' + (c.sponsored ? 'b-teal' : 'b-muted') + '">' + (c.sponsored ? 'Yes' : 'No') + '</span></td>' +
         '</tr>'
       );
     }).join('');
 
-    // Fixed column widths so a long competitor title wraps within its own
-    // column instead of squeezing rating/reviews/price/ads into an
-    // unreadable, wrapping mess (flagged as cramped/hard to read).
+    rows += (
+      '<tr>' +
+        '<td style="font-weight:700;color:var(--teal-d);">Your Book</td>' +
+        '<td class="tc">' + fmtBsrCell(b.bestseller_rank_number) + '</td>' +
+        '<td class="tr" style="color:var(--orange);">' + fmtRevCell(nicheStats.yourEstimatedRevenue) + '</td>' +
+        '<td class="tc">' + (b.live_review_count != null ? escapeHtml(String(b.live_review_count)) : 'Not available') + '</td>' +
+        '<td class="tc"><span class="badge b-muted">No</span></td>' +
+      '</tr>'
+    );
+
     return (
-      '<div class="breakdown-card" style="margin-top:24px;overflow-x:auto;">' +
-        '<h2>Who this book is competing with</h2>' +
-        '<p>Real listings currently ranking for this book\'s category, pulled live.</p>' +
-        '<table style="width:100%;min-width:520px;border-collapse:collapse;font-size:14px;margin-top:8px;table-layout:fixed;">' +
-          '<colgroup><col style="width:44%;"><col style="width:14%;"><col style="width:14%;"><col style="width:14%;"><col style="width:14%;"></colgroup>' +
-          '<thead><tr style="text-align:left;border-bottom:1px solid var(--border);">' +
-            '<th style="padding:8px 6px;">Book</th><th style="padding:8px 6px;">Rating</th>' +
-            '<th style="padding:8px 6px;">Reviews</th><th style="padding:8px 6px;">Price</th>' +
-            '<th style="padding:8px 6px;">Ads</th>' +
-          '</tr></thead>' +
+      '<p style="font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:1.5px;color:var(--muted);margin-bottom:12px;">Niche Data' + (b.amazon_category ? (': ' + escapeHtml(b.amazon_category)) : '') + '</p>' +
+      '<div style="overflow-x:auto;">' +
+        '<table class="dash-table">' +
+          '<thead><tr><th>Book</th><th class="tc">BSR</th><th class="tr">Rev / Mo</th><th class="tc">Reviews</th><th class="tc">Ads</th></tr></thead>' +
           '<tbody>' + rows + '</tbody>' +
         '</table>' +
       '</div>'
@@ -1241,31 +1275,33 @@
       standing = standing + ' ' + reviewNote;
     }
 
-    // .rb-callout (style.css, added 4 August 2026): the single biggest
-    // takeaway sentence gets a left-border highlight box instead of a
-    // plain paragraph, matching how the legacy reference dashboards set
-    // this line apart from the surrounding narrative text.
+    // card/card-title/callout (style.css, ported 5 August 2026 from
+    // MASTER-TEMPLATE.html, the real hand-built reference): the punchy
+    // one-line takeaway sits in the callout box, the fuller narrative
+    // prose sits below it as normal paragraphs. The reference also shows
+    // 3 discrete checkmark insight items here, that needs a narrative
+    // schema change (structured insight points, not just a paragraph
+    // blob) not made this session, flagged as a follow-up.
     var insightHtml = (narrative && narrative.bookInsight)
-      ? '<div class="rb-callout">' + escapeHtml(narrative.bookInsight) + '</div>'
+      ? '<div class="callout">' + escapeHtml(narrative.bookInsight) + '</div>'
       : '';
 
     return (
-      '<div class="breakdown-card" style="margin-bottom:24px;">' +
-        '<h2>Where this book stands</h2>' +
-        insightHtml +
-        narrativeHtml(standing) +
-        '<div>' +
-          statRow('Category', b.amazon_category) +
-          statRow('Bestseller rank', b.bestseller_rank) +
-          statRow('Star rating', b.live_rating ? (b.live_rating + ' / 5') : null) +
-          statRow('Reviews', b.live_review_count) +
-          statRow('Price', b.live_price) +
+      '<div class="sec-label">Market Analysis</div>' +
+      '<div class="card mb">' +
+        '<div class="g2" style="gap:32px;align-items:start;">' +
+          '<div>' +
+            '<div class="card-title">Niche Summary</div>' +
+            insightHtml +
+            narrativeHtml(standing) +
+          '</div>' +
+          '<div>' +
+            (competitors && competitors.length
+              ? competitorTableHtml(b)
+              : '<p style="font-size:13px;color:var(--muted);">Competitor-by-competitor benchmarking appears here once this book\'s full audit has run.</p>') +
+          '</div>' +
         '</div>' +
-      '</div>' +
-      competitorTableHtml(competitors) +
-      (competitors && competitors.length
-        ? ''
-        : '<p style="font-size:13px;color:var(--muted);margin-top:16px;">This is a first-pass read built from this book\'s live Amazon listing. Competitor-by-competitor benchmarking is a planned next step.</p>')
+      '</div>'
     );
   }
 
@@ -1306,29 +1342,41 @@
     return steps;
   }
 
+  // Restyled 5 August 2026 to match MASTER-TEMPLATE.html: each step is its
+  // own card (hb-card/hb-eyebrow "Step N: Title"), a checkmark item for the
+  // recommendation body, connected to the next step by a centred orange
+  // down-arrow. The reference groups several checkmark sub-points under
+  // each step heading (an intro paragraph plus 2-4 items); our narrative
+  // only generates one {title, body} pair per step, so each step card
+  // here holds a single checkmark item rather than several, honest to
+  // what the data actually is rather than fabricating extra sub-points.
+  // Restructuring the narrative schema to generate real grouped sub-points
+  // is a follow-up, not done this session, flagged separately.
   function marketingStrategyHtml(b) {
     var narrative = b.audit_narrative_json;
     var steps = (narrative && Array.isArray(narrative.strategySteps) && narrative.strategySteps.length)
       ? narrative.strategySteps
       : fallbackStrategySteps(b);
 
-    // .rb-step/.rb-step-teal/.rb-step-num (style.css, added 4 August 2026)
-    // rather than the inline numbered-circle markup this used before,
-    // per ReaderBull_Dashboard_Component_Catalogue.md's recommended build
-    // order (Phase: restyle Marketing Strategy/Quick Wins to .rb-step
-    // cards). Pure restyle, strategySteps/fallbackStrategySteps content
-    // is unchanged, same teal circle colour already used here.
     var stepsHtml = steps.map(function (s, i) {
+      var arrowHtml = (i < steps.length - 1)
+        ? '<div style="text-align:center;margin-top:20px;"><span style="font-size:28px;color:var(--orange);line-height:1;">&#8595;</span></div>'
+        : '';
       return (
-        '<div class="rb-step rb-step-teal">' +
-          '<div class="rb-step-num">' + (i + 1) + '</div>' +
-          '<div><div class="rb-step-t">' + escapeHtml(s.title) + '</div><div class="rb-step-b">' + escapeHtml(s.body) + '</div></div>' +
+        '<div class="hb-card">' +
+          '<div class="hb-eyebrow">Step ' + (i + 1) + ': ' + escapeHtml(s.title) + '</div>' +
+          '<div class="item" style="margin-bottom:0;">' +
+            '<div class="item-icon icon-orange">&#10003;</div>' +
+            '<div class="item-b">' + escapeHtml(s.body) + '</div>' +
+          '</div>' +
+          arrowHtml +
         '</div>'
       );
     }).join('');
 
     return (
-      '<div class="breakdown-card"><h2>Your action plan</h2><p>Ordered by what\'s most likely to move your Discoverability Score next.</p><div>' + stepsHtml + '</div></div>'
+      '<div class="sec-label">Marketing Strategy</div>' +
+      stepsHtml
     );
   }
 
@@ -1336,49 +1384,70 @@
     return String(b.keywords || '').split(',').map(function (k) { return k.trim(); }).filter(Boolean);
   }
 
+  // status -> comp-high/comp-med/comp-low colour, matching MASTER-TEMPLATE.
+  // html's tiering: top-tier "Use it now" keywords (Use on the Amazon
+  // Keywords panel, Priority on the Recommended panel) are comp-high
+  // (red), second-tier (Best Fit) is comp-med (yellow), Skip is comp-low
+  // (teal/deprioritised). Real status values already produced by
+  // classifyKeywords in api/enrich-audit.js, nothing invented here, just
+  // a colour mapping.
+  function kwStatusClass(status) {
+    if (status === 'Skip') return 'comp-low';
+    if (status === 'Best Fit') return 'comp-med';
+    return 'comp-high'; // Use, Priority
+  }
+
   function keywordRowHtml(item, inList, atCap) {
     var kw = item.keyword || '';
     var volume = (item.volume === null || item.volume === undefined || item.volume === '') ? '-' : escapeHtml(String(item.volume));
-    var statusClass = (item.status === 'Skip') ? 'error' : (item.status === 'Priority' ? 'imported' : 'needs-details');
     var btnHtml;
     if (inList) {
-      btnHtml = '<button type="button" class="btn btn-outline" style="padding:4px 12px;font-size:12px;" data-kw-remove="' + escapeHtml(kw) + '">Remove</button>';
+      btnHtml = '<button type="button" class="kw-add added" data-kw-remove="' + escapeHtml(kw) + '">Remove</button>';
     } else if (atCap) {
-      btnHtml = '<button type="button" class="btn btn-outline" style="padding:4px 12px;font-size:12px;" disabled title="7/7 keywords used">+ Add</button>';
+      btnHtml = '<button type="button" class="kw-add" disabled title="7/7 keywords used">+ Add</button>';
     } else {
-      btnHtml = '<button type="button" class="btn btn-outline" style="padding:4px 12px;font-size:12px;" data-kw-add="' + escapeHtml(kw) + '">+ Add</button>';
+      btnHtml = '<button type="button" class="kw-add" data-kw-add="' + escapeHtml(kw) + '">+ Add</button>';
     }
     return (
       '<tr>' +
-        '<td style="padding:8px 6px;">' + escapeHtml(kw) + '</td>' +
-        '<td style="padding:8px 6px;">' + volume + '</td>' +
-        '<td style="padding:8px 6px;"><span class="status-pill ' + statusClass + '">' + escapeHtml(item.status || '') + '</span></td>' +
-        '<td style="padding:8px 6px;text-align:right;">' + btnHtml + '</td>' +
+        '<td class="kw-word">' + escapeHtml(kw) + '</td>' +
+        '<td class="tr kw-vol">' + volume + '</td>' +
+        '<td class="tc"><span class="' + kwStatusClass(item.status) + '">' + escapeHtml(item.status || '') + '</span></td>' +
+        '<td class="tc">' + btnHtml + '</td>' +
       '</tr>'
     );
   }
 
-  function keywordTableHtml(title, subtitle, items, currentList) {
-    if (!items || !items.length) return '';
+  // Two-panel side-by-side layout (restyled 5 August 2026 to match
+  // MASTER-TEMPLATE.html's .kw-tool structure), replacing yesterday's
+  // stacked single-column tables. The live add/remove-to-KDP-list
+  // functionality (wireKeywordsPanel/saveKeywordChange below) is unchanged,
+  // this is a re-skin of the container it renders into, not a rewrite of
+  // the working logic. panelId/countId/searchId are unique per panel so
+  // the client-side search filter (filterKeywordTable, wired once at the
+  // bottom of this file) can target the right table.
+  function keywordPanelHtml(panelId, headerHtml, recClass, countId, searchId, searchPlaceholder, items, currentList) {
     var atCap = currentList.length >= 7;
-    var rows = items.map(function (item) {
+    var rows = (items || []).map(function (item) {
       var inList = currentList.some(function (k) { return k.toLowerCase() === String(item.keyword || '').toLowerCase(); });
       return keywordRowHtml(item, inList, atCap && !inList);
     }).join('');
-    // Item count shown inline in the header ("Amazon Keywords 11"), matching
-    // the legacy Jordan Truehart dashboard's keyword table format (see
-    // ReaderBull_Next_Chat_Handover_Prompt.md item 9).
+
     return (
-      '<div class="breakdown-card" style="margin-top:24px;overflow-x:auto;">' +
-        '<h2>' + title + ' <span style="font-weight:600;color:var(--muted);font-size:14px;">' + items.length + '</span></h2><p>' + subtitle + '</p>' +
-        '<table style="width:100%;border-collapse:collapse;font-size:14px;margin-top:8px;">' +
-          '<thead><tr style="text-align:left;border-bottom:1px solid var(--border);">' +
-            '<th style="padding:8px 6px;">Keyword</th><th style="padding:8px 6px;">Volume</th>' +
-            '<th style="padding:8px 6px;">Status</th><th style="padding:8px 6px;"></th>' +
-          '</tr></thead>' +
-          '<tbody>' + rows + '</tbody>' +
-        '</table>' +
-        '<p style="font-size:12px;color:var(--muted);margin-top:10px;">Volume is the estimated number of times this keyword is searched on Amazon each month, not an exact or real-time figure.</p>' +
+      '<div class="kw-panel">' +
+        '<div class="kw-panel-hdr' + recClass + '">' +
+          '<span>' + headerHtml + '</span>' +
+          '<span class="kw-count" id="' + countId + '">' + (items ? items.length : 0) + '</span>' +
+        '</div>' +
+        '<div class="kw-search">' +
+          '<input type="text" id="' + searchId + '" data-kw-filter-target="' + panelId + '" data-kw-filter-count="' + countId + '" placeholder="' + escapeHtml(searchPlaceholder) + '">' +
+        '</div>' +
+        '<div style="overflow-x:auto;">' +
+          '<table class="kw-table">' +
+            '<thead><tr><th>Keyword</th><th class="tr">Volume</th><th class="tc">Status</th><th></th></tr></thead>' +
+            '<tbody id="' + panelId + '">' + rows + '</tbody>' +
+          '</table>' +
+        '</div>' +
       '</div>'
     );
   }
@@ -1395,28 +1464,25 @@
       : '<p style="font-size:14px;color:var(--mid);">No keywords recorded yet for this book.</p>';
 
     var research = b.audit_narrative_json && b.audit_narrative_json.keywordResearch;
-    var researchHtml;
+    var toolHtml;
     if (research && Array.isArray(research.amazonKeywords) && research.amazonKeywords.length) {
       var recommended = Array.isArray(research.recommendedKeywords) ? research.recommendedKeywords : [];
-      // Table order matches the legacy Jordan Truehart dashboard's keyword
-      // section (Amazon Keywords first, Readerbull Recommended Keywords
-      // second), confirmed by re-opening
-      // johnhones.github.io/readabull-jordan-truehart and comparing structure
-      // directly, per ReaderBull_Next_Chat_Handover_Prompt.md item 9.
-      researchHtml =
-        (research.totalFound
-          ? '<p style="font-size:13px;color:var(--muted);margin-top:16px;">Researched ' + escapeHtml(String(research.totalFound)) + ' keywords for "' + escapeHtml(research.seedKeyword || '') + '". Add any of them straight to your 7 KDP fields below.</p>'
-          : '') +
-        keywordTableHtml('Amazon Keywords', 'Every related keyword found for this niche, flagged Use or Skip.', research.amazonKeywords, list) +
-        keywordTableHtml('Readerbull Recommended Keywords', 'The strongest picks for your 7 KDP backend keyword fields, ranked by fit.', recommended, list);
+      var introHtml = '<div class="callout mb"><strong>Amazon keyword research for &ldquo;' + escapeHtml(research.seedKeyword || '') + '&rdquo;' +
+        (research.totalFound ? ' (' + escapeHtml(String(research.totalFound)) + ' keywords found)' : '') +
+        '.</strong> Add any of them straight to your 7 KDP fields below.</div>';
+      toolHtml = introHtml + '<div class="kw-tool">' +
+        keywordPanelHtml('amazon-tbody', '<i class="ti ti-brand-amazon" style="margin-right:6px;font-size:14px;vertical-align:middle;"></i>Amazon Keywords', '', 'amazon-count', 'amazon-search', 'Search keywords…', research.amazonKeywords, list) +
+        keywordPanelHtml('rec-tbody', '<i class="ti ti-bulb" style="margin-right:6px;font-size:14px;vertical-align:middle;"></i>Readerbull Recommended', ' rec', 'rec-count', 'rec-search', 'Filter recommendations…', recommended, list) +
+      '</div>';
     } else {
-      researchHtml = '<p style="font-size:13px;color:var(--muted);margin-top:16px;">Keyword research for this book has not run yet, or turned up nothing usable. It runs automatically the next time this book is re-submitted through onboarding.</p>';
+      toolHtml = '<p style="font-size:13px;color:var(--muted);margin-top:16px;">Keyword research for this book has not run yet, or turned up nothing usable. It runs automatically the next time this book is re-submitted through onboarding, or via Refresh audit on the Overview tab.</p>';
     }
 
     return (
-      '<div class="breakdown-card"><h2>Your backend keywords (' + list.length + ' / 7)</h2><p>What\'s currently in this book\'s 7 KDP keyword fields. Adding or removing one here updates your Discoverability Score immediately.</p>' + chipsHtml + '</div>' +
-      '<div id="keyword-save-error" class="detail-error" style="display:none;margin-top:12px;"></div>' +
-      researchHtml
+      '<div class="sec-label">Keywords</div>' +
+      '<div class="card mb"><div class="card-title">Your backend keywords (' + list.length + ' / 7)</div><p style="font-size:13px;color:var(--mid);margin-bottom:14px;">What\'s currently in this book\'s 7 KDP keyword fields. Adding or removing one here updates your Discoverability Score immediately.</p>' + chipsHtml + '</div>' +
+      '<div id="keyword-save-error" class="detail-error" style="display:none;margin-bottom:16px;"></div>' +
+      toolHtml
     );
   }
 
@@ -1507,24 +1573,44 @@
         saveKeywordChange(b, list);
       });
     });
+
+    // Client-side search filter per kw-panel (matches MASTER-TEMPLATE.html's
+    // filterTable behaviour), addEventListener rather than an inline
+    // oninput attribute since this whole file runs inside an IIFE and an
+    // inline handler can't see functions closed over that scope.
+    panel.querySelectorAll('[data-kw-filter-target]').forEach(function (input) {
+      input.addEventListener('input', function () {
+        var tbody = document.getElementById(input.getAttribute('data-kw-filter-target'));
+        var countEl = document.getElementById(input.getAttribute('data-kw-filter-count'));
+        if (!tbody) return;
+        var q = input.value.toLowerCase();
+        var visible = 0;
+        tbody.querySelectorAll('tr').forEach(function (row) {
+          var wordCell = row.querySelector('.kw-word');
+          var show = !wordCell || wordCell.textContent.toLowerCase().indexOf(q) !== -1;
+          row.style.display = show ? '' : 'none';
+          if (show) visible++;
+        });
+        if (countEl) countEl.textContent = visible;
+      });
+    });
   }
 
+  // Restyled 5 August 2026 to match MASTER-TEMPLATE.html's boxed
+  // step/step-orange/step-num treatment (solid tinted background, left
+  // border accent, numbered pill) instead of yesterday's flat
+  // bottom-border-divided rb-step list. Same content, same source data.
   function quickWinsHtml(b) {
     var narrative = b.audit_narrative_json;
     var itemsHtml;
 
-    // .rb-step/.rb-step-orange/.rb-step-num (style.css), same restyle as
-    // marketingStrategyHtml above, both branches below (LLM-written
-    // quickWins and the fallback gap list), orange circle colour kept as
-    // already live, distinguishing Quick Wins from Marketing Strategy's
-    // teal circles.
     if (narrative && Array.isArray(narrative.quickWins) && narrative.quickWins.length) {
       itemsHtml = narrative.quickWins.slice(0, 3).map(function (w, i) {
         return (
-          '<div class="rb-step rb-step-orange">' +
-            '<div class="rb-step-num">' + (i + 1) + '</div>' +
-            '<div><div class="rb-step-t">' + escapeHtml(w.title) + '</div>' +
-            '<div class="rb-step-b">' + escapeHtml(w.body) + '</div></div>' +
+          '<div class="step step-orange">' +
+            '<div class="step-num num-orange">' + (i + 1) + '</div>' +
+            '<div><div class="step-t">' + escapeHtml(w.title) + '</div>' +
+            '<div class="step-b">' + escapeHtml(w.body) + '</div></div>' +
           '</div>'
         );
       }).join('');
@@ -1548,10 +1634,10 @@
       itemsHtml = gaps.length
         ? gaps.slice(0, 3).map(function (g, i) {
             return (
-              '<div class="rb-step rb-step-orange">' +
-                '<div class="rb-step-num">' + (i + 1) + '</div>' +
-                '<div><div class="rb-step-t">' + g.label + ' (' + g.gap + ' points available)</div>' +
-                '<div class="rb-step-b">' + (actionText[g.key] || 'Focus on improving this area next.') + '</div></div>' +
+              '<div class="step step-orange">' +
+                '<div class="step-num num-orange">' + (i + 1) + '</div>' +
+                '<div><div class="step-t">' + g.label + ' (' + g.gap + ' points available)</div>' +
+                '<div class="step-b">' + (actionText[g.key] || 'Focus on improving this area next.') + '</div></div>' +
               '</div>'
             );
           }).join('')
@@ -1559,7 +1645,11 @@
     }
 
     return (
-      '<div class="breakdown-card"><h2>Do these next, in order</h2><p>Ranked by how many Discoverability Score points are still on the table.</p>' + itemsHtml + '</div>'
+      '<div class="sec-label">Quick Wins</div>' +
+      '<div class="card">' +
+        '<div class="card-hdr">Do These in Order: Sequence Matters</div>' +
+        itemsHtml +
+      '</div>'
     );
   }
 
