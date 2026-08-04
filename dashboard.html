@@ -564,19 +564,13 @@
             ' <span style="color:var(--muted);">&middot; (' + (b.live_review_count != null ? b.live_review_count : 0) + ')</span></div>'
         : '';
 
-      // Description paragraph restored (4 August 2026): briefly pulled
-      // earlier the same day after this book's description read as
-      // off-topic out of context (an urban-dictionary-style slang
-      // definition). John confirmed it's real, correct content, this book
-      // ("Screen Kids: The Hidden Dangers of Early Smartphone Use")
-      // decodes exactly this kind of slang for parents as part of its
-      // actual subject matter, it just reads oddly in isolation without
-      // that context. Not a data-quality bug, restored as-is.
-      var descText = b.description ? String(b.description).trim() : '';
-      var descHtml = descText
-        ? '<p style="font-size:14px;color:var(--mid);line-height:1.6;margin-bottom:14px;">' +
-            escapeHtml(descText.slice(0, 400)) + (descText.length > 400 ? '…' : '') + '</p>'
-        : '';
+      // Description paragraph removed (4 August 2026, per John: "we dont
+      // need to repeat the whole description from amazon", the heading
+      // plus the AI insight below is enough, the raw Amazon description
+      // was just noise here). descHtml kept as an empty string rather than
+      // deleted outright so the render/fallback logic below still reads
+      // cleanly without a bigger refactor.
+      var descHtml = '';
 
       var insightHtml = insight
         ? '<p style="font-weight:700;color:var(--navy);margin-bottom:4px;">' + escapeHtml(insight) + '</p>'
