@@ -919,8 +919,6 @@
       : '';
 
     return (
-      '<div class="sec-eyebrow" style="margin-bottom:6px;">Market Analysis</div>' +
-      '<h2 style="font-size:20px;color:var(--navy);margin-bottom:16px;">' + escapeHtml(b.book_title || '') + '</h2>' +
       '<div class="breakdown-card" style="margin-bottom:24px;">' +
         '<h2>Where this book stands</h2>' +
         insightHtml +
@@ -995,8 +993,6 @@
     }).join('');
 
     return (
-      '<div class="sec-eyebrow" style="margin-bottom:6px;">Marketing Strategy</div>' +
-      '<h2 style="font-size:20px;color:var(--navy);margin-bottom:16px;">' + escapeHtml(b.book_title || '') + '</h2>' +
       '<div class="breakdown-card"><h2>Your action plan</h2><p>Ordered by what\'s most likely to move your Discoverability Score next.</p><div>' + stepsHtml + '</div></div>'
     );
   }
@@ -1083,8 +1079,6 @@
     }
 
     return (
-      '<div class="sec-eyebrow" style="margin-bottom:6px;">Keywords</div>' +
-      '<h2 style="font-size:20px;color:var(--navy);margin-bottom:16px;">' + escapeHtml(b.book_title || '') + '</h2>' +
       '<div class="breakdown-card"><h2>Your backend keywords (' + list.length + ' / 7)</h2><p>What\'s currently in this book\'s 7 KDP keyword fields. Adding or removing one here updates your Discoverability Score immediately.</p>' + chipsHtml + '</div>' +
       '<div id="keyword-save-error" class="detail-error" style="display:none;margin-top:12px;"></div>' +
       researchHtml
@@ -1225,8 +1219,6 @@
     }
 
     return (
-      '<div class="sec-eyebrow" style="margin-bottom:6px;">Quick Wins</div>' +
-      '<h2 style="font-size:20px;color:var(--navy);margin-bottom:16px;">' + escapeHtml(b.book_title || '') + '</h2>' +
       '<div class="breakdown-card"><h2>Do these next, in order</h2><p>Ranked by how many Discoverability Score points are still on the table.</p>' + itemsHtml + '</div>'
     );
   }
