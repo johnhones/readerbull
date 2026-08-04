@@ -575,7 +575,7 @@
       var descHtml = '';
 
       var insightHtml = insight
-        ? '<p style="font-weight:700;color:var(--navy);margin-bottom:4px;">' + escapeHtml(insight) + '</p>'
+        ? '<p style="font-weight:400;color:var(--navy);margin-bottom:4px;">' + escapeHtml(insight) + '</p>'
         : '';
 
       var competitorCount = stats && stats.competitorCount > 0 ? stats.competitorCount : null;
@@ -915,7 +915,7 @@
     }
 
     var insightHtml = (narrative && narrative.bookInsight)
-      ? '<p style="font-weight:700;color:var(--navy);margin-bottom:12px;">' + escapeHtml(narrative.bookInsight) + '</p>'
+      ? '<p style="font-weight:400;color:var(--navy);margin-bottom:12px;">' + escapeHtml(narrative.bookInsight) + '</p>'
       : '';
 
     return (
