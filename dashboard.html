@@ -544,22 +544,17 @@
       var assessment = narrative.professionalAssessment;
       if (!stats && !assessment) return '';
 
-      var statCardsHtml = '';
-      if (stats && (stats.booksSellingWell || stats.estimatedNicheRevenue)) {
-        statCardsHtml =
-          '<div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(140px,1fr));gap:12px;margin-top:16px;">' +
-            '<div style="background:var(--light);border-radius:10px;padding:14px;text-align:center;">' +
-              '<div style="font-size:22px;font-weight:800;color:var(--orange-d);">' + (stats.booksSellingWell != null ? stats.booksSellingWell : '—') + '</div>' +
-              '<div style="font-size:12px;color:var(--muted);margin-top:2px;">Books Selling Well In This Niche</div>' +
-            '</div>' +
-            '<div style="background:var(--light);border-radius:10px;padding:14px;text-align:center;">' +
-              '<div style="font-size:22px;font-weight:800;color:var(--teal-d);">' + (stats.estimatedNicheRevenue != null ? ('~$' + Math.round(stats.estimatedNicheRevenue).toLocaleString() + '/mo') : 'Not enough data') + '</div>' +
-              '<div style="font-size:12px;color:var(--muted);margin-top:2px;">Estimated KDP Niche Revenue</div>' +
-            '</div>' +
-          '</div>' +
-          '<div style="font-size:11px;color:var(--muted);margin-top:8px;">Estimated from bestseller rank across ' + (stats.sampleSize || 0) + ' comparable listing' + (stats.sampleSize === 1 ? '' : 's') + ', not a reported figure.</div>';
-      }
-
+      // Removed 4 August 2026: this used to also show "Books Selling Well
+      // In This Niche" and "Estimated KDP Niche Revenue" stat cards, both
+      // converting bestsellerRank through a sales-volume curve. Caught via
+      // a live test on a real book before any author saw it: bestsellerRank
+      // here is a category-specific rank (e.g. "#25 in Child Psychology
+      // Reference"), not Amazon's overall store-wide rank, so running it
+      // through that curve produced a wildly inflated ~$173,502/mo figure
+      // for a niche of largely obscure titles. Removed rather than shipped
+      // wrong, see the comment on estimateNicheStats in api/enrich-audit.js.
+      // The Best Seller Rank comparison below is a direct rank-vs-rank
+      // comparison, no revenue conversion, and stays accurate.
       var bsrHtml = '';
       if (stats && stats.bestSellerRank && (stats.bestSellerRank.yours || stats.bestSellerRank.nicheAverage || stats.bestSellerRank.topCompetitor)) {
         bsrHtml =
@@ -599,17 +594,9 @@
           '</div>'
         : '';
 
-      if (!statCardsHtml && !bsrHtml && !assessmentHtml) return '';
+      if (!bsrHtml && !assessmentHtml) return '';
 
-      // Only wrap statCardsHtml in its own "Book Summary" card when there's
-      // actually a stat to show, otherwise this renders an empty card with
-      // just a heading (confirmed with a synthetic no-nicheStats case
-      // where only professionalAssessment was present).
-      var bookSummaryHtml = statCardsHtml
-        ? '<div class="breakdown-card" style="margin-top:16px;"><h2>Book Summary</h2>' + statCardsHtml + '</div>'
-        : '';
-
-      return bookSummaryHtml + bsrHtml + assessmentHtml;
+      return bsrHtml + assessmentHtml;
     }
     currentShowScoreDetail = showScoreDetail;
 
