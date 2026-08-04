@@ -599,7 +599,7 @@
       return (
         '<div class="breakdown-card">' +
           '<h2>Book Summary</h2>' +
-          '<h3 style="font-size:16px;font-weight:400;color:var(--navy);margin:8px 0 2px;">' + escapeHtml(b.book_title || '') + '</h3>' +
+          '<h3 style="font-size:14px;font-weight:400;color:var(--navy);margin:8px 0 2px;">' + escapeHtml(b.book_title || '') + '</h3>' +
           (b.author_name ? '<div style="font-size:13px;color:var(--muted);margin-bottom:2px;">by ' + escapeHtml(b.author_name) + '</div>' : '') +
           starsHtml +
           descHtml +
@@ -1099,6 +1099,11 @@
     var listingMeta = breakdown.listing || {};
     var amazonAdsActive = !!(breakdown.amazonAds && breakdown.amazonAds.active);
     var newKeywords = newList.join(', ');
+    // Read back out of audit_narrative_json.nicheStats.yourStoreWideRank
+    // (see api/enrich-audit.js), the only place this survives a page
+    // reload, so the Sales/mo re-score after a keyword change uses the
+    // same correct, non-inflated rank as the initial onboarding score.
+    var nicheStatsForRescore = (b.audit_narrative_json && b.audit_narrative_json.nicheStats) || {};
 
     var scoreResult = computeDiscoverabilityScore({
       title: b.book_title,
@@ -1109,6 +1114,7 @@
       category: b.amazon_category,
       categoryCount: listingMeta.categoryCount,
       bestsellerRank: b.bestseller_rank_number,
+      storeWideRank: (typeof nicheStatsForRescore.yourStoreWideRank === 'number') ? nicheStatsForRescore.yourStoreWideRank : undefined,
       price: b.live_price,
       coverImage: b.cover_image_url,
       pageRank: listingMeta.pageRank,
