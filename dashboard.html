@@ -472,19 +472,13 @@
           '<div style="font-size:11px;color:var(--muted);margin-top:2px;">Estimated from bestseller rank, not a reported figure.</div>' +
         '</div>';
 
-      var listHtml =
-        '<div style="display:flex;justify-content:space-between;padding:10px 0;border-bottom:1px solid var(--border);font-size:14px;">' +
-          '<span style="color:var(--navy);font-weight:600;">Listing</span>' +
-          '<span style="color:var(--mid);">' + listing.points + ' / ' + listing.max + ' pts</span>' +
-        '</div>' +
-        '<div style="display:flex;justify-content:space-between;padding:10px 0;border-bottom:1px solid var(--border);font-size:14px;">' +
-          '<span style="color:var(--navy);font-weight:600;">Reviews &amp; Ratings</span>' +
-          '<span style="color:var(--mid);">' + reviews.points + ' / ' + reviews.max + ' pts</span>' +
-        '</div>' +
-        '<div style="display:flex;justify-content:space-between;padding:10px 0;border-bottom:1px solid var(--border);font-size:14px;">' +
-          '<span style="color:var(--navy);font-weight:600;">Star Rating</span>' +
-          '<span style="color:var(--mid);">' + starRating.points + ' / ' + starRating.max + ' pts</span>' +
-        '</div>';
+      // "What's holding your book back" list removed (4 August 2026, per
+      // John: redundant with the Listing/Reviews & Ratings/Star Rating bars
+      // already shown in the score-demo card to its left, and not part of
+      // the original MVP layout). Book Summary now sits in this second
+      // column instead, matching the legacy dashboards, listing/reviews/
+      // starRating above still feed barsHtml, only the duplicate list of
+      // the same three numbers is gone.
 
       var badge = scoreBadge(b.score);
       // Discreet dot-plus-label pill, not a loud error-style badge, matching
@@ -510,13 +504,8 @@
             '</div>' +
             '<div class="bars">' + barsHtml + '</div>' +
           '</div>' +
-          '<div class="breakdown-card">' +
-            '<h2>What\'s holding your book back</h2>' +
-            '<p>Here\'s exactly where your points came from. Two more factors (Sales/mo and Price vs Niche) also feed your total score but aren\'t broken out point-by-point here.</p>' +
-            '<div>' + listHtml + '</div>' +
-          '</div>' +
+          bookSummaryHtml(b) +
         '</div>' +
-        bookSummaryHtml(b) +
         nicheAssessmentHtml(b);
       detailWrap.scrollIntoView({ behavior: 'smooth', block: 'start' });
     }
@@ -568,20 +557,19 @@
             ' <span style="color:var(--muted);">&middot; (' + (b.live_review_count != null ? b.live_review_count : 0) + ')</span></div>'
         : '';
 
-      // Description paragraph disabled (4 August 2026, hours after shipping):
-      // a live test found a real book's stored `description` field held
-      // completely unrelated, inappropriate text (an urban-dictionary-style
-      // slang definition, nothing to do with the book), pulled from
-      // SerpApi's product_description parser and stored as-is at import
-      // time. That's a raw external field we don't control or validate,
-      // rendering it unfiltered on a live public page is not safe. Pulled
-      // immediately rather than left live while a proper fix (content
-      // moderation/validation before display, or before storing at import
-      // time) gets scoped. bookInsight below is AI-generated from
-      // structured data and already does the "what is this book" job
-      // safely, so this isn't a loss of the intended content, just the
-      // free-text description line specifically.
-      var descHtml = '';
+      // Description paragraph restored (4 August 2026): briefly pulled
+      // earlier the same day after this book's description read as
+      // off-topic out of context (an urban-dictionary-style slang
+      // definition). John confirmed it's real, correct content, this book
+      // ("Screen Kids: The Hidden Dangers of Early Smartphone Use")
+      // decodes exactly this kind of slang for parents as part of its
+      // actual subject matter, it just reads oddly in isolation without
+      // that context. Not a data-quality bug, restored as-is.
+      var descText = b.description ? String(b.description).trim() : '';
+      var descHtml = descText
+        ? '<p style="font-size:14px;color:var(--mid);line-height:1.6;margin-bottom:14px;">' +
+            escapeHtml(descText.slice(0, 400)) + (descText.length > 400 ? '…' : '') + '</p>'
+        : '';
 
       var insightHtml = insight
         ? '<p style="font-weight:700;color:var(--navy);margin-bottom:4px;">' + escapeHtml(insight) + '</p>'
@@ -601,10 +589,14 @@
           (revenue != null ? '<div style="font-size:11px;color:var(--muted);margin-top:8px;">Niche revenue is estimated from Amazon rank and price data, not a reported figure.</div>' : '');
       }
 
-      if (!starsHtml && !descHtml && !insightHtml && !cardsHtml) return '';
-
+      // Now the split's second column (moved 4 August 2026, per John: sits
+      // beside the score card exactly like the legacy dashboards, no
+      // margin-top needed here any more, .split's align-items:stretch
+      // matches its height to score-demo automatically. Always renders a
+      // card, even with nothing but the title, so the split never ends up
+      // with an empty-looking second column.
       return (
-        '<div class="breakdown-card" style="margin-top:16px;">' +
+        '<div class="breakdown-card">' +
           '<h2>Book Summary</h2>' +
           '<h3 style="font-size:16px;color:var(--navy);margin:8px 0 2px;">' + escapeHtml(b.book_title || '') + '</h3>' +
           (b.author_name ? '<div style="font-size:13px;color:var(--muted);margin-bottom:2px;">by ' + escapeHtml(b.author_name) + '</div>' : '') +
@@ -612,6 +604,9 @@
           descHtml +
           insightHtml +
           cardsHtml +
+          (!starsHtml && !descHtml && !insightHtml && !cardsHtml
+            ? '<p style="font-size:13px;color:var(--muted);">More detail appears here once this book\'s full audit has run.</p>'
+            : '') +
         '</div>'
       );
     }
