@@ -1050,11 +1050,32 @@ async function generateNarrative(input, competitors, pageRank, nicheStats) {
     }
 
     if (!parsed || typeof parsed !== 'object') return null;
-    return parsed;
+    return stripEmDashes(parsed);
   } catch (err) {
     await sendErrorAlert('enrich-audit', 'Narrative generation threw an unexpected error: ' + (err && err.message ? err.message : String(err)));
     return null;
   }
+}
+
+// Defensive backstop for the "never use the em dash character" instruction
+// above (added 4 August 2026, per John: "make sure there are no em dashes
+// anywhere on the site"). The system prompt already tells the model not to
+// use em dashes, but a prompt instruction is not a guarantee, models slip.
+// Recursively walks every string in the parsed narrative (bookInsight,
+// marketAnalysis, strategySteps/quickWins titles+bodies,
+// professionalAssessment, etc.) and replaces any em dash with a plain
+// " - ", so a stray one from the model can never reach the page. Runs
+// once here on the narrative object only, nicheStats/assessmentTags are
+// pure calculations with no free text and never need this.
+function stripEmDashes(value) {
+  if (typeof value === 'string') return value.split('—').join(' - ');
+  if (Array.isArray(value)) return value.map(stripEmDashes);
+  if (value && typeof value === 'object') {
+    var out = {};
+    Object.keys(value).forEach(function (k) { out[k] = stripEmDashes(value[k]); });
+    return out;
+  }
+  return value;
 }
 
 function sendErrorAlert(endpoint, detail) {
