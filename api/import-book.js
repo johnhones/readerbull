@@ -86,6 +86,26 @@ module.exports = async function handler(req, res) {
       }
     });
 
+    // Store-wide rank, separate from bestRank above (fixed 4 August 2026,
+    // scoped after John flagged the missing Book Summary panel and a
+    // question about why the old niche-revenue stat card had been pulled).
+    // Amazon lists best_sellers_rank broadest-first on the real product
+    // page: the top-level store rank (e.g. "#45,231 in Books") comes
+    // before any narrower subcategory rank (e.g. "#12 in Near-Death
+    // Experiences"), confirmed against SerpApi's own documented example
+    // ("#129 in Grocery & Gourmet Food" listed before "#1 in Ground
+    // Coffee"). bestRank above deliberately picks the LOWEST number across
+    // the whole array, which is correct for "category fit" but almost
+    // always lands on a narrow subcategory, not the store-wide rank. A
+    // BSR-to-sales curve needs the store-wide rank specifically, using
+    // bestRank for that produced a wildly inflated revenue figure before
+    // (see the removal note in api/enrich-audit.js, 4 August 2026). ranks[0]
+    // is the fix: the first entry Amazon lists is always the broadest one.
+    var storeWideRankEntry = ranks[0] || null;
+    var storeWideRank = (storeWideRankEntry && typeof storeWideRankEntry.extracted_rank === 'number')
+      ? storeWideRankEntry.extracted_rank
+      : null;
+
     var coverImage = (product.thumbnails && product.thumbnails[0]) || product.thumbnail || null;
 
     // "Frequently bought together" for this exact ASIN, when Amazon shows
@@ -210,6 +230,8 @@ module.exports = async function handler(req, res) {
       categoryCount: ranks.length,
       bestsellerRank: bestRank ? bestRank.extracted_rank : null,
       bestsellerRankText: bestRank ? bestRank.text : null,
+      storeWideRank: storeWideRank,
+      storeWideRankText: storeWideRankEntry ? storeWideRankEntry.text : null,
       amazonUrl: (data.search_metadata && data.search_metadata.amazon_product_url) || null,
       boughtTogether: boughtTogether,
       formats: formats,

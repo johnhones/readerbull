@@ -39,8 +39,16 @@
 // book where every mechanical seed fails.
 //
 // POST { title, category, keywords, asin, price, rating, reviewCount,
-//        bestsellerRank, boughtTogether }
+//        bestsellerRank, storeWideRank, boughtTogether }
 // -> { competitors: [...], pageRank: {...}, keywordResearch: {...}, narrative: {...} }
+//
+// storeWideRank (4 August 2026): Amazon's broadest/store-wide best-seller
+// rank (ranks[0] from SerpApi, see the comment on it in import-book.js),
+// distinct from bestsellerRank (the lowest-numbered, most category-specific
+// rank, used for the "category fit" scoring sub-factor). storeWideRank
+// feeds estimateNicheStats' revenue estimate below, using bestsellerRank
+// for that produced a wildly wrong figure previously, see the comment on
+// estimateNicheStats.
 //
 // Competitor accuracy fix (29 July 2026): findCompetitors now prefers
 // boughtTogether (Amazon's own "frequently bought together" data for this
@@ -306,6 +314,14 @@ async function attachCompetitorBsr(competitors) {
         }
       });
       if (bestRank) c.bestsellerRank = bestRank;
+
+      // Store-wide rank (4 August 2026), same fix as import-book.js: the
+      // first entry in best_sellers_rank is Amazon's broadest, store-wide
+      // rank, not the lowest-numbered one. Needed for revenue estimation,
+      // see estimateNicheStats below and the removal note there.
+      if (ranks[0] && typeof ranks[0].extracted_rank === 'number') {
+        c.storeWideRank = ranks[0].extracted_rank;
+      }
     } catch (err) {
       // best-effort, this competitor just won't have a BSR
       continue;
@@ -314,24 +330,26 @@ async function attachCompetitorBsr(competitors) {
 }
 
 // ---------- Best Seller Rank comparison (no extra calls, pure calculation) ----------
-// IMPORTANT (fixed 4 August 2026, caught via a live test on a real book
-// before this ever reached an author): this file's bestsellerRank field
-// is the LOWEST-numbered entry across every category a listing appears
-// in (see the bestRank comment in import-book.js), i.e. a category-specific
-// rank like "#25 in Child Psychology Reference", not Amazon's overall
+// Fixed 4 August 2026, caught via a live test on a real book before this
+// ever reached an author: this file's bestsellerRank field is the
+// LOWEST-numbered entry across every category a listing appears in (see
+// the bestRank comment in import-book.js), i.e. a category-specific rank
+// like "#25 in Child Psychology Reference", not Amazon's overall
 // store-wide sales rank ("#45,231 in Books"). An earlier version of this
 // function ran that category rank through a public BSR-to-sales-volume
 // curve (the kind self-pub tools use for the OVERALL store rank) and
-// produced a wildly inflated "~$173,502/mo" niche revenue estimate on a
-// real live test, because a small category-specific rank number looks
-// like a huge overall seller when read on the wrong scale. There is no
-// reliable way to isolate the true overall store-wide rank from what
-// this endpoint currently pulls, so rather than keep presenting a
-// plausible-looking but wrong dollar figure to an author, this only
-// ever compares category-best rank positions directly (yours vs niche
-// average vs top competitor), never converts rank into a sales or
-// revenue number. If a real BSR-to-revenue estimate is wanted later, it
-// needs the confirmed overall store-wide rank, not this field.
+// produced a wildly inflated "~$173,502/mo" niche revenue estimate,
+// because a small category-specific rank number looks like a huge
+// overall seller when read on the wrong scale. This comparison block
+// (yours vs niche average vs top competitor) only ever compares
+// category-best rank positions directly, never converts rank into a
+// sales or revenue number, that part of the earlier fix stands.
+//
+// Revenue estimate re-added 4 August 2026, using storeWideRank instead
+// (ranks[0], Amazon's broadest/store-wide entry, see the comment on
+// storeWideRank in import-book.js and attachCompetitorBsr above), not
+// bestsellerRank. Deliberately labelled as an estimate everywhere it's
+// shown (dashboard.html), same convention as the Sales/mo milestone bar.
 function estimateNicheStats(input, competitors) {
   var ownBsr = (typeof input.bestsellerRank === 'number') ? input.bestsellerRank : null;
 
@@ -345,10 +363,91 @@ function estimateNicheStats(input, competitors) {
     : null;
   var topCompetitorBsr = competitorBsrs.length ? Math.min.apply(null, competitorBsrs) : null;
 
+  // Revenue estimate: only ever built from storeWideRank + a real price,
+  // one data point per book (own book plus each competitor that has
+  // both). Books missing either value simply don't contribute, rather
+  // than being estimated with a guessed price or rank.
+  var revenueContributions = [];
+
+  var ownPrice = parsePrice(input.price);
+  var ownStoreWideRank = (typeof input.storeWideRank === 'number') ? input.storeWideRank : null;
+  var ownMonthlyRevenue = estimateMonthlyRevenue(ownStoreWideRank, ownPrice);
+  if (ownMonthlyRevenue != null) revenueContributions.push(ownMonthlyRevenue);
+
+  (competitors || []).forEach(function (c) {
+    var cPrice = parsePrice(c.price);
+    var cRank = (typeof c.storeWideRank === 'number') ? c.storeWideRank : null;
+    var cRevenue = estimateMonthlyRevenue(cRank, cPrice);
+    if (cRevenue != null) revenueContributions.push(cRevenue);
+  });
+
+  var estimatedNicheRevenue = revenueContributions.length
+    ? Math.round(revenueContributions.reduce(function (a, b) { return a + b; }, 0))
+    : null;
+
   return {
     bestSellerRank: { yours: ownBsr, nicheAverage: nicheAverageBsr, topCompetitor: topCompetitorBsr },
-    sampleSize: competitorBsrs.length + (ownBsr ? 1 : 0)
+    sampleSize: competitorBsrs.length + (ownBsr ? 1 : 0),
+    // "Books Selling Well In This Niche": every comparable listing found
+    // for this book, own book not included in the count. Simple count,
+    // no revenue threshold applied, matches what the competitor table
+    // itself already shows the author.
+    competitorCount: (competitors || []).length,
+    estimatedNicheRevenue: estimatedNicheRevenue,
+    revenueSampleSize: revenueContributions.length
   };
+}
+
+// Parses a display price string ("$14.99", "£9.99", "14.99") into a plain
+// number, or null if nothing usable is there. Never guesses a price.
+function parsePrice(raw) {
+  if (typeof raw === 'number') return raw;
+  if (!raw) return null;
+  var match = String(raw).replace(/,/g, '').match(/(\d+(\.\d+)?)/);
+  return match ? parseFloat(match[1]) : null;
+}
+
+// Rough public approximation of Amazon's store-wide BSR-to-daily-sales
+// curve, the kind of log-scale interpolation self-pub sales-estimator
+// tools use (not an exact or proprietary Amazon figure, deliberately
+// conservative). Anchor points are commonly-cited rough benchmarks (rank
+// 1 selling in the thousands/day, rank ~100,000 selling roughly one a
+// day, dropping off sharply after that). Interpolates log-log between
+// them, only ever called with storeWideRank, never the category-specific
+// bestsellerRank (see the comment above), that mismatch is what produced
+// the wrong $173,502/mo figure previously.
+var BSR_CURVE = [
+  { rank: 1, dailySales: 3000 },
+  { rank: 100, dailySales: 200 },
+  { rank: 1000, dailySales: 50 },
+  { rank: 10000, dailySales: 5 },
+  { rank: 100000, dailySales: 1 },
+  { rank: 1000000, dailySales: 0.1 },
+  { rank: 5000000, dailySales: 0.01 }
+];
+
+function estimateMonthlySalesFromRank(rank) {
+  if (typeof rank !== 'number' || rank <= 0) return null;
+  if (rank <= BSR_CURVE[0].rank) return BSR_CURVE[0].dailySales * 30;
+  var last = BSR_CURVE[BSR_CURVE.length - 1];
+  if (rank >= last.rank) return last.dailySales * 30;
+
+  for (var i = 0; i < BSR_CURVE.length - 1; i++) {
+    var a = BSR_CURVE[i], b = BSR_CURVE[i + 1];
+    if (rank >= a.rank && rank <= b.rank) {
+      var logRankA = Math.log(a.rank), logRankB = Math.log(b.rank), logRank = Math.log(rank);
+      var t = (logRank - logRankA) / (logRankB - logRankA);
+      var logSales = Math.log(a.dailySales) + t * (Math.log(b.dailySales) - Math.log(a.dailySales));
+      return Math.exp(logSales) * 30;
+    }
+  }
+  return null;
+}
+
+function estimateMonthlyRevenue(rank, price) {
+  var monthlySales = estimateMonthlySalesFromRank(rank);
+  if (monthlySales == null || price == null) return null;
+  return monthlySales * price;
 }
 
 // ---------- Professional Assessment tag pills (deterministic, not LLM) ----------
@@ -770,12 +869,21 @@ async function generateNarrative(input, competitors, pageRank, nicheStats) {
     'around the gap honestly instead of guessing a figure. Name the single biggest lever available (usually ' +
     'reviews, ads, or both) and roughly what closes the gap, without inventing a specific target number ' +
     'or dollar figure unless one is present in the data given. ' +
+    'Content type (added 4 August 2026, for the Overview "Book Summary" panel): classify this book\'s ' +
+    'subject matter as exactly one of "Evergreen", "Trending", or "Seasonal", based on book.title, ' +
+    'book.category and book.description. Evergreen means the topic stays relevant indefinitely (most ' +
+    'non-fiction how-to, self-help, health, personal-development, and most fiction genres). Trending ' +
+    'means the topic is tied to a current cultural moment likely to fade (a specific viral trend, a ' +
+    'recent news event). Seasonal means demand for the topic spikes at a specific time of year (holiday ' +
+    'guides, tax-season, back-to-school, diet-after-New-Year). Default to "Evergreen" unless the subject ' +
+    'clearly fits one of the other two, most self-published non-fiction and fiction is evergreen. ' +
     'Respond with ONLY a JSON object, no markdown fences, no commentary, matching exactly this shape: ' +
     '{"bookInsight": "one bolded-worthy sentence summarising the single biggest takeaway", ' +
     '"marketAnalysis": "2-3 short paragraphs on where this book stands versus the competitors given", ' +
     '"strategySteps": [{"title": "short step title", "body": "1-2 sentences, specific to this book\'s data"}], ' +
     '"quickWins": [{"title": "short action title", "body": "1-2 sentences on why this is the next best move"}], ' +
-    '"professionalAssessment": "2 short paragraphs, as described above"}. ' +
+    '"professionalAssessment": "2 short paragraphs, as described above", ' +
+    '"contentType": "Evergreen"|"Trending"|"Seasonal"}. ' +
     'Provide 3-5 strategySteps ordered by likely impact, and 3 quickWins ordered by ease and impact.';
 
   try {
