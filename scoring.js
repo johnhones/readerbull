@@ -191,6 +191,19 @@ function estimateMonthlyRevenue(bsr, price) {
   return daily * 30.4 * p;
 }
 
+// bsr here should be storeWideRank whenever it's available (see
+// computeDiscoverabilityScore below): bestsellerRank alone is the
+// lowest-numbered entry across every category a listing appears in (e.g.
+// "#32 in Blogging"), a narrow category-specific rank, not Amazon's
+// overall store-wide sales rank. Running that small category number
+// through this store-wide curve reads as a huge overall seller and wildly
+// overstates the estimate, the same scale-mismatch bug already fixed for
+// the Overview "KDP Niche Revenue" figure in api/enrich-audit.js (see the
+// comment on estimateNicheStats there), caught again 4 August 2026 when a
+// book showing "$1,000+ milestone reached" here had a niche-wide revenue
+// estimate of only $247/mo. Falls back to bestsellerRank only when
+// storeWideRank truly isn't available (an older book, or the SerpApi call
+// failed), better than showing nothing.
 function scoreSalesPerMonth(bsr, price) {
   var revenue = estimateMonthlyRevenue(bsr, price);
   var points;
@@ -247,7 +260,9 @@ function scoreBadge(score) {
  * @param {string} [inputs.description] - listing/description text, pulled or author-written
  * @param {string} [inputs.category] - auto-detected category text
  * @param {number} [inputs.categoryCount] - number of categories the listing appears in, from SerpApi best_sellers_rank
- * @param {number} [inputs.bestsellerRank] - pulled bestseller rank number
+ * @param {number} [inputs.bestsellerRank] - pulled bestseller rank number (category-specific, lowest-numbered entry)
+ * @param {number} [inputs.storeWideRank] - Amazon's broadest/overall rank (ranks[0] from SerpApi), preferred over
+ *   bestsellerRank for the Sales/mo estimate specifically, see the comment on scoreSalesPerMonth above
  * @param {string|number} [inputs.price] - pulled listing price
  * @param {string} [inputs.coverImage] - pulled cover image URL
  * @param {Object} [inputs.pageRank] - { position, keyword } from api/enrich-audit.js
@@ -261,7 +276,8 @@ function computeDiscoverabilityScore(inputs) {
   var listingPoints = scoreListing(inputs);
   var reviewsPoints = scoreReviewsRatings(inputs.reviewCount);
   var starPoints = scoreStarRating(inputs.rating);
-  var sales = scoreSalesPerMonth(inputs.bestsellerRank, inputs.price);
+  var salesRank = (typeof inputs.storeWideRank === 'number') ? inputs.storeWideRank : inputs.bestsellerRank;
+  var sales = scoreSalesPerMonth(salesRank, inputs.price);
   var priceVsNiche = scorePriceVsNiche(inputs.price, inputs.competitors);
 
   var score = listingPoints + reviewsPoints + starPoints + sales.points + priceVsNiche.points;
@@ -288,7 +304,8 @@ function computeDiscoverabilityScore(inputs) {
     },
     salesPerMonth: {
       label: 'Sales/mo', points: sales.points, max: 20, visible: 'milestone',
-      estimatedRevenue: sales.estimatedRevenue, basis: 'bsr-estimate'
+      estimatedRevenue: sales.estimatedRevenue,
+      basis: (typeof inputs.storeWideRank === 'number') ? 'storeWideRank-estimate' : 'bsr-estimate'
     },
     priceVsNiche: {
       label: 'Price vs Niche', points: priceVsNiche.points, max: 20, visible: 'internal',

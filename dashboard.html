@@ -56,17 +56,19 @@
       <button class="shell-nav-item act" data-panel="barnes-noble"><i class="ti ti-building-store"></i> Barnes &amp; Noble</button>
       <button class="shell-nav-item act" data-panel="apple-books"><i class="ti ti-device-tablet"></i> Apple Books</button>
       <button class="shell-nav-item act" data-panel="audible-acx"><i class="ti ti-headphones"></i> Audible / ACX</button>
+
+      <hr class="shell-divider">
+      <div class="shell-section-label">Account</div>
+      <button class="shell-nav-item" id="sidebar-set-password"><i class="ti ti-key"></i> Set a password</button>
+      <button class="shell-nav-item" id="sidebar-logout"><i class="ti ti-logout"></i> Log out</button>
     </div>
   </div>
 
   <!-- MAIN -->
   <div class="shell-main">
-    <div class="shell-topbar">
-      <div class="shell-topbar-actions">
-        <a href="#" id="set-password-link"><i class="ti ti-key"></i> Set a password</a>
-        <a href="#" id="logout-link"><i class="ti ti-logout"></i> Log out</a>
-      </div>
-    </div>
+    <!-- shell-topbar removed (its only content, Set a password/Log out, moved
+         into the sidebar Account section), was left behind as an empty bar
+         creating dead whitespace at the top of the main column. -->
 
     <!-- OVERVIEW: populated by JS, either the embedded legacy dashboard or the auto score -->
     <div id="panel-overview" class="shell-panel-container"></div>
@@ -182,7 +184,7 @@
   var user = await readerbull.requireUser('index.html');
   if (!user) return;
 
-  document.getElementById('logout-link').addEventListener('click', function (e) {
+  document.getElementById('sidebar-logout').addEventListener('click', function (e) {
     e.preventDefault();
     readerbull.signOut();
   });
@@ -239,7 +241,7 @@
     });
   }
 
-  document.getElementById('set-password-link').addEventListener('click', function (e) {
+  document.getElementById('sidebar-set-password').addEventListener('click', function (e) {
     e.preventDefault();
     pwModalCard.innerHTML = pwModalDefaultHtml;
     wirePasswordForm();
@@ -484,7 +486,7 @@
       // Discreet dot-plus-label pill, not a loud error-style badge, matching
       // the legacy Jordan Truehart dashboard's treatment (see .ads-pill in
       // style.css and ReaderBull_Next_Chat_Handover_Prompt.md item 6).
-      var adsPillHtml = '<span class="ads-pill ' + (amazonAds.active ? 'active' : 'inactive') + '" style="margin-left:10px;">' +
+      var adsPillHtml = '<span class="ads-pill ' + (amazonAds.active ? 'active' : 'inactive') + '">' +
         '<span class="dot"></span>Amazon Ads: ' + (amazonAds.active ? 'Active' : 'Not active') +
       '</span>';
 
@@ -498,15 +500,20 @@
               '<div>' +
                 '<div class="eyebrow2">Discoverability Score</div>' +
                 '<div class="num">' + b.score + '<span>&thinsp;/ 100</span></div>' +
-                '<div style="font-size:12px;font-weight:700;color:var(--teal-d);margin-top:2px;">' + badge + adsPillHtml + '</div>' +
+                '<div style="font-size:12px;font-weight:700;color:var(--teal-d);margin-top:2px;">' + badge + '</div>' +
               '</div>' +
               (b.cover_image_url ? '<div class="score-cover"><img src="' + b.cover_image_url + '" alt=""></div>' : '') +
             '</div>' +
             '<div class="bars">' + barsHtml + '</div>' +
+            '<div style="margin-top:16px;">' + adsPillHtml + '</div>' +
+            bsrCardHtml(b) +
           '</div>' +
-          bookSummaryHtml(b) +
+          '<div style="display:flex;flex-direction:column;gap:16px;">' +
+            bookSummaryHtml(b) +
+            professionalAssessmentCardHtml(b) +
+          '</div>' +
         '</div>' +
-        nicheAssessmentHtml(b);
+        revenueInsightHtml(b);
       detailWrap.scrollIntoView({ behavior: 'smooth', block: 'start' });
     }
 
@@ -557,19 +564,13 @@
             ' <span style="color:var(--muted);">&middot; (' + (b.live_review_count != null ? b.live_review_count : 0) + ')</span></div>'
         : '';
 
-      // Description paragraph restored (4 August 2026): briefly pulled
-      // earlier the same day after this book's description read as
-      // off-topic out of context (an urban-dictionary-style slang
-      // definition). John confirmed it's real, correct content, this book
-      // ("Screen Kids: The Hidden Dangers of Early Smartphone Use")
-      // decodes exactly this kind of slang for parents as part of its
-      // actual subject matter, it just reads oddly in isolation without
-      // that context. Not a data-quality bug, restored as-is.
-      var descText = b.description ? String(b.description).trim() : '';
-      var descHtml = descText
-        ? '<p style="font-size:14px;color:var(--mid);line-height:1.6;margin-bottom:14px;">' +
-            escapeHtml(descText.slice(0, 400)) + (descText.length > 400 ? '…' : '') + '</p>'
-        : '';
+      // Description paragraph removed (4 August 2026, per John: "we dont
+      // need to repeat the whole description from amazon", the heading
+      // plus the AI insight below is enough, the raw Amazon description
+      // was just noise here). descHtml kept as an empty string rather than
+      // deleted outright so the render/fallback logic below still reads
+      // cleanly without a bigger refactor.
+      var descHtml = '';
 
       var insightHtml = insight
         ? '<p style="font-weight:700;color:var(--navy);margin-bottom:4px;">' + escapeHtml(insight) + '</p>'
@@ -598,7 +599,7 @@
       return (
         '<div class="breakdown-card">' +
           '<h2>Book Summary</h2>' +
-          '<h3 style="font-size:16px;color:var(--navy);margin:8px 0 2px;">' + escapeHtml(b.book_title || '') + '</h3>' +
+          '<h3 style="font-size:14px;font-weight:400;color:var(--navy);margin:8px 0 2px;">' + escapeHtml(b.book_title || '') + '</h3>' +
           (b.author_name ? '<div style="font-size:13px;color:var(--muted);margin-bottom:2px;">by ' + escapeHtml(b.author_name) + '</div>' : '') +
           starsHtml +
           descHtml +
@@ -611,63 +612,76 @@
       );
     }
 
-    // ---------- Niche revenue + Best Seller Rank + Professional Assessment ----------
-    // Added 3 August 2026: the Overview block confirmed present on the
-    // legacy hand-built reference dashboards (Silver Ramsay, Soul Truth)
-    // but never carried over to this rebuild. Reads data already stored
-    // on the book row inside audit_narrative_json (nicheStats,
-    // assessmentTags, professionalAssessment, see api/enrich-audit.js),
-    // nothing computed client-side. Renders nothing at all when that data
-    // is missing (an older book audited before this shipped, or the
-    // enrichment step failed for this book), same graceful-fallback
-    // convention as competitorTableHtml above, rather than showing a
-    // broken-looking empty block.
+    // ---------- Niche revenue + Best Seller Rank + Professional Assessment + Revenue Reality ----------
+    // Added 3-4 August 2026: the Overview blocks confirmed present on the
+    // legacy hand-built reference dashboards (Silver Ramsay, Soul Truth,
+    // Jordan Truehart) but missing from this rebuild. Reads data already
+    // stored on the book row inside audit_narrative_json (nicheStats,
+    // assessmentTags, professionalAssessment, revenueInsight, see
+    // api/enrich-audit.js), nothing computed client-side. Renders nothing
+    // at all when that data is missing (an older book audited before this
+    // shipped, or the enrichment step failed for this book), same
+    // graceful-fallback convention as competitorTableHtml above, rather
+    // than showing a broken-looking empty block.
+    //
+    // Layout matches the full-page legacy screenshots exactly (John, 4
+    // August 2026): Best Seller Rank lives INSIDE the navy score card
+    // (below the bars/ads pill, not a separate white card), Professional
+    // Assessment stacks below Book Summary in the right-hand column (not
+    // full width), and the Revenue Reality callout is a full-width navy
+    // block below both columns. See selectBook() for how these three
+    // pieces are assembled.
     function fmtRank(n) {
       return (typeof n === 'number') ? ('#' + n.toLocaleString()) : 'Unknown';
     }
 
-    function nicheAssessmentHtml(b) {
+    // Dark-on-navy variant of the Best Seller Rank comparison, meant to sit
+    // inside .score-demo (see the rgba(255,255,255,..) tones, matching the
+    // existing .ads-pill/.bar-meta treatment already used in that card).
+    // Removed 4 August 2026, re-added same day: this used to also show
+    // "Books Selling Well In This Niche" and "Estimated KDP Niche Revenue"
+    // stat cards here, both converting bestsellerRank (category-specific,
+    // e.g. "#25 in Child Psychology Reference") through a sales curve
+    // meant for the store-wide rank, producing a wildly inflated
+    // ~$173,502/mo figure. Those two cards now live correctly in
+    // bookSummaryHtml below (driven by storeWideRank instead). This
+    // comparison never converts rank into revenue, so it stays accurate.
+    function bsrCardHtml(b) {
       var narrative = b.audit_narrative_json;
-      if (!narrative) return '';
+      var stats = narrative && narrative.nicheStats;
+      if (!stats || !stats.bestSellerRank) return '';
+      var r = stats.bestSellerRank;
+      if (!r.yours && !r.nicheAverage && !r.topCompetitor) return '';
 
-      var stats = narrative.nicheStats;
-      var tags = narrative.assessmentTags;
-      var assessment = narrative.professionalAssessment;
-      if (!stats && !assessment) return '';
-
-      // Removed 4 August 2026: this used to also show "Books Selling Well
-      // In This Niche" and "Estimated KDP Niche Revenue" stat cards, both
-      // converting bestsellerRank through a sales-volume curve. Caught via
-      // a live test on a real book before any author saw it: bestsellerRank
-      // here is a category-specific rank (e.g. "#25 in Child Psychology
-      // Reference"), not Amazon's overall store-wide rank, so running it
-      // through that curve produced a wildly inflated ~$173,502/mo figure
-      // for a niche of largely obscure titles. Removed rather than shipped
-      // wrong, see the comment on estimateNicheStats in api/enrich-audit.js.
-      // The Best Seller Rank comparison below is a direct rank-vs-rank
-      // comparison, no revenue conversion, and stays accurate.
-      var bsrHtml = '';
-      if (stats && stats.bestSellerRank && (stats.bestSellerRank.yours || stats.bestSellerRank.nicheAverage || stats.bestSellerRank.topCompetitor)) {
-        bsrHtml =
-          '<div class="breakdown-card" style="margin-top:16px;">' +
-            '<h2>Best Seller Rank</h2>' +
-            '<div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(120px,1fr));gap:12px;margin-top:12px;">' +
-              '<div style="background:var(--light);border-radius:10px;padding:14px;text-align:center;">' +
-                '<div style="font-size:11px;letter-spacing:.05em;text-transform:uppercase;color:var(--muted);">Your BSR</div>' +
-                '<div style="font-size:18px;font-weight:800;color:var(--navy);margin-top:4px;">' + fmtRank(stats.bestSellerRank.yours) + '</div>' +
-              '</div>' +
-              '<div style="background:var(--light);border-radius:10px;padding:14px;text-align:center;">' +
-                '<div style="font-size:11px;letter-spacing:.05em;text-transform:uppercase;color:var(--muted);">Niche Average</div>' +
-                '<div style="font-size:18px;font-weight:800;color:var(--navy);margin-top:4px;">' + fmtRank(stats.bestSellerRank.nicheAverage) + '</div>' +
-              '</div>' +
-              '<div style="background:var(--light);border-radius:10px;padding:14px;text-align:center;">' +
-                '<div style="font-size:11px;letter-spacing:.05em;text-transform:uppercase;color:var(--muted);">Top Competitor</div>' +
-                '<div style="font-size:18px;font-weight:800;color:var(--teal-d);margin-top:4px;">' + fmtRank(stats.bestSellerRank.topCompetitor) + '</div>' +
-              '</div>' +
+      return (
+        '<div style="margin-top:24px;padding-top:20px;border-top:1px solid rgba(255,255,255,.1);">' +
+          '<div class="eyebrow2" style="margin-bottom:10px;">Best Seller Rank</div>' +
+          '<div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(100px,1fr));gap:10px;">' +
+            '<div style="background:rgba(255,255,255,.06);border:1px solid rgba(255,255,255,.1);border-radius:10px;padding:12px;text-align:center;">' +
+              '<div style="font-size:10px;letter-spacing:.05em;text-transform:uppercase;color:rgba(255,255,255,.5);">Your BSR</div>' +
+              '<div style="font-size:16px;font-weight:800;color:#fff;margin-top:4px;">' + fmtRank(r.yours) + '</div>' +
             '</div>' +
-            '<div style="font-size:11px;color:var(--muted);margin-top:8px;">A lower rank means more sales. Niche average and top competitor are based on the comparable listings found for this book.</div>' +
-          '</div>';
-      }
+            '<div style="background:rgba(255,255,255,.06);border:1px solid rgba(255,255,255,.1);border-radius:10px;padding:12px;text-align:center;">' +
+              '<div style="font-size:10px;letter-spacing:.05em;text-transform:uppercase;color:rgba(255,255,255,.5);">Niche Average</div>' +
+              '<div style="font-size:16px;font-weight:800;color:#fff;margin-top:4px;">' + fmtRank(r.nicheAverage) + '</div>' +
+            '</div>' +
+            '<div style="background:rgba(255,255,255,.06);border:1px solid rgba(255,255,255,.1);border-radius:10px;padding:12px;text-align:center;">' +
+              '<div style="font-size:10px;letter-spacing:.05em;text-transform:uppercase;color:rgba(255,255,255,.5);">Top Competitor</div>' +
+              '<div style="font-size:16px;font-weight:800;color:var(--teal);margin-top:4px;">' + fmtRank(r.topCompetitor) + '</div>' +
+            '</div>' +
+          '</div>' +
+          '<div style="font-size:11px;color:rgba(255,255,255,.5);margin-top:8px;">A lower rank means more sales. Niche average and top competitor are based on the comparable listings found for this book.</div>' +
+        '</div>'
+      );
+    }
+
+    // White card for the right-hand column, stacked directly below
+    // bookSummaryHtml (see selectBook()), not full width.
+    function professionalAssessmentCardHtml(b) {
+      var narrative = b.audit_narrative_json;
+      var tags = narrative && narrative.assessmentTags;
+      var assessment = narrative && narrative.professionalAssessment;
+      if (!assessment) return '';
 
       var tagsHtml = (Array.isArray(tags) && tags.length)
         ? '<div style="display:flex;flex-wrap:wrap;gap:8px;margin-top:16px;">' +
@@ -677,17 +691,39 @@
           '</div>'
         : '';
 
-      var assessmentHtml = assessment
-        ? '<div class="breakdown-card" style="margin-top:16px;">' +
-            '<h2>Professional Assessment</h2>' +
-            narrativeHtml(assessment) +
-            tagsHtml +
+      return (
+        '<div class="breakdown-card">' +
+          '<h2>Professional Assessment</h2>' +
+          narrativeHtml(assessment) +
+          tagsHtml +
+        '</div>'
+      );
+    }
+
+    // Full-width navy callout below the split, matching the legacy "No
+    // Ads. No Revenue. The Data Is Clear." block. Deterministic, not LLM
+    // (see buildRevenueInsight in api/enrich-audit.js): every figure here
+    // traces back to a real price + storeWideRank estimate, headline/body/
+    // pills are all pre-built server-side, this just renders them.
+    function revenueInsightHtml(b) {
+      var narrative = b.audit_narrative_json;
+      var insight = narrative && narrative.revenueInsight;
+      if (!insight || !insight.body) return '';
+
+      var pillsHtml = (insight.currentPill || insight.targetPill)
+        ? '<div style="display:flex;flex-wrap:wrap;gap:12px;margin-top:20px;">' +
+            (insight.currentPill ? '<span style="background:rgba(255,255,255,.1);color:#fff;font-size:13px;font-weight:700;padding:10px 18px;border-radius:8px;">' + escapeHtml(insight.currentPill) + '</span>' : '') +
+            (insight.targetPill ? '<span style="background:var(--teal);color:#fff;font-size:13px;font-weight:700;padding:10px 18px;border-radius:8px;">' + escapeHtml(insight.targetPill) + '</span>' : '') +
           '</div>'
         : '';
 
-      if (!bsrHtml && !assessmentHtml) return '';
-
-      return bsrHtml + assessmentHtml;
+      return (
+        '<div style="background:var(--navy);border-radius:12px;padding:28px 32px;margin-top:20px;">' +
+          '<div style="font-size:17px;font-weight:800;color:#fff;margin-bottom:12px;">💡 ' + escapeHtml(insight.headline || '') + '</div>' +
+          '<p style="font-size:14px;color:rgba(255,255,255,.75);line-height:1.7;margin:0;">' + escapeHtml(insight.body) + '</p>' +
+          pillsHtml +
+        '</div>'
+      );
     }
     currentShowScoreDetail = showScoreDetail;
 
@@ -1063,6 +1099,11 @@
     var listingMeta = breakdown.listing || {};
     var amazonAdsActive = !!(breakdown.amazonAds && breakdown.amazonAds.active);
     var newKeywords = newList.join(', ');
+    // Read back out of audit_narrative_json.nicheStats.yourStoreWideRank
+    // (see api/enrich-audit.js), the only place this survives a page
+    // reload, so the Sales/mo re-score after a keyword change uses the
+    // same correct, non-inflated rank as the initial onboarding score.
+    var nicheStatsForRescore = (b.audit_narrative_json && b.audit_narrative_json.nicheStats) || {};
 
     var scoreResult = computeDiscoverabilityScore({
       title: b.book_title,
@@ -1073,6 +1114,7 @@
       category: b.amazon_category,
       categoryCount: listingMeta.categoryCount,
       bestsellerRank: b.bestseller_rank_number,
+      storeWideRank: (typeof nicheStatsForRescore.yourStoreWideRank === 'number') ? nicheStatsForRescore.yourStoreWideRank : undefined,
       price: b.live_price,
       coverImage: b.cover_image_url,
       pageRank: listingMeta.pageRank,

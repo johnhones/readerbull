@@ -128,6 +128,7 @@ module.exports = async function handler(req, res) {
 
   var nicheStats = estimateNicheStats(input, competitors);
   var assessmentTags = buildAssessmentTags(input, result.pageRank);
+  var revenueInsight = buildRevenueInsight(input, nicheStats);
 
   var narrative = await generateNarrative(input, competitors, result.pageRank, nicheStats);
   // nicheStats and assessmentTags are pure calculations with no LLM
@@ -142,6 +143,7 @@ module.exports = async function handler(req, res) {
   result.narrative = narrative || {};
   result.narrative.nicheStats = nicheStats;
   result.narrative.assessmentTags = assessmentTags;
+  result.narrative.revenueInsight = revenueInsight;
 
   // Always 200: this is a best-effort enrichment step, a partial or empty
   // result still lets the submit flow continue and store what it got.
@@ -385,6 +387,49 @@ function estimateNicheStats(input, competitors) {
     ? Math.round(revenueContributions.reduce(function (a, b) { return a + b; }, 0))
     : null;
 
+  // "Revenue Reality" block (added 4 August 2026, ReaderBull_Next_Chat
+  // this matches the legacy hand-built dashboards' "No Ads. No Revenue."
+  // callout, generalised into a real, deterministic rule set instead of
+  // per-author hand-written copy. Deliberately pure calculation, no LLM,
+  // same reasoning as the rest of this function: every number here must
+  // trace back to a real price + storeWideRank, nothing invented.
+  //
+  // "Paid" competitors = comparable listings with both a real price above
+  // $0 and a computable revenue estimate (storeWideRank + price). Their
+  // individual (not summed) revenue estimates form the min-max range shown
+  // ("paid books in this niche earn $X to $Y a month"). Free listings
+  // (price parses to exactly 0, i.e. free ebooks) are counted separately
+  // and never enter the range, since a $0 list price always estimates to
+  // $0 revenue regardless of rank and would just drag the low end down
+  // artificially.
+  var paidCompetitorRevenues = [];
+  var freeCompetitorCount = 0;
+  var benchmarkCompetitor = null; // highest-earning paid competitor: the "close this gap" target
+  (competitors || []).forEach(function (c) {
+    var cPrice = parsePrice(c.price);
+    if (cPrice === 0) { freeCompetitorCount++; return; }
+    var cRank = (typeof c.storeWideRank === 'number') ? c.storeWideRank : null;
+    var cRevenue = estimateMonthlyRevenue(cRank, cPrice);
+    if (cRevenue == null) return;
+    paidCompetitorRevenues.push(cRevenue);
+    if (!benchmarkCompetitor || cRevenue > benchmarkCompetitor.estimatedRevenue) {
+      benchmarkCompetitor = {
+        title: c.title || null,
+        reviews: (typeof c.reviews === 'number') ? c.reviews : null,
+        estimatedRevenue: Math.round(cRevenue)
+      };
+    }
+  });
+
+  var revenueRange = paidCompetitorRevenues.length
+    ? { min: Math.round(Math.min.apply(null, paidCompetitorRevenues)), max: Math.round(Math.max.apply(null, paidCompetitorRevenues)) }
+    : null;
+
+  // Target: the best-performing paid comparable's own estimate, falling
+  // back to the top of the range if no single benchmark title resolved.
+  // Never a bigger number than the highest real data point we have.
+  var targetRevenue = benchmarkCompetitor ? benchmarkCompetitor.estimatedRevenue : (revenueRange ? revenueRange.max : null);
+
   return {
     bestSellerRank: { yours: ownBsr, nicheAverage: nicheAverageBsr, topCompetitor: topCompetitorBsr },
     sampleSize: competitorBsrs.length + (ownBsr ? 1 : 0),
@@ -394,7 +439,22 @@ function estimateNicheStats(input, competitors) {
     // itself already shows the author.
     competitorCount: (competitors || []).length,
     estimatedNicheRevenue: estimatedNicheRevenue,
-    revenueSampleSize: revenueContributions.length
+    revenueSampleSize: revenueContributions.length,
+    // Revenue Reality block fields:
+    yourEstimatedRevenue: (ownMonthlyRevenue != null) ? Math.round(ownMonthlyRevenue) : null,
+    paidCompetitorCount: paidCompetitorRevenues.length,
+    freeCompetitorCount: freeCompetitorCount,
+    revenueRange: revenueRange,
+    benchmarkCompetitor: benchmarkCompetitor,
+    targetRevenue: targetRevenue,
+    // Persisted here (4 August 2026) purely so dashboard.html's
+    // saveKeywordChange re-score path (keyword add/remove on the Keywords
+    // tab, see that function) has access to the correct store-wide rank
+    // for the Sales/mo estimate too, not just the initial onboarding
+    // score. onboarding.html has b.storeWideRank in memory at submit
+    // time, but nothing else persists it as its own column, this JSONB
+    // field is the one place it survives a page reload.
+    yourStoreWideRank: ownStoreWideRank
   };
 }
 
@@ -486,6 +546,73 @@ function buildAssessmentTags(input, pageRank) {
   tags.push(input.amazonAdsActive ? 'Ads Active' : 'No Ads Running');
 
   return tags;
+}
+
+// ---------- Revenue Reality callout (deterministic, not LLM) ----------
+// Matches the legacy hand-built dashboards' full-width "No Ads. No
+// Revenue. The Data Is Clear." callout (ReaderBull_Next_Chat_Handover_Prompt.md,
+// confirmed 4 August 2026: the one MVP panel still missing from this
+// rebuild). Kept deterministic like buildAssessmentTags above rather than
+// LLM-written: every figure here is a real estimate from nicheStats
+// (revenueRange, yourEstimatedRevenue, benchmarkCompetitor, targetRevenue),
+// so a template avoids any risk of the model inventing or rounding a
+// dollar figure that doesn't trace back to real data. Returns null when
+// there isn't enough nicheStats data to say anything honest, same
+// graceful-fallback convention as the rest of this file.
+function buildRevenueInsight(input, nicheStats) {
+  if (!nicheStats) return null;
+  var range = nicheStats.revenueRange;
+  var yours = nicheStats.yourEstimatedRevenue;
+  var target = nicheStats.targetRevenue;
+  if (range == null && yours == null && target == null) return null;
+
+  var fmt = function (n) {
+    if (typeof n !== 'number') return null;
+    return '$' + Math.round(n).toLocaleString();
+  };
+
+  var headline = input.amazonAdsActive
+    ? 'Ads Are Live. Here’s What The Data Shows.'
+    : 'No Ads. No Revenue. The Data Is Clear.';
+
+  var sentences = [];
+  if (range) {
+    sentences.push(
+      'Readerbull niche research shows ' + nicheStats.paidCompetitorCount +
+      ' comparable paid ' + (nicheStats.paidCompetitorCount === 1 ? 'listing earns' : 'listings earn') +
+      ' ' + fmt(range.min) + ' to ' + fmt(range.max) + ' per month each, estimated from rank and price.'
+    );
+  }
+  if (nicheStats.freeCompetitorCount) {
+    sentences.push('Free listings in the same niche earn close to $0.');
+  }
+  if (yours != null) {
+    sentences.push(
+      'Your book currently earns an estimated ' + fmt(yours) + '/month' +
+      (input.amazonAdsActive ? ' with ads running.' : ' with no ads running.')
+    );
+  }
+  if (target != null && (yours == null || target > yours)) {
+    var benchmark = nicheStats.benchmarkCompetitor;
+    sentences.push(
+      'The path to ' + fmt(target) + '+/month means closing the gap to' +
+      (benchmark && benchmark.title ? (' "' + benchmark.title + '"') : ' the top comparable title') +
+      (benchmark && typeof benchmark.reviews === 'number' ? (', currently at ' + benchmark.reviews + ' reviews.') : '.')
+    );
+  }
+  if (!sentences.length) return null;
+
+  return {
+    headline: headline,
+    body: sentences.join(' '),
+    currentPill: (yours != null) ? ('Currently: ' + fmt(yours) + '/mo') : null,
+    targetPill: (target != null)
+      ? ('Target: ' + fmt(target) + '/mo' +
+          (nicheStats.benchmarkCompetitor && typeof nicheStats.benchmarkCompetitor.reviews === 'number'
+            ? (', ' + nicheStats.benchmarkCompetitor.reviews + '-review benchmark')
+            : ''))
+      : null
+  };
 }
 
 // ---------- Keyword research (DataForSEO Amazon Related Keywords + Anthropic classification) ----------
