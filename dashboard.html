@@ -56,17 +56,17 @@
       <button class="shell-nav-item act" data-panel="barnes-noble"><i class="ti ti-building-store"></i> Barnes &amp; Noble</button>
       <button class="shell-nav-item act" data-panel="apple-books"><i class="ti ti-device-tablet"></i> Apple Books</button>
       <button class="shell-nav-item act" data-panel="audible-acx"><i class="ti ti-headphones"></i> Audible / ACX</button>
+
+      <hr class="shell-divider">
+      <div class="shell-section-label">Account</div>
+      <button class="shell-nav-item" id="sidebar-set-password"><i class="ti ti-key"></i> Set a password</button>
+      <button class="shell-nav-item" id="sidebar-logout"><i class="ti ti-logout"></i> Log out</button>
     </div>
   </div>
 
   <!-- MAIN -->
   <div class="shell-main">
-    <div class="shell-topbar">
-      <div class="shell-topbar-actions">
-        <a href="#" id="set-password-link"><i class="ti ti-key"></i> Set a password</a>
-        <a href="#" id="logout-link"><i class="ti ti-logout"></i> Log out</a>
-      </div>
-    </div>
+    <div class="shell-topbar"></div>
 
     <!-- OVERVIEW: populated by JS, either the embedded legacy dashboard or the auto score -->
     <div id="panel-overview" class="shell-panel-container"></div>
@@ -182,7 +182,7 @@
   var user = await readerbull.requireUser('index.html');
   if (!user) return;
 
-  document.getElementById('logout-link').addEventListener('click', function (e) {
+  document.getElementById('sidebar-logout').addEventListener('click', function (e) {
     e.preventDefault();
     readerbull.signOut();
   });
@@ -239,7 +239,7 @@
     });
   }
 
-  document.getElementById('set-password-link').addEventListener('click', function (e) {
+  document.getElementById('sidebar-set-password').addEventListener('click', function (e) {
     e.preventDefault();
     pwModalCard.innerHTML = pwModalDefaultHtml;
     wirePasswordForm();

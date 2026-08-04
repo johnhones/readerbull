@@ -248,7 +248,7 @@ img { max-width: 100%; display: block; }
 /* ---------- DASHBOARD SHELL (sidebar nav) ---------- */
 .shell { display: flex; min-height: 100vh; }
 .shell-sidebar { position: fixed; top: 0; left: 0; bottom: 0; width: 220px; flex-shrink: 0; background: var(--navy); display: flex; flex-direction: column; border-right: 1px solid rgba(255,255,255,.07); overflow-y: auto; z-index: 400; }
-.shell-logo { display: flex; flex-direction: column; align-items: center; gap: 8px; color: var(--orange); font-weight: 800; font-size: 14px; letter-spacing: .3px; text-decoration: none; padding: 24px 12px 20px; border-bottom: 1px solid rgba(255,255,255,.07); }
+.shell-logo { display: flex; flex-direction: column; align-items: center; gap: 8px; color: var(--orange); font-weight: 800; font-size: 14px; letter-spacing: .3px; text-decoration: none; padding: 24px 12px 20px; background: var(--navy); border-bottom: 1px solid rgba(255,255,255,.07); }
 .shell-logo img { width: 40px; height: 40px; object-fit: contain; }
 
 /* Sidebar book switcher, replaces the old "Your Books" card grid at the top
