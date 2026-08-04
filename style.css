@@ -254,8 +254,8 @@ img { max-width: 100%; display: block; }
 /* Sidebar book switcher, replaces the old "Your Books" card grid at the top
 of Overview (ReaderBull_Next_Chat_Handover_Prompt.md item 5). */
 .book-switcher { position: relative; padding: 14px 12px; border-bottom: 1px solid rgba(255,255,255,.07); }
-.book-switcher-trigger { display: flex; align-items: center; gap: 10px; width: 100%; background: var(--orange); border: 1px solid var(--orange); border-radius: 8px; padding: 7px 10px; color: #fff; cursor: pointer; font-family: inherit; text-align: left; box-shadow: 0 2px 8px rgba(0,0,0,.15); }
-.book-switcher-trigger:hover { background: var(--orange-d); border-color: var(--orange-d); }
+.book-switcher-trigger { display: flex; align-items: center; gap: 10px; width: 100%; background: var(--teal); border: 1px solid var(--teal); border-radius: 8px; padding: 7px 10px; color: #fff; cursor: pointer; font-family: inherit; text-align: left; box-shadow: 0 2px 8px rgba(0,0,0,.15); }
+.book-switcher-trigger:hover { background: var(--teal-d); border-color: var(--teal-d); }
 .book-switcher-trigger i { font-size: 13px; color: #fff; flex-shrink: 0; }
 .book-switcher-cover { width: 24px; height: 34px; border-radius: 3px; background: var(--light); flex-shrink: 0; overflow: hidden; display: flex; align-items: center; justify-content: center; font-size: 9px; font-weight: 700; color: var(--muted); }
 .book-switcher-cover img { width: 100%; height: 100%; object-fit: cover; }
