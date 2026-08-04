@@ -492,8 +492,10 @@
 
       detailWrap.style.display = 'block';
       detailWrap.innerHTML =
-        '<div class="sec-eyebrow" style="margin-bottom:6px;">Selected book</div>' +
-        '<h2 style="font-size:20px;color:var(--navy);margin-bottom:16px;">' + escapeHtml(b.book_title || '') + '</h2>' +
+        // "Selected book" eyebrow + large title removed (4 August 2026, per
+        // John): redundant with the book switcher dropdown in the sidebar
+        // and the title already shown inside the Book Summary card below,
+        // was just repeating the same title twice at the top of Overview.
         '<div class="split" style="align-items:stretch;">' +
           '<div class="score-demo" style="height:100%;">' +
             '<div class="score-top">' +
@@ -573,7 +575,7 @@
       var descHtml = '';
 
       var insightHtml = insight
-        ? '<p style="font-weight:700;color:var(--navy);margin-bottom:4px;">' + escapeHtml(insight) + '</p>'
+        ? '<p style="font-weight:400;color:var(--navy);margin-bottom:4px;">' + escapeHtml(insight) + '</p>'
         : '';
 
       var competitorCount = stats && stats.competitorCount > 0 ? stats.competitorCount : null;
@@ -913,7 +915,7 @@
     }
 
     var insightHtml = (narrative && narrative.bookInsight)
-      ? '<p style="font-weight:700;color:var(--navy);margin-bottom:12px;">' + escapeHtml(narrative.bookInsight) + '</p>'
+      ? '<p style="font-weight:400;color:var(--navy);margin-bottom:12px;">' + escapeHtml(narrative.bookInsight) + '</p>'
       : '';
 
     return (
