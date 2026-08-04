@@ -446,7 +446,15 @@ function estimateNicheStats(input, competitors) {
     freeCompetitorCount: freeCompetitorCount,
     revenueRange: revenueRange,
     benchmarkCompetitor: benchmarkCompetitor,
-    targetRevenue: targetRevenue
+    targetRevenue: targetRevenue,
+    // Persisted here (4 August 2026) purely so dashboard.html's
+    // saveKeywordChange re-score path (keyword add/remove on the Keywords
+    // tab, see that function) has access to the correct store-wide rank
+    // for the Sales/mo estimate too, not just the initial onboarding
+    // score. onboarding.html has b.storeWideRank in memory at submit
+    // time, but nothing else persists it as its own column, this JSONB
+    // field is the one place it survives a page reload.
+    yourStoreWideRank: ownStoreWideRank
   };
 }
 
