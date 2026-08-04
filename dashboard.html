@@ -66,7 +66,9 @@
 
   <!-- MAIN -->
   <div class="shell-main">
-    <div class="shell-topbar"></div>
+    <!-- shell-topbar removed (its only content, Set a password/Log out, moved
+         into the sidebar Account section), was left behind as an empty bar
+         creating dead whitespace at the top of the main column. -->
 
     <!-- OVERVIEW: populated by JS, either the embedded legacy dashboard or the auto score -->
     <div id="panel-overview" class="shell-panel-container"></div>
@@ -484,7 +486,7 @@
       // Discreet dot-plus-label pill, not a loud error-style badge, matching
       // the legacy Jordan Truehart dashboard's treatment (see .ads-pill in
       // style.css and ReaderBull_Next_Chat_Handover_Prompt.md item 6).
-      var adsPillHtml = '<span class="ads-pill ' + (amazonAds.active ? 'active' : 'inactive') + '" style="margin-left:10px;">' +
+      var adsPillHtml = '<span class="ads-pill ' + (amazonAds.active ? 'active' : 'inactive') + '">' +
         '<span class="dot"></span>Amazon Ads: ' + (amazonAds.active ? 'Active' : 'Not active') +
       '</span>';
 
@@ -498,11 +500,12 @@
               '<div>' +
                 '<div class="eyebrow2">Discoverability Score</div>' +
                 '<div class="num">' + b.score + '<span>&thinsp;/ 100</span></div>' +
-                '<div style="font-size:12px;font-weight:700;color:var(--teal-d);margin-top:2px;">' + badge + adsPillHtml + '</div>' +
+                '<div style="font-size:12px;font-weight:700;color:var(--teal-d);margin-top:2px;">' + badge + '</div>' +
               '</div>' +
               (b.cover_image_url ? '<div class="score-cover"><img src="' + b.cover_image_url + '" alt=""></div>' : '') +
             '</div>' +
             '<div class="bars">' + barsHtml + '</div>' +
+            '<div style="margin-top:16px;">' + adsPillHtml + '</div>' +
           '</div>' +
           bookSummaryHtml(b) +
         '</div>' +
