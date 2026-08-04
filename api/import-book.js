@@ -72,18 +72,6 @@ module.exports = async function handler(req, res) {
       return;
     }
 
-    // Temporary diagnostic (3 August 2026, same pattern as the description
-    // diagnostic above): checking whether SerpApi already surfaces A+
-    // content, format availability (hardback/paperback/Kindle) or Kindle
-    // Unlimited enrolment anywhere in the raw payload, ahead of building
-    // the Overview "Professional Assessment" block. Only fires when the
-    // caller explicitly passes { debug: true }, so it never affects a
-    // normal import. Remove once the real fields are confirmed and wired.
-    if (req.body && req.body.debug === true) {
-      res.status(200).json({ debug: true, raw: data });
-      return;
-    }
-
     var product = data.product_results || {};
     var details = data.product_details || {};
     var ranks = details.best_sellers_rank || [];
@@ -156,6 +144,28 @@ module.exports = async function handler(req, res) {
       || (Array.isArray(product.feature_bullets) ? product.feature_bullets.join(' ') : null)
       || null;
 
+    // Format availability (3 August 2026): confirmed live that SerpApi's
+    // top-level `prices` array lists every format Amazon shows a buy box
+    // for on this listing (Kindle, Paperback, Hardcover, Audiobook), each
+    // with its own title and price. Not the same as product_results,
+    // which only reflects whichever format the search matched. Feeds the
+    // Overview "Professional Assessment" tag pills (dashboard.html), no
+    // extra paid call, this was already sitting unused in the same
+    // response every import already makes.
+    var formats = Array.isArray(data.prices)
+      ? data.prices.map(function (p) { return p && p.title; }).filter(Boolean)
+      : [];
+
+    // A+ Content presence (3 August 2026): SerpApi has no explicit "A+
+    // content live" boolean, confirmed live by inspecting the raw
+    // response. The closest honest proxy is whether Amazon's
+    // product_description block (the enhanced-content module A+ listings
+    // use) came back non-empty, same signal already used for the
+    // description fallback above. Treated as a proxy, not a confirmed
+    // fact, dashboard.html should word this as "content" rather than
+    // certainty if it can't be confirmed another way.
+    var hasEnhancedContent = descriptionParts.length > 0;
+
     // Temporary diagnostic (3 August 2026, matches the same debug-then-fix
     // pattern used 28 July to confirm the Kindle description gap above):
     // a paperback (ASIN 1998449416) came back with no description despite
@@ -196,7 +206,9 @@ module.exports = async function handler(req, res) {
       bestsellerRank: bestRank ? bestRank.extracted_rank : null,
       bestsellerRankText: bestRank ? bestRank.text : null,
       amazonUrl: (data.search_metadata && data.search_metadata.amazon_product_url) || null,
-      boughtTogether: boughtTogether
+      boughtTogether: boughtTogether,
+      formats: formats,
+      hasEnhancedContent: hasEnhancedContent
     });
   } catch (err) {
     await sendErrorAlert('import-book', 'Amazon lookup threw an unexpected error: ' + (err && err.message ? err.message : String(err)));

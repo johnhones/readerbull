@@ -103,14 +103,37 @@ module.exports = async function handler(req, res) {
   var result = { competitors: [], pageRank: null, keywordResearch: null, narrative: null };
 
   var competitors = await findCompetitors(input);
+
+  // Competitor bestseller rank (3 August 2026): bounded to the top 2
+  // competitors only, one extra paid SerpApi call each, same
+  // cost-bounded philosophy already used for findPageRank below ("one
+  // extra call per book, not per item"). Powers the Overview "Best
+  // Seller Rank: yours vs niche average vs top competitor" comparison.
+  // Best-effort: a competitor without a resolvable BSR just doesn't
+  // contribute to the average rather than blocking the rest of the audit.
+  await attachCompetitorBsr(competitors);
   result.competitors = competitors;
 
   result.pageRank = await findPageRank(input);
 
   result.keywordResearch = await findKeywordResearch(input);
 
-  var narrative = await generateNarrative(input, competitors);
-  result.narrative = narrative;
+  var nicheStats = estimateNicheStats(input, competitors);
+  var assessmentTags = buildAssessmentTags(input, result.pageRank);
+
+  var narrative = await generateNarrative(input, competitors, result.pageRank, nicheStats);
+  // nicheStats and assessmentTags are pure calculations with no LLM
+  // involvement, always attach them even when the Anthropic call itself
+  // fails or is unavailable (missing key, rate limited, bad JSON), so a
+  // narrative-generation hiccup doesn't also take down the Book Summary
+  // stat cards and Best Seller Rank comparison on the Overview tab,
+  // which have nothing to do with the LLM succeeding. dashboard.html's
+  // nicheAssessmentHtml already renders each piece independently and
+  // skips whatever's missing, so a narrative-less result with real
+  // nicheStats still shows something useful.
+  result.narrative = narrative || {};
+  result.narrative.nicheStats = nicheStats;
+  result.narrative.assessmentTags = assessmentTags;
 
   // Always 200: this is a best-effort enrichment step, a partial or empty
   // result still lets the submit flow continue and store what it got.
@@ -249,6 +272,153 @@ async function trySerpApiCompetitorCandidates(candidates, apiKey, ownAsin) {
     }
   }
   return [];
+}
+
+// ---------- Competitor bestseller rank (bounded extra calls) ----------
+// SerpApi's competitor discovery (boughtTogether and the Amazon Search
+// fallback) confirmed live (3 August 2026) to carry rating/reviews/price
+// but never a bestseller rank field, on either path. The only way to get
+// a competitor's real BSR is a per-ASIN product lookup, the same call
+// import-book.js already makes for the author's own book. Capped at the
+// first 2 competitors specifically to keep this bounded (mirrors the
+// "one extra call per book" reasoning already used for findPageRank
+// below), rather than one extra paid call per competitor.
+async function attachCompetitorBsr(competitors) {
+  var apiKey = process.env.SERPAPI_KEY;
+  if (!apiKey || !Array.isArray(competitors) || !competitors.length) return;
+
+  var targets = competitors.filter(function (c) { return c && c.asin; }).slice(0, 2);
+
+  for (var i = 0; i < targets.length; i++) {
+    var c = targets[i];
+    try {
+      var url = 'https://serpapi.com/search.json?engine=amazon_product&asin=' +
+        encodeURIComponent(c.asin) + '&amazon_domain=amazon.com&api_key=' + encodeURIComponent(apiKey);
+      var response = await fetch(url);
+      var data = await response.json();
+      if (!response.ok) continue;
+
+      var ranks = (data.product_details && data.product_details.best_sellers_rank) || [];
+      var bestRank = null;
+      ranks.forEach(function (r) {
+        if (typeof r.extracted_rank === 'number' && (!bestRank || r.extracted_rank < bestRank)) {
+          bestRank = r.extracted_rank;
+        }
+      });
+      if (bestRank) c.bestsellerRank = bestRank;
+    } catch (err) {
+      // best-effort, this competitor just won't have a BSR
+      continue;
+    }
+  }
+}
+
+// ---------- Niche revenue estimate (no extra calls, pure calculation) ----------
+// Converts a bestseller rank into an approximate monthly sales figure
+// using a widely-referenced order-of-magnitude Kindle Store BSR curve
+// (the same type of approximation self-publishing tools like Publisher
+// Rocket use). This is deliberately a rough estimate, never a confirmed
+// sales figure, dashboard.html must always present it with "~" and
+// "estimated" wording, never as a fact. Only ever computed from
+// bestsellerRank + price data already sitting in the payload, never
+// invented when those are missing.
+function estimateMonthlySalesFromBSR(bsr) {
+  if (typeof bsr !== 'number' || bsr <= 0) return null;
+  var dailySales;
+  if (bsr <= 100) dailySales = 200;
+  else if (bsr <= 1000) dailySales = 200 * Math.pow(100 / bsr, 0.6);
+  else if (bsr <= 10000) dailySales = 20 * Math.pow(1000 / bsr, 0.6);
+  else if (bsr <= 100000) dailySales = 3 * Math.pow(10000 / bsr, 0.6);
+  else if (bsr <= 500000) dailySales = 0.4 * Math.pow(100000 / bsr, 0.6);
+  else dailySales = 0.05;
+  return Math.max(dailySales * 30, 0);
+}
+
+function parsePrice(price) {
+  if (typeof price === 'number') return price;
+  var parsed = parseFloat(String(price || '').replace(/[^0-9.]/g, ''));
+  return isNaN(parsed) ? null : parsed;
+}
+
+// Books counted as "selling well" once their estimated revenue clears
+// this monthly floor, a deliberately conservative bar so the count
+// doesn't get inflated by long-tail listings with almost no real sales.
+var SELLING_WELL_MONTHLY_REVENUE_FLOOR = 50;
+
+function estimateNicheStats(input, competitors) {
+  var ownBsr = (typeof input.bestsellerRank === 'number') ? input.bestsellerRank : null;
+  var ownPrice = parsePrice(input.price);
+
+  var entries = [];
+  if (ownBsr) {
+    var ownSales = estimateMonthlySalesFromBSR(ownBsr);
+    entries.push({ revenue: (ownSales && ownPrice) ? ownSales * ownPrice : null });
+  }
+
+  var competitorBsrs = [];
+  (competitors || []).forEach(function (c) {
+    if (typeof c.bestsellerRank !== 'number') return;
+    competitorBsrs.push(c.bestsellerRank);
+    var price = parsePrice(c.price);
+    var sales = estimateMonthlySalesFromBSR(c.bestsellerRank);
+    entries.push({ revenue: (sales && price) ? sales * price : null });
+  });
+
+  var nicheAverageBsr = competitorBsrs.length
+    ? Math.round(competitorBsrs.reduce(function (a, b) { return a + b; }, 0) / competitorBsrs.length)
+    : null;
+  var topCompetitorBsr = competitorBsrs.length ? Math.min.apply(null, competitorBsrs) : null;
+
+  var revenues = entries.map(function (e) { return e.revenue; }).filter(function (r) { return typeof r === 'number'; });
+  var estimatedNicheRevenue = revenues.length
+    ? Math.round(revenues.reduce(function (a, b) { return a + b; }, 0))
+    : null;
+  var booksSellingWell = revenues.filter(function (r) { return r >= SELLING_WELL_MONTHLY_REVENUE_FLOOR; }).length;
+
+  return {
+    bestSellerRank: { yours: ownBsr, nicheAverage: nicheAverageBsr, topCompetitor: topCompetitorBsr },
+    estimatedNicheRevenue: estimatedNicheRevenue,
+    booksSellingWell: booksSellingWell,
+    sampleSize: entries.length
+  };
+}
+
+// ---------- Professional Assessment tag pills (deterministic, not LLM) ----------
+// Built directly from data already in the payload, never from the
+// narrative model, so every tag traces back to a real number rather than
+// something Claude inferred. "Enhanced Content" rather than "A+ Content"
+// deliberately: SerpApi has no explicit A+ flag, the true signal is
+// whether Amazon's enhanced product_description block came back
+// non-empty (see the hasEnhancedContent comment in import-book.js),
+// which is a reasonable proxy but not a confirmed fact.
+function buildAssessmentTags(input, pageRank) {
+  var tags = [];
+
+  if (pageRank && pageRank.checked && typeof pageRank.position === 'number') {
+    var page = Math.max(1, Math.ceil(pageRank.position / 16));
+    tags.push('Page ' + page + ' Organic');
+  }
+
+  if (typeof input.rating === 'number') tags.push(input.rating.toFixed(1) + ' Star Rating');
+
+  if (input.hasEnhancedContent) tags.push('Enhanced Content Live');
+
+  if (typeof input.categoryCount === 'number' && input.categoryCount > 0) {
+    tags.push(input.categoryCount + (input.categoryCount === 1 ? ' Category' : ' Categories'));
+  }
+
+  if (Array.isArray(input.formats) && input.formats.length) {
+    var nonKindle = input.formats.filter(function (f) { return !/kindle/i.test(f); });
+    if (nonKindle.length) tags.push(nonKindle.join(' & ') + ' Available');
+  }
+
+  if (typeof input.reviewCount === 'number') {
+    tags.push(input.reviewCount + (input.reviewCount === 1 ? ' Written Review' : ' Written Reviews'));
+  }
+
+  tags.push(input.amazonAdsActive ? 'Ads Active' : 'No Ads Running');
+
+  return tags;
 }
 
 // ---------- Keyword research (DataForSEO Amazon Related Keywords + Anthropic classification) ----------
@@ -531,7 +701,7 @@ async function classifyKeywords(input, seed, items) {
 }
 
 // ---------- Narrative generation (Anthropic Messages API) ----------
-async function generateNarrative(input, competitors) {
+async function generateNarrative(input, competitors, pageRank, nicheStats) {
   var apiKey = process.env.ANTHROPIC_API_KEY;
   if (!apiKey) { await sendErrorAlert('enrich-audit', 'ANTHROPIC_API_KEY is missing, narrative generation cannot run.'); return null; }
 
@@ -557,10 +727,19 @@ async function generateNarrative(input, competitors) {
       // gate the paid-ads and portfolio-expansion recommendations below on
       // real data rather than guessing.
       amazonAdsActive: !!input.amazonAdsActive,
-      authorBookCount: (typeof input.authorBookCount === 'number') ? input.authorBookCount : null
+      authorBookCount: (typeof input.authorBookCount === 'number') ? input.authorBookCount : null,
+      // Added 3 August 2026 for the Overview "Professional Assessment"
+      // block: organic search position (from findPageRank above),
+      // format availability and the enhanced-content proxy (both from
+      // import-book.js), and the deterministic niche revenue estimate
+      // (estimateNicheStats above, never computed by the model itself).
+      organicSearchPosition: (pageRank && pageRank.checked) ? (pageRank.position || null) : null,
+      formats: Array.isArray(input.formats) ? input.formats : null,
+      hasEnhancedContent: !!input.hasEnhancedContent
     },
     scoreBreakdown: breakdown,
-    competitors: competitors
+    competitors: competitors,
+    nicheStats: nicheStats || null
   };
 
   // Content-quality rewrite, 29 July 2026 (ReaderBull_Next_Chat_Handover_Prompt.md
@@ -614,11 +793,20 @@ async function generateNarrative(input, competitors) {
     'step suggesting the author think about a second, related title, since a second book compounds ' +
     'discoverability (cross-sell, a new keyword footprint, a new category placement). Do not suggest ' +
     'this if authorBookCount is missing, null, or greater than 1. ' +
+    'Professional Assessment: write a short, direct verdict (2 short paragraphs) for the Overview tab, in ' +
+    'the voice of an experienced KDP consultant giving a straight read of where this book stands right now. ' +
+    'Ground it in nicheStats (estimated niche revenue and books selling well, always describe these as ' +
+    'estimates, never as confirmed figures) and book.organicSearchPosition, book.formats, ' +
+    'book.hasEnhancedContent, book.amazonAdsActive when given. If nicheStats or its numbers are null, write ' +
+    'around the gap honestly instead of guessing a figure. Name the single biggest lever available (usually ' +
+    'reviews, ads, or both) and roughly what closes the gap, without inventing a specific target number ' +
+    'unless one is present in the data given. ' +
     'Respond with ONLY a JSON object, no markdown fences, no commentary, matching exactly this shape: ' +
     '{"bookInsight": "one bolded-worthy sentence summarising the single biggest takeaway", ' +
     '"marketAnalysis": "2-3 short paragraphs on where this book stands versus the competitors given", ' +
     '"strategySteps": [{"title": "short step title", "body": "1-2 sentences, specific to this book\'s data"}], ' +
-    '"quickWins": [{"title": "short action title", "body": "1-2 sentences on why this is the next best move"}]}. ' +
+    '"quickWins": [{"title": "short action title", "body": "1-2 sentences on why this is the next best move"}], ' +
+    '"professionalAssessment": "2 short paragraphs, as described above"}. ' +
     'Provide 3-5 strategySteps ordered by likely impact, and 3 quickWins ordered by ease and impact.';
 
   try {
@@ -631,7 +819,12 @@ async function generateNarrative(input, competitors) {
       },
       body: JSON.stringify({
         model: 'claude-haiku-4-5-20251001',
-        max_tokens: 1200,
+        // Raised from 1200 to 1600 on 3 August 2026: the new
+        // professionalAssessment field adds roughly two more paragraphs
+        // of output on top of the existing four fields, same
+        // max-tokens-cutoff risk already solved for classifyKeywords
+        // above applies here too.
+        max_tokens: 1600,
         system: systemPrompt,
         messages: [
           { role: 'user', content: 'Here is the structured audit data:\n\n' + JSON.stringify(payload, null, 2) }
