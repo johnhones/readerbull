@@ -176,6 +176,33 @@
   </div>
 </div>
 
+<!-- REFRESH AUDIT MODAL -->
+<!-- Added per ReaderBull_Next_Chat_Handover_Prompt.md open item 1: existing
+     books need a way to re-run the full audit pipeline (fresh Amazon data
+     plus a fresh AI narrative) without re-onboarding, so the newer Overview
+     panels (Best Seller Rank, Professional Assessment, Revenue Reality)
+     stop being stuck on whatever the book had at its original onboarding
+     time. Same confirm-then-loading modal pattern as the submit flow in
+     onboarding.html, reused here rather than inventing a new one. -->
+<div class="modal-overlay" id="refresh-audit-modal">
+  <div class="modal-card">
+    <div id="refresh-audit-confirm-view">
+      <h3>Refresh audit?</h3>
+      <p id="refresh-audit-text">This re-checks the live Amazon listing and rewrites the Discoverability Score, Market Analysis, Marketing Strategy, Keywords and Quick Wins for this book. Your own description and keywords are kept as you entered them.</p>
+      <div class="detail-error" id="refresh-audit-error" style="display:none;"></div>
+      <div class="modal-actions">
+        <button class="btn btn-outline" id="refresh-audit-cancel">Cancel</button>
+        <button class="btn btn-primary" id="refresh-audit-confirm">Refresh audit</button>
+      </div>
+    </div>
+    <div id="refresh-audit-loading-view" class="submit-loading" style="display:none;">
+      <div class="submit-loading-icon"><img src="readerbull-icon.png" alt=""></div>
+      <p class="submit-loading-message" id="refresh-audit-loading-message">Pulling your live Amazon listing&hellip;</p>
+      <p class="submit-loading-timer" id="refresh-audit-loading-timer">0s</p>
+    </div>
+  </div>
+</div>
+
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.js"></script>
 <script src="supabase-client.js"></script>
 <script src="scoring.js"></script>
@@ -183,6 +210,13 @@
 (async function () {
   var user = await readerbull.requireUser('index.html');
   if (!user) return;
+
+  // Needed for the Refresh audit action below (Authorization header on
+  // /api/import-book and /api/enrich-audit, same pattern onboarding.html
+  // uses at submit time). Fetched once up front rather than per-click,
+  // Supabase's client keeps the session valid across the page's lifetime.
+  var sessionResult = await readerbull.client.auth.getSession();
+  var accessToken = (sessionResult.data && sessionResult.data.session && sessionResult.data.session.access_token) || '';
 
   document.getElementById('sidebar-logout').addEventListener('click', function (e) {
     e.preventDefault();
@@ -508,6 +542,7 @@
             '</div>' +
             '<div class="bars">' + barsHtml + '</div>' +
             '<div style="margin-top:16px;">' + adsPillHtml + '</div>' +
+            '<div style="margin-top:10px;">' + refreshAuditControlHtml(b) + '</div>' +
             bsrCardHtml(b) +
           '</div>' +
           '<div style="display:flex;flex-direction:column;gap:16px;">' +
@@ -516,7 +551,62 @@
           '</div>' +
         '</div>' +
         revenueInsightHtml(b);
+      wireRefreshAuditButton(b);
       detailWrap.scrollIntoView({ behavior: 'smooth', block: 'start' });
+    }
+
+    // ---------- Refresh audit control (added 4 August 2026) ----------
+    // Small text-button plus a "Refreshed X ago" caption, sat directly
+    // under the Amazon Ads pill inside the navy score card. One-hour
+    // cooldown after each run (client-side check against
+    // b.last_audited_at) so a repeat click can't trigger back-to-back
+    // paid SerpApi/DataForSEO/Anthropic calls, on top of the per-user
+    // hourly rate limits already enforced server-side on both
+    // /api/import-book and /api/enrich-audit (see api/_auth.js).
+    var REFRESH_COOLDOWN_MS = 60 * 60 * 1000;
+
+    function formatRelativeTime(iso) {
+      if (!iso) return null;
+      var then = new Date(iso).getTime();
+      if (isNaN(then)) return null;
+      var diffMs = Date.now() - then;
+      if (diffMs < 0) diffMs = 0;
+      var mins = Math.floor(diffMs / 60000);
+      if (mins < 1) return 'just now';
+      if (mins < 60) return mins + (mins === 1 ? ' minute ago' : ' minutes ago');
+      var hours = Math.floor(mins / 60);
+      if (hours < 24) return hours + (hours === 1 ? ' hour ago' : ' hours ago');
+      var days = Math.floor(hours / 24);
+      return days + (days === 1 ? ' day ago' : ' days ago');
+    }
+
+    function refreshAuditControlHtml(b) {
+      var lastAudited = b.last_audited_at || null;
+      var onCooldown = lastAudited && (Date.now() - new Date(lastAudited).getTime()) < REFRESH_COOLDOWN_MS;
+      var relTime = formatRelativeTime(lastAudited);
+
+      return (
+        '<div style="display:flex;align-items:center;gap:10px;flex-wrap:wrap;">' +
+          '<button type="button" id="refresh-audit-trigger" data-book-id="' + escapeHtml(String(b.id)) + '"' +
+            (onCooldown ? ' disabled' : '') +
+            ' style="background:transparent;border:1px solid rgba(255,255,255,.3);color:#fff;font-size:12px;font-weight:700;padding:6px 12px;border-radius:999px;cursor:' + (onCooldown ? 'default' : 'pointer') + ';opacity:' + (onCooldown ? '.5' : '1') + ';display:inline-flex;align-items:center;gap:6px;">' +
+            '<i class="ti ti-refresh"></i> Refresh audit' +
+          '</button>' +
+          (relTime ? '<span style="font-size:11px;color:rgba(255,255,255,.5);">Refreshed ' + escapeHtml(relTime) + '</span>' : '') +
+        '</div>'
+      );
+    }
+
+    // Re-attached every time showScoreDetail rebuilds detailWrap's HTML
+    // (its button is destroyed and recreated on every render), same pattern
+    // wireKeywordsPanel already uses for the Keywords tab below.
+    function wireRefreshAuditButton(b) {
+      var btn = document.getElementById('refresh-audit-trigger');
+      if (!btn) return;
+      btn.addEventListener('click', function () {
+        if (btn.disabled) return;
+        openRefreshAuditModal(b);
+      });
     }
 
     // ---------- Book Summary (added 4 August 2026) ----------
@@ -543,13 +633,19 @@
       return n >= 1000 ? ('~$' + Math.round(n / 1000) + 'k/mo') : ('~$' + Math.round(n) + '/mo');
     }
 
+    // Uses the .rb-stat-cell/.rb-stat-v/.rb-stat-l/.rb-badge classes
+    // (style.css, added 4 August 2026, Phase 1 of ReaderBull_Dashboard_
+    // Visual_Rebuild_Plan.md) rather than the one-off inline styles this
+    // shipped with earlier the same day, closes out the tech debt flagged
+    // in ReaderBull_Dashboard_Component_Catalogue.md section B. Same
+    // visual output, just a reusable class instead of an inline style.
     function statCardHtml(value, label, badge) {
       if (value == null || value === '') return '';
       return (
-        '<div style="background:var(--light);border-radius:10px;padding:14px;text-align:center;">' +
-          '<div style="font-size:20px;font-weight:800;color:var(--navy);">' + escapeHtml(String(value)) + '</div>' +
-          '<div style="font-size:11px;color:var(--mid);margin-top:4px;">' + escapeHtml(label) + '</div>' +
-          (badge ? '<div style="margin-top:8px;"><span style="background:var(--teal-l);color:var(--teal-d);font-size:10px;font-weight:700;padding:3px 8px;border-radius:999px;">&check; ' + escapeHtml(badge) + '</span></div>' : '') +
+        '<div class="rb-stat-cell">' +
+          '<div class="rb-stat-v">' + escapeHtml(String(value)) + '</div>' +
+          '<div class="rb-stat-l">' + escapeHtml(label) + '</div>' +
+          (badge ? '<div style="margin-top:8px;"><span class="rb-badge rb-b-teal">&check; ' + escapeHtml(badge) + '</span></div>' : '') +
         '</div>'
       );
     }
@@ -588,7 +684,7 @@
           statCardHtml(fmtNicheRevenue(revenue), 'KDP Niche Revenue', revenue != null ? 'Real Demand' : null) +
           statCardHtml(contentType, 'Content Type', contentType === 'Evergreen' ? 'Stays Relevant' : (contentType === 'Trending' ? 'Act Fast' : (contentType === 'Seasonal' ? 'Plan The Window' : null)));
         cardsHtml =
-          '<div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(130px,1fr));gap:12px;margin-top:12px;">' + cards + '</div>' +
+          '<div class="rb-stat-strip">' + cards + '</div>' +
           (revenue != null ? '<div style="font-size:11px;color:var(--muted);margin-top:8px;">Niche revenue is estimated from Amazon rank and price data, not a reported figure.</div>' : '');
       }
 
@@ -685,10 +781,15 @@
       var assessment = narrative && narrative.professionalAssessment;
       if (!assessment) return '';
 
+      // .rb-badge/.rb-b-navy (style.css) instead of the inline pill style
+      // this shipped with earlier the same day, same tech-debt cleanup as
+      // statCardHtml above. Slightly larger than the base .rb-badge size
+      // (12px vs 10px) to match what was already live, kept as an inline
+      // font-size override rather than a new modifier class for one field.
       var tagsHtml = (Array.isArray(tags) && tags.length)
         ? '<div style="display:flex;flex-wrap:wrap;gap:8px;margin-top:16px;">' +
             tags.map(function (t) {
-              return '<span style="background:var(--light);color:var(--navy);font-size:12px;font-weight:600;padding:5px 10px;border-radius:999px;">' + escapeHtml(t) + '</span>';
+              return '<span class="rb-badge rb-b-navy" style="font-size:12px;padding:5px 10px;">' + escapeHtml(t) + '</span>';
             }).join('') +
           '</div>'
         : '';
@@ -803,6 +904,232 @@
     else renderOverview();
   });
 
+  // ---------- REFRESH AUDIT ----------
+  // Re-runs the same pipeline onboarding.html uses at submit time
+  // (api/import-book -> api/enrich-audit -> computeDiscoverabilityScore),
+  // for a book that already exists, so the Overview panels that only ever
+  // got populated once, at onboarding, stop being permanently stuck on
+  // whatever the book had back then (ReaderBull_Next_Chat_Handover_Prompt.md
+  // open item 1). Plan agreed with John, 4 August 2026:
+  //   - Author-entered description and keywords are kept as-is, never
+  //     overwritten by whatever Amazon returns on re-import (READABULL_
+  //     RULES.md: the author's own confirmed data always takes precedence
+  //     over scraped data).
+  //   - Amazon Ads active status is carried over silently from whatever was
+  //     last recorded (score_breakdown.amazonAds.active), not re-asked, so
+  //     this stays a genuine one-click action rather than a short form.
+  //   - last_audited_at is stamped on success (see last_audited_at_
+  //     migration.sql), driving both the "Refreshed X ago" caption and the
+  //     one-hour client-side cooldown on the button itself.
+  var refreshModal = document.getElementById('refresh-audit-modal');
+  var refreshConfirmView = document.getElementById('refresh-audit-confirm-view');
+  var refreshLoadingView = document.getElementById('refresh-audit-loading-view');
+  var refreshText = document.getElementById('refresh-audit-text');
+  var refreshError = document.getElementById('refresh-audit-error');
+  var refreshConfirmBtn = document.getElementById('refresh-audit-confirm');
+  var refreshCancelBtn = document.getElementById('refresh-audit-cancel');
+  var refreshLoadingMessageEl = document.getElementById('refresh-audit-loading-message');
+  var refreshLoadingTimerEl = document.getElementById('refresh-audit-loading-timer');
+  var pendingRefreshBook = null;
+
+  function openRefreshAuditModal(b) {
+    pendingRefreshBook = b;
+    refreshError.style.display = 'none';
+    refreshConfirmBtn.disabled = false;
+    refreshConfirmBtn.textContent = 'Refresh audit';
+    refreshText.textContent = 'This re-checks the live Amazon listing for "' + (b.book_title || 'this book') + '" and rewrites its Discoverability Score, Market Analysis, Marketing Strategy, Keywords and Quick Wins. Your own description and keywords are kept as you entered them.';
+    refreshConfirmView.style.display = 'block';
+    refreshLoadingView.style.display = 'none';
+    refreshModal.classList.add('active');
+  }
+
+  refreshCancelBtn.addEventListener('click', function () {
+    refreshModal.classList.remove('active');
+    pendingRefreshBook = null;
+  });
+
+  refreshConfirmBtn.addEventListener('click', async function () {
+    if (!pendingRefreshBook) return;
+    var b = pendingRefreshBook;
+
+    refreshError.style.display = 'none';
+    refreshConfirmView.style.display = 'none';
+    refreshLoadingView.style.display = 'block';
+
+    var loadingMessages = ['Pulling your live Amazon listing…', 'Checking your competitors…', 'Researching keywords…', 'Writing your strategy…', 'Almost there…'];
+    var loadingMsgIndex = 0;
+    refreshLoadingMessageEl.textContent = loadingMessages[0];
+    refreshLoadingTimerEl.textContent = '0s';
+    var loadingStart = Date.now();
+    var loadingMessageInterval = setInterval(function () {
+      loadingMsgIndex = (loadingMsgIndex + 1) % loadingMessages.length;
+      refreshLoadingMessageEl.textContent = loadingMessages[loadingMsgIndex];
+    }, 4000);
+    var loadingTimerInterval = setInterval(function () {
+      refreshLoadingTimerEl.textContent = Math.floor((Date.now() - loadingStart) / 1000) + 's';
+    }, 1000);
+
+    function stopLoadingView() {
+      clearInterval(loadingMessageInterval);
+      clearInterval(loadingTimerInterval);
+    }
+
+    function failWithMessage(msg) {
+      stopLoadingView();
+      refreshConfirmView.style.display = 'block';
+      refreshLoadingView.style.display = 'none';
+      refreshError.textContent = msg || 'Something went wrong, please try again.';
+      refreshError.style.display = 'block';
+    }
+
+    if (!b.asin) {
+      failWithMessage('This book has no ASIN on record, it can\'t be re-imported. Delete it and add it again.');
+      return;
+    }
+    if (!accessToken) {
+      failWithMessage('Your session could not be found, please refresh the page and sign in again.');
+      return;
+    }
+
+    // Step 1: fresh Amazon listing data, same call import-book.js already
+    // makes at add-book time. This is the only way to get real (not
+    // invented) values for boughtTogether/formats/hasEnhancedContent and an
+    // up-to-date storeWideRank, none of which are persisted on the books
+    // row today, see the comment on api/enrich-audit.js.
+    var importData;
+    try {
+      var importResp = await fetch('/api/import-book', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', 'Authorization': 'Bearer ' + accessToken },
+        body: JSON.stringify({ input: b.asin })
+      });
+      importData = await importResp.json();
+      if (!importResp.ok) {
+        failWithMessage(importData.error || 'Could not pull fresh Amazon data for this book.');
+        return;
+      }
+    } catch (err) {
+      failWithMessage('Could not reach Amazon data provider, please try again.');
+      return;
+    }
+
+    // How many books this author has in total, so the narrative prompt can
+    // gate the single-book portfolio-expansion suggestion, same best-effort
+    // query onboarding.html runs at submit time.
+    var authorBookCount = null;
+    try {
+      var countResult = await readerbull.client
+        .from('books')
+        .select('id', { count: 'exact', head: true })
+        .eq('user_id', user.id);
+      authorBookCount = (typeof countResult.count === 'number') ? countResult.count : null;
+    } catch (err) {
+      // best-effort only
+    }
+
+    var amazonAdsActive = !!(b.score_breakdown && b.score_breakdown.amazonAds && b.score_breakdown.amazonAds.active);
+
+    // Step 2: competitors, page rank, keyword research and the AI
+    // narrative, same endpoint and same best-effort-swallow pattern
+    // onboarding.html uses, a failure here shouldn't lose the fresh
+    // Amazon data already pulled in step 1.
+    var competitorsJson = null;
+    var pageRankJson = null;
+    var narrativeJson = null;
+    try {
+      var enrichResp = await fetch('/api/enrich-audit', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', 'Authorization': 'Bearer ' + accessToken },
+        body: JSON.stringify({
+          title: importData.title || b.book_title,
+          category: importData.category || b.amazon_category,
+          keywords: b.keywords,
+          description: b.description,
+          asin: b.asin,
+          price: importData.price,
+          rating: importData.rating,
+          reviewCount: importData.reviewCount,
+          bestsellerRank: importData.bestsellerRank,
+          storeWideRank: importData.storeWideRank,
+          boughtTogether: importData.boughtTogether || [],
+          amazonAdsActive: amazonAdsActive,
+          authorBookCount: authorBookCount,
+          formats: importData.formats || [],
+          hasEnhancedContent: !!importData.hasEnhancedContent
+        })
+      });
+      if (enrichResp.ok) {
+        var enrichData = await enrichResp.json();
+        competitorsJson = enrichData.competitors || null;
+        pageRankJson = enrichData.pageRank || null;
+        narrativeJson = enrichData.narrative || null;
+        if (enrichData.keywordResearch) {
+          narrativeJson = narrativeJson || {};
+          narrativeJson.keywordResearch = enrichData.keywordResearch;
+        }
+      }
+    } catch (err) {
+      // swallow, this step is best-effort, same as onboarding.html
+    }
+
+    var scoreResult = computeDiscoverabilityScore({
+      title: importData.title || b.book_title,
+      reviewCount: importData.reviewCount,
+      rating: importData.rating,
+      keywords: b.keywords,
+      description: b.description,
+      category: importData.category || b.amazon_category,
+      categoryCount: importData.categoryCount,
+      bestsellerRank: importData.bestsellerRank,
+      storeWideRank: importData.storeWideRank,
+      price: importData.price,
+      coverImage: importData.coverImage || b.cover_image_url,
+      pageRank: pageRankJson,
+      competitors: competitorsJson,
+      amazonAdsActive: amazonAdsActive
+    });
+
+    var nowIso = new Date().toISOString();
+    var updateFields = {
+      book_title: importData.title || b.book_title,
+      cover_image_url: importData.coverImage || b.cover_image_url,
+      amazon_category: importData.category || b.amazon_category,
+      live_price: importData.price,
+      live_rating: importData.rating,
+      live_review_count: importData.reviewCount,
+      bestseller_rank: importData.bestsellerRankText || b.bestseller_rank,
+      bestseller_rank_number: importData.bestsellerRank,
+      score: scoreResult.score,
+      score_breakdown: scoreResult.breakdown,
+      competitors_json: competitorsJson,
+      audit_narrative_json: narrativeJson,
+      last_audited_at: nowIso
+    };
+
+    var { error: updateError } = await readerbull.client
+      .from('books')
+      .update(updateFields)
+      .eq('id', b.id);
+
+    if (updateError) {
+      failWithMessage(updateError.message || 'Could not save the refreshed audit, please try again.');
+      return;
+    }
+
+    stopLoadingView();
+    refreshModal.classList.remove('active');
+    pendingRefreshBook = null;
+
+    // Mutate the in-memory row and re-render in place, same convention
+    // saveKeywordChange already uses below, no page reload.
+    Object.keys(updateFields).forEach(function (k) { b[k] = updateFields[k]; });
+    if (currentAuditBook && currentAuditBook.id === b.id) {
+      if (currentShowScoreDetail) currentShowScoreDetail(b);
+      renderAuditPanels(b);
+    }
+    refreshSwitcherTrigger();
+  });
+
   // ---------- AUDIT CONTENT (Market Analysis / Marketing Strategy / Keywords / Quick Wins) ----------
   // First-pass, automated read built entirely from what we already pull live
   // from Amazon plus the Discoverability Score breakdown, no invented
@@ -864,7 +1191,7 @@
           '<td style="padding:8px 6px;white-space:nowrap;">' + (c.rating ? (escapeHtml(String(c.rating)) + ' / 5') : 'Not available') + '</td>' +
           '<td style="padding:8px 6px;white-space:nowrap;">' + (c.reviews != null ? escapeHtml(String(c.reviews)) : 'Not available') + '</td>' +
           '<td style="padding:8px 6px;white-space:nowrap;">' + (c.price ? escapeHtml(String(c.price)) : 'Not available') + '</td>' +
-          '<td style="padding:8px 6px;white-space:nowrap;">' + (c.sponsored ? 'Running ads' : 'No ads seen') + '</td>' +
+          '<td style="padding:8px 6px;white-space:nowrap;"><span class="rb-badge ' + (c.sponsored ? 'rb-b-orange' : 'rb-b-muted') + '">' + (c.sponsored ? 'Running ads' : 'No ads seen') + '</span></td>' +
         '</tr>'
       );
     }).join('');
@@ -914,8 +1241,12 @@
       standing = standing + ' ' + reviewNote;
     }
 
+    // .rb-callout (style.css, added 4 August 2026): the single biggest
+    // takeaway sentence gets a left-border highlight box instead of a
+    // plain paragraph, matching how the legacy reference dashboards set
+    // this line apart from the surrounding narrative text.
     var insightHtml = (narrative && narrative.bookInsight)
-      ? '<p style="font-weight:400;color:var(--navy);margin-bottom:12px;">' + escapeHtml(narrative.bookInsight) + '</p>'
+      ? '<div class="rb-callout">' + escapeHtml(narrative.bookInsight) + '</div>'
       : '';
 
     return (
@@ -981,13 +1312,17 @@
       ? narrative.strategySteps
       : fallbackStrategySteps(b);
 
+    // .rb-step/.rb-step-teal/.rb-step-num (style.css, added 4 August 2026)
+    // rather than the inline numbered-circle markup this used before,
+    // per ReaderBull_Dashboard_Component_Catalogue.md's recommended build
+    // order (Phase: restyle Marketing Strategy/Quick Wins to .rb-step
+    // cards). Pure restyle, strategySteps/fallbackStrategySteps content
+    // is unchanged, same teal circle colour already used here.
     var stepsHtml = steps.map(function (s, i) {
       return (
-        '<div style="padding:16px 0;border-bottom:1px solid var(--border);">' +
-          '<div style="display:flex;gap:12px;align-items:flex-start;">' +
-            '<div style="width:24px;height:24px;border-radius:50%;background:var(--teal-l);color:var(--teal-d);font-weight:800;font-size:12px;display:flex;align-items:center;justify-content:center;flex-shrink:0;">' + (i + 1) + '</div>' +
-            '<div><h3 style="font-size:15px;color:var(--navy);margin-bottom:4px;">' + escapeHtml(s.title) + '</h3><p style="font-size:14px;color:var(--mid);line-height:1.6;">' + escapeHtml(s.body) + '</p></div>' +
-          '</div>' +
+        '<div class="rb-step rb-step-teal">' +
+          '<div class="rb-step-num">' + (i + 1) + '</div>' +
+          '<div><div class="rb-step-t">' + escapeHtml(s.title) + '</div><div class="rb-step-b">' + escapeHtml(s.body) + '</div></div>' +
         '</div>'
       );
     }).join('');
@@ -1178,13 +1513,18 @@
     var narrative = b.audit_narrative_json;
     var itemsHtml;
 
+    // .rb-step/.rb-step-orange/.rb-step-num (style.css), same restyle as
+    // marketingStrategyHtml above, both branches below (LLM-written
+    // quickWins and the fallback gap list), orange circle colour kept as
+    // already live, distinguishing Quick Wins from Marketing Strategy's
+    // teal circles.
     if (narrative && Array.isArray(narrative.quickWins) && narrative.quickWins.length) {
       itemsHtml = narrative.quickWins.slice(0, 3).map(function (w, i) {
         return (
-          '<div style="display:flex;gap:14px;align-items:flex-start;padding:16px 0;border-bottom:1px solid var(--border);">' +
-            '<div style="width:26px;height:26px;border-radius:50%;background:var(--orange-l);color:var(--orange-d);font-weight:800;font-size:13px;display:flex;align-items:center;justify-content:center;flex-shrink:0;">' + (i + 1) + '</div>' +
-            '<div><h3 style="font-size:15px;color:var(--navy);margin-bottom:4px;">' + escapeHtml(w.title) + '</h3>' +
-            '<p style="font-size:14px;color:var(--mid);line-height:1.6;">' + escapeHtml(w.body) + '</p></div>' +
+          '<div class="rb-step rb-step-orange">' +
+            '<div class="rb-step-num">' + (i + 1) + '</div>' +
+            '<div><div class="rb-step-t">' + escapeHtml(w.title) + '</div>' +
+            '<div class="rb-step-b">' + escapeHtml(w.body) + '</div></div>' +
           '</div>'
         );
       }).join('');
@@ -1208,10 +1548,10 @@
       itemsHtml = gaps.length
         ? gaps.slice(0, 3).map(function (g, i) {
             return (
-              '<div style="display:flex;gap:14px;align-items:flex-start;padding:16px 0;border-bottom:1px solid var(--border);">' +
-                '<div style="width:26px;height:26px;border-radius:50%;background:var(--orange-l);color:var(--orange-d);font-weight:800;font-size:13px;display:flex;align-items:center;justify-content:center;flex-shrink:0;">' + (i + 1) + '</div>' +
-                '<div><h3 style="font-size:15px;color:var(--navy);margin-bottom:4px;">' + g.label + ' (' + g.gap + ' points available)</h3>' +
-                '<p style="font-size:14px;color:var(--mid);line-height:1.6;">' + (actionText[g.key] || 'Focus on improving this area next.') + '</p></div>' +
+              '<div class="rb-step rb-step-orange">' +
+                '<div class="rb-step-num">' + (i + 1) + '</div>' +
+                '<div><div class="rb-step-t">' + g.label + ' (' + g.gap + ' points available)</div>' +
+                '<div class="rb-step-b">' + (actionText[g.key] || 'Focus on improving this area next.') + '</div></div>' +
               '</div>'
             );
           }).join('')
