@@ -306,6 +306,7 @@ b.coverImage = payload.coverImage;
 b.category = payload.category;
 b.categoryCount = payload.categoryCount;
 b.bestsellerRank = payload.bestsellerRank;
+b.storeWideRank = payload.storeWideRank;
 b.boughtTogether = payload.boughtTogether || [];
 // Added 3 August 2026 for the Overview "Professional Assessment" block
 // (see api/enrich-audit.js buildAssessmentTags): format availability and
@@ -612,6 +613,7 @@ price: b.price,
 rating: b.rating,
 reviewCount: b.reviewCount,
 bestsellerRank: b.bestsellerRank,
+storeWideRank: b.storeWideRank,
 boughtTogether: b.boughtTogether || [],
 amazonAdsActive: amazonAdsActive,
 authorBookCount: authorBookCount,
