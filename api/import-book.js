@@ -152,8 +152,13 @@ module.exports = async function handler(req, res) {
     // Overview "Professional Assessment" tag pills (dashboard.html), no
     // extra paid call, this was already sitting unused in the same
     // response every import already makes.
+    // Confirmed live 4 August 2026: some listings carry two `prices`
+    // entries with the same format title (e.g. two separate "Paperback"
+    // rows for different bindings/sellers), which produced a duplicate
+    // "Paperback & Paperback" tag before this dedupe was added.
     var formats = Array.isArray(data.prices)
       ? data.prices.map(function (p) { return p && p.title; }).filter(Boolean)
+        .filter(function (f, i, arr) { return arr.indexOf(f) === i; })
       : [];
 
     // A+ Content presence (3 August 2026): SerpApi has no explicit "A+
