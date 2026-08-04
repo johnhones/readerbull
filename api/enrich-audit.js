@@ -313,55 +313,31 @@ async function attachCompetitorBsr(competitors) {
   }
 }
 
-// ---------- Niche revenue estimate (no extra calls, pure calculation) ----------
-// Converts a bestseller rank into an approximate monthly sales figure
-// using a widely-referenced order-of-magnitude Kindle Store BSR curve
-// (the same type of approximation self-publishing tools like Publisher
-// Rocket use). This is deliberately a rough estimate, never a confirmed
-// sales figure, dashboard.html must always present it with "~" and
-// "estimated" wording, never as a fact. Only ever computed from
-// bestsellerRank + price data already sitting in the payload, never
-// invented when those are missing.
-function estimateMonthlySalesFromBSR(bsr) {
-  if (typeof bsr !== 'number' || bsr <= 0) return null;
-  var dailySales;
-  if (bsr <= 100) dailySales = 200;
-  else if (bsr <= 1000) dailySales = 200 * Math.pow(100 / bsr, 0.6);
-  else if (bsr <= 10000) dailySales = 20 * Math.pow(1000 / bsr, 0.6);
-  else if (bsr <= 100000) dailySales = 3 * Math.pow(10000 / bsr, 0.6);
-  else if (bsr <= 500000) dailySales = 0.4 * Math.pow(100000 / bsr, 0.6);
-  else dailySales = 0.05;
-  return Math.max(dailySales * 30, 0);
-}
-
-function parsePrice(price) {
-  if (typeof price === 'number') return price;
-  var parsed = parseFloat(String(price || '').replace(/[^0-9.]/g, ''));
-  return isNaN(parsed) ? null : parsed;
-}
-
-// Books counted as "selling well" once their estimated revenue clears
-// this monthly floor, a deliberately conservative bar so the count
-// doesn't get inflated by long-tail listings with almost no real sales.
-var SELLING_WELL_MONTHLY_REVENUE_FLOOR = 50;
-
+// ---------- Best Seller Rank comparison (no extra calls, pure calculation) ----------
+// IMPORTANT (fixed 4 August 2026, caught via a live test on a real book
+// before this ever reached an author): this file's bestsellerRank field
+// is the LOWEST-numbered entry across every category a listing appears
+// in (see the bestRank comment in import-book.js), i.e. a category-specific
+// rank like "#25 in Child Psychology Reference", not Amazon's overall
+// store-wide sales rank ("#45,231 in Books"). An earlier version of this
+// function ran that category rank through a public BSR-to-sales-volume
+// curve (the kind self-pub tools use for the OVERALL store rank) and
+// produced a wildly inflated "~$173,502/mo" niche revenue estimate on a
+// real live test, because a small category-specific rank number looks
+// like a huge overall seller when read on the wrong scale. There is no
+// reliable way to isolate the true overall store-wide rank from what
+// this endpoint currently pulls, so rather than keep presenting a
+// plausible-looking but wrong dollar figure to an author, this only
+// ever compares category-best rank positions directly (yours vs niche
+// average vs top competitor), never converts rank into a sales or
+// revenue number. If a real BSR-to-revenue estimate is wanted later, it
+// needs the confirmed overall store-wide rank, not this field.
 function estimateNicheStats(input, competitors) {
   var ownBsr = (typeof input.bestsellerRank === 'number') ? input.bestsellerRank : null;
-  var ownPrice = parsePrice(input.price);
-
-  var entries = [];
-  if (ownBsr) {
-    var ownSales = estimateMonthlySalesFromBSR(ownBsr);
-    entries.push({ revenue: (ownSales && ownPrice) ? ownSales * ownPrice : null });
-  }
 
   var competitorBsrs = [];
   (competitors || []).forEach(function (c) {
-    if (typeof c.bestsellerRank !== 'number') return;
-    competitorBsrs.push(c.bestsellerRank);
-    var price = parsePrice(c.price);
-    var sales = estimateMonthlySalesFromBSR(c.bestsellerRank);
-    entries.push({ revenue: (sales && price) ? sales * price : null });
+    if (typeof c.bestsellerRank === 'number') competitorBsrs.push(c.bestsellerRank);
   });
 
   var nicheAverageBsr = competitorBsrs.length
@@ -369,17 +345,9 @@ function estimateNicheStats(input, competitors) {
     : null;
   var topCompetitorBsr = competitorBsrs.length ? Math.min.apply(null, competitorBsrs) : null;
 
-  var revenues = entries.map(function (e) { return e.revenue; }).filter(function (r) { return typeof r === 'number'; });
-  var estimatedNicheRevenue = revenues.length
-    ? Math.round(revenues.reduce(function (a, b) { return a + b; }, 0))
-    : null;
-  var booksSellingWell = revenues.filter(function (r) { return r >= SELLING_WELL_MONTHLY_REVENUE_FLOOR; }).length;
-
   return {
     bestSellerRank: { yours: ownBsr, nicheAverage: nicheAverageBsr, topCompetitor: topCompetitorBsr },
-    estimatedNicheRevenue: estimatedNicheRevenue,
-    booksSellingWell: booksSellingWell,
-    sampleSize: entries.length
+    sampleSize: competitorBsrs.length + (ownBsr ? 1 : 0)
   };
 }
 
@@ -795,12 +763,13 @@ async function generateNarrative(input, competitors, pageRank, nicheStats) {
     'this if authorBookCount is missing, null, or greater than 1. ' +
     'Professional Assessment: write a short, direct verdict (2 short paragraphs) for the Overview tab, in ' +
     'the voice of an experienced KDP consultant giving a straight read of where this book stands right now. ' +
-    'Ground it in nicheStats (estimated niche revenue and books selling well, always describe these as ' +
-    'estimates, never as confirmed figures) and book.organicSearchPosition, book.formats, ' +
+    'Ground it in nicheStats.bestSellerRank (how this book\'s best category placement compares to the niche ' +
+    'average and top competitor, always described as a rank comparison, never converted into a sales or ' +
+    'revenue figure, nicheStats has no revenue numbers) and book.organicSearchPosition, book.formats, ' +
     'book.hasEnhancedContent, book.amazonAdsActive when given. If nicheStats or its numbers are null, write ' +
     'around the gap honestly instead of guessing a figure. Name the single biggest lever available (usually ' +
     'reviews, ads, or both) and roughly what closes the gap, without inventing a specific target number ' +
-    'unless one is present in the data given. ' +
+    'or dollar figure unless one is present in the data given. ' +
     'Respond with ONLY a JSON object, no markdown fences, no commentary, matching exactly this shape: ' +
     '{"bookInsight": "one bolded-worthy sentence summarising the single biggest takeaway", ' +
     '"marketAnalysis": "2-3 short paragraphs on where this book stands versus the competitors given", ' +
