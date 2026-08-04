@@ -568,11 +568,20 @@
             ' <span style="color:var(--muted);">&middot; (' + (b.live_review_count != null ? b.live_review_count : 0) + ')</span></div>'
         : '';
 
-      var descText = b.description ? String(b.description).trim() : '';
-      var descHtml = descText
-        ? '<p style="font-size:14px;color:var(--mid);line-height:1.6;margin-bottom:14px;">' +
-            escapeHtml(descText.slice(0, 400)) + (descText.length > 400 ? '…' : '') + '</p>'
-        : '';
+      // Description paragraph disabled (4 August 2026, hours after shipping):
+      // a live test found a real book's stored `description` field held
+      // completely unrelated, inappropriate text (an urban-dictionary-style
+      // slang definition, nothing to do with the book), pulled from
+      // SerpApi's product_description parser and stored as-is at import
+      // time. That's a raw external field we don't control or validate,
+      // rendering it unfiltered on a live public page is not safe. Pulled
+      // immediately rather than left live while a proper fix (content
+      // moderation/validation before display, or before storing at import
+      // time) gets scoped. bookInsight below is AI-generated from
+      // structured data and already does the "what is this book" job
+      // safely, so this isn't a loss of the intended content, just the
+      // free-text description line specifically.
+      var descHtml = '';
 
       var insightHtml = insight
         ? '<p style="font-weight:700;color:var(--navy);margin-bottom:4px;">' + escapeHtml(insight) + '</p>'
