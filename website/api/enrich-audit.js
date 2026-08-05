@@ -633,7 +633,7 @@ function buildRevenueInsight(input, nicheStats) {
 async function findKeywordResearch(input) {
   var login = process.env.DATAFORSEO_LOGIN;
   var password = process.env.DATAFORSEO_PASSWORD;
-  if (!login || !password) return null;
+  if (!login || !password) return { __debug: { reason: 'missing dataforseo creds', hasLogin: !!login, hasPassword: !!password, loginLen: (login||'').length, passwordLen: (password||'').length } };
 
   var auth = Buffer.from(login + ':' + password).toString('base64');
 
