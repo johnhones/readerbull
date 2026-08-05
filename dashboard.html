@@ -331,6 +331,27 @@
     .order('created_at', { ascending: true });
 
   books = books || [];
+
+  // Plan gating (5 August 2026): drives the free/paid keyword-display
+  // split on the Keywords tab (see keywordsHtml/keywordTableHtml below).
+  // Defaults to 'free' on any failure (no subscriptions row yet, RLS
+  // denies it, network hiccup), fails safe rather than accidentally
+  // unlocking paid content.
+  var userPlan = 'free';
+  try {
+    var subResult = await readerbull.client
+      .from('subscriptions')
+      .select('plan,status')
+      .eq('user_id', user.id)
+      .maybeSingle();
+    var subRow = subResult && subResult.data;
+    if (subRow && subRow.status === 'active' && subRow.plan && subRow.plan !== 'free') {
+      userPlan = subRow.plan;
+    }
+  } catch (e) {
+    // default to 'free', see comment above
+  }
+
   var legacyBook = books.filter(function (b) { return b.dashboard_url; })[0];
 
   // ---------- BILLING / SUBSCRIPTION (payment system build, 5 August 2026) ----------
@@ -1565,57 +1586,69 @@
     return 'comp-high'; // Use, Priority
   }
 
-  function keywordRowHtml(item, inList, atCap) {
+    function keywordRowHtml(item, inList, atCap, blurred) {
     var kw = item.keyword || '';
     var volume = (item.volume === null || item.volume === undefined || item.volume === '') ? '-' : escapeHtml(String(item.volume));
+    var statusClass = (item.status === 'Skip') ? 'error' : ((item.status === 'Priority' || item.status === 'Suggested') ? 'imported' : 'needs-details');
     var btnHtml;
-    if (inList) {
-      btnHtml = '<button type="button" class="kw-add added" data-kw-remove="' + escapeHtml(kw) + '">Remove</button>';
+    if (blurred) {
+      btnHtml = '';
+    } else if (inList) {
+      btnHtml = '<button type="button" class="btn btn-outline" style="padding:4px 12px;font-size:12px;" data-kw-remove="' + escapeHtml(kw) + '">Remove</button>';
     } else if (atCap) {
-      btnHtml = '<button type="button" class="kw-add" disabled title="7/7 keywords used">+ Add</button>';
+      btnHtml = '<button type="button" class="btn btn-outline" style="padding:4px 12px;font-size:12px;" disabled title="7/7 keywords used">+ Add</button>';
     } else {
-      btnHtml = '<button type="button" class="kw-add" data-kw-add="' + escapeHtml(kw) + '">+ Add</button>';
+      btnHtml = '<button type="button" class="btn btn-outline" style="padding:4px 12px;font-size:12px;" data-kw-add="' + escapeHtml(kw) + '">+ Add</button>';
     }
+    // Free-tier blur (5 August 2026): the row's own text is blurred with
+    // a CSS filter and the Add/Remove button hidden, rather than leaving
+    // the keyword out of the table entirely, so a free author can see a
+    // full 7-keyword result exists and knows exactly what upgrading
+    // unlocks, matching the agreed "prove the value, don't just withhold
+    // it" approach.
+    var blurStyle = blurred ? ' style="filter:blur(5px);user-select:none;"' : '';
     return (
-      '<tr>' +
-        '<td class="kw-word">' + escapeHtml(kw) + '</td>' +
-        '<td class="tr kw-vol">' + volume + '</td>' +
-        '<td class="tc"><span class="' + kwStatusClass(item.status) + '">' + escapeHtml(item.status || '') + '</span></td>' +
-        '<td class="tc">' + btnHtml + '</td>' +
+      '<tr' + blurStyle + '>' +
+        '<td style="padding:8px 6px;">' + escapeHtml(kw) + '</td>' +
+        '<td style="padding:8px 6px;">' + volume + '</td>' +
+        '<td style="padding:8px 6px;"><span class="status-pill ' + statusClass + '">' + escapeHtml(item.status || '') + '</span></td>' +
+        '<td style="padding:8px 6px;text-align:right;">' + btnHtml + '</td>' +
       '</tr>'
     );
   }
 
-  // Two-panel side-by-side layout (restyled 5 August 2026 to match
-  // MASTER-TEMPLATE.html's .kw-tool structure), replacing yesterday's
-  // stacked single-column tables. The live add/remove-to-KDP-list
-  // functionality (wireKeywordsPanel/saveKeywordChange below) is unchanged,
-  // this is a re-skin of the container it renders into, not a rewrite of
-  // the working logic. panelId/countId/searchId are unique per panel so
-  // the client-side search filter (filterKeywordTable, wired once at the
-  // bottom of this file) can target the right table.
-  function keywordPanelHtml(panelId, headerHtml, recClass, countId, searchId, searchPlaceholder, items, currentList) {
+  function keywordTableHtml(title, subtitle, items, currentList, blurAfter) {
+    if (!items || !items.length) return '';
     var atCap = currentList.length >= 7;
-    var rows = (items || []).map(function (item) {
+    var rows = items.map(function (item, i) {
       var inList = currentList.some(function (k) { return k.toLowerCase() === String(item.keyword || '').toLowerCase(); });
-      return keywordRowHtml(item, inList, atCap && !inList);
+      var blurred = (typeof blurAfter === 'number' && i >= blurAfter);
+      return keywordRowHtml(item, inList, atCap && !inList, blurred);
     }).join('');
-
+    // Upgrade row (5 August 2026): shown once, directly under the last
+    // visible row, when this table has more items than the free tier
+    // shows. Same data already paid for once (see the comment on
+    // recommendedBlurAfter in keywordsHtml below), this is a display
+    // choice only, not an extra API call.
+    var upgradeRowHtml = (typeof blurAfter === 'number' && items.length > blurAfter)
+      ? '<tr><td colspan="4" style="padding:14px 6px;text-align:center;background:var(--teal-l);border-radius:8px;">' +
+          '<a href="pricing.html" style="color:var(--teal-d);font-weight:700;text-decoration:none;">Upgrade to see all ' + items.length + ' recommended keywords &rarr;</a>' +
+        '</td></tr>'
+      : '';
+    // Item count shown inline in the header ("Amazon Keywords 11"), matching
+    // the legacy Jordan Truehart dashboard's keyword table format (see
+    // ReaderBull_Next_Chat_Handover_Prompt.md item 9).
     return (
-      '<div class="kw-panel">' +
-        '<div class="kw-panel-hdr' + recClass + '">' +
-          '<span>' + headerHtml + '</span>' +
-          '<span class="kw-count" id="' + countId + '">' + (items ? items.length : 0) + '</span>' +
-        '</div>' +
-        '<div class="kw-search">' +
-          '<input type="text" id="' + searchId + '" data-kw-filter-target="' + panelId + '" data-kw-filter-count="' + countId + '" placeholder="' + escapeHtml(searchPlaceholder) + '">' +
-        '</div>' +
-        '<div style="overflow-x:auto;">' +
-          '<table class="kw-table">' +
-            '<thead><tr><th>Keyword</th><th class="tr">Volume</th><th class="tc">Status</th><th></th></tr></thead>' +
-            '<tbody id="' + panelId + '">' + rows + '</tbody>' +
-          '</table>' +
-        '</div>' +
+      '<div class="breakdown-card" style="margin-top:24px;overflow-x:auto;">' +
+        '<h2>' + title + ' <span style="font-weight:600;color:var(--muted);font-size:14px;">' + items.length + '</span></h2><p>' + subtitle + '</p>' +
+        '<table style="width:100%;border-collapse:collapse;font-size:14px;margin-top:8px;">' +
+          '<thead><tr style="text-align:left;border-bottom:1px solid var(--border);">' +
+            '<th style="padding:8px 6px;">Keyword</th><th style="padding:8px 6px;">Volume</th>' +
+            '<th style="padding:8px 6px;">Status</th><th style="padding:8px 6px;"></th>' +
+          '</tr></thead>' +
+          '<tbody>' + rows + upgradeRowHtml + '</tbody>' +
+        '</table>' +
+        '<p style="font-size:12px;color:var(--muted);margin-top:10px;">Volume is the estimated number of times this keyword is searched on Amazon each month, not an exact or real-time figure.</p>' +
       '</div>'
     );
   }
@@ -1632,34 +1665,51 @@
       : '<p style="font-size:14px;color:var(--mid);">No keywords recorded yet for this book.</p>';
 
     var research = b.audit_narrative_json && b.audit_narrative_json.keywordResearch;
-    var toolHtml;
-    if (research && Array.isArray(research.amazonKeywords) && research.amazonKeywords.length) {
+    var researchHtml;
+    // Free/paid gating (5 August 2026): free-tier authors see the first 3
+    // of the up-to-7 Readerbull Recommended Keywords clearly, the rest
+    // blurred with an upgrade prompt, same underlying data either way
+    // (already paid for in one DataForSEO call regardless of who's
+    // looking), only the display differs. userPlan is set once near the
+    // top of this script from the subscriptions table.
+    var recommendedBlurAfter = (userPlan === 'free') ? 3 : null;
+
+    if (research && research.suggestedOnly && Array.isArray(research.recommendedKeywords) && research.recommendedKeywords.length) {
+      // Cost-cap fallback (5 August 2026, ReaderBull_Project_Rules.md
+      // rule 12 update): no live Amazon search-volume data was available
+      // for this book after the one paid DataForSEO lookup, so these are
+      // AI-suggested search terms instead, not checked against real
+      // search volume.
+      researchHtml =
+        '<p style="font-size:13px;color:var(--muted);margin-top:16px;">We could not find live Amazon search-volume data for this book, so here are suggested search terms instead. Add any of them straight to your 7 KDP fields below.</p>' +
+        keywordTableHtml('Suggested Keywords', 'AI-suggested search terms for this niche, search volume not available.', research.recommendedKeywords, list, recommendedBlurAfter);
+    } else if (research && Array.isArray(research.amazonKeywords) && research.amazonKeywords.length) {
       var recommended = Array.isArray(research.recommendedKeywords) ? research.recommendedKeywords : [];
-      var introHtml = '<div class="callout mb"><strong>Amazon keyword research for &ldquo;' + escapeHtml(research.seedKeyword || '') + '&rdquo;' +
-        (research.totalFound ? ' (' + escapeHtml(String(research.totalFound)) + ' keywords found)' : '') +
-        '.</strong> Add any of them straight to your 7 KDP fields below.</div>';
-      toolHtml = introHtml + '<div class="kw-tool">' +
-        keywordPanelHtml('amazon-tbody', '<i class="ti ti-brand-amazon" style="margin-right:6px;font-size:14px;vertical-align:middle;"></i>Amazon Keywords', '', 'amazon-count', 'amazon-search', 'Search keywords…', research.amazonKeywords, list) +
-        keywordPanelHtml('rec-tbody', '<i class="ti ti-bulb" style="margin-right:6px;font-size:14px;vertical-align:middle;"></i>Readerbull Recommended', ' rec', 'rec-count', 'rec-search', 'Filter recommendations…', recommended, list) +
-      '</div>';
+      // Table order matches the legacy Jordan Truehart dashboard's keyword
+      // section (Amazon Keywords first, Readerbull Recommended Keywords
+      // second), confirmed by re-opening
+      // johnhones.github.io/readabull-jordan-truehart and comparing structure
+      // directly, per ReaderBull_Next_Chat_Handover_Prompt.md item 9.
+      researchHtml =
+        (research.totalFound
+          ? '<p style="font-size:13px;color:var(--muted);margin-top:16px;">Researched ' + escapeHtml(String(research.totalFound)) + ' keywords for "' + escapeHtml(research.seedKeyword || '') + '". Add any of them straight to your 7 KDP fields below.</p>'
+          : '') +
+        keywordTableHtml('Amazon Keywords', 'Every related keyword found for this niche, flagged Use or Skip.', research.amazonKeywords, list, null) +
+        keywordTableHtml('Readerbull Recommended Keywords', 'The strongest picks for your 7 KDP backend keyword fields, ranked by fit.', recommended, list, recommendedBlurAfter);
     } else {
-      toolHtml = '<p style="font-size:13px;color:var(--muted);margin-top:16px;">Keyword research for this book has not run yet, or turned up nothing usable. It runs automatically the next time this book is re-submitted through onboarding, or via Refresh audit on the Overview tab.</p>';
+      researchHtml = '<p style="font-size:13px;color:var(--muted);margin-top:16px;">Keyword research for this book has not run yet, or turned up nothing usable. It runs automatically the next time this book is re-submitted through onboarding.</p>';
     }
 
     return (
-      '<div class="sec-label">Keywords</div>' +
-      '<div class="card mb"><div class="card-title">Your backend keywords (' + list.length + ' / 7)</div><p style="font-size:13px;color:var(--mid);margin-bottom:14px;">What\'s currently in this book\'s 7 KDP keyword fields. Adding or removing one here updates your Discoverability Score immediately.</p>' + chipsHtml + '</div>' +
-      '<div id="keyword-save-error" class="detail-error" style="display:none;margin-bottom:16px;"></div>' +
-      toolHtml
+      '<div class="sec-eyebrow" style="margin-bottom:6px;">Keywords</div>' +
+      '<h2 style="font-size:20px;color:var(--navy);margin-bottom:16px;">' + escapeHtml(b.book_title || '') + '</h2>' +
+      '<div class="breakdown-card"><h2>Your backend keywords (' + list.length + ' / 7)</h2><p>What\'s currently in this book\'s 7 KDP keyword fields. Adding or removing one here updates your Discoverability Score immediately.</p>' + chipsHtml + '</div>' +
+      '<div id="keyword-save-error" class="detail-error" style="display:none;margin-top:12px;"></div>' +
+      researchHtml
     );
   }
 
-  // Recomputes the score using data already cached on the book row, no
-  // repeat paid SerpApi/DataForSEO calls per click. pageRank and
-  // categoryCount are read back out of score_breakdown.listing, where
-  // scoring.js stashed them at onboarding time, see scoring.js's comment
-  // on that field for the accepted staleness tradeoff.
-  async function saveKeywordChange(b, newList) {
+async function saveKeywordChange(b, newList) {
     var breakdown = b.score_breakdown || {};
     var listingMeta = breakdown.listing || {};
     var amazonAdsActive = !!(breakdown.amazonAds && breakdown.amazonAds.active);
