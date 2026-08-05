@@ -108,6 +108,7 @@ module.exports = async function handler(req, res) {
   }
 
   var input = req.body || {};
+  if (input.__ping) { res.status(200).json({ pong: true, buildTag: 'DIAG3', dfLoginSet: !!process.env.DATAFORSEO_LOGIN, dfPassSet: !!process.env.DATAFORSEO_PASSWORD }); return; }
   var result = { competitors: [], pageRank: null, keywordResearch: null, narrative: null };
 
   var competitors = await findCompetitors(input);
