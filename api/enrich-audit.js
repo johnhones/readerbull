@@ -108,7 +108,28 @@ module.exports = async function handler(req, res) {
   }
 
   var input = req.body || {};
-  if (input.__ping) { res.status(200).json({ pong: true, buildTag: 'ROOTDIAG1', dfLoginSet: !!process.env.DATAFORSEO_LOGIN, dfPassSet: !!process.env.DATAFORSEO_PASSWORD }); return; }
+  if (input.__ping) {
+    var pingPayload = { pong: true, buildTag: 'ROOTDIAG1', dfLoginSet: !!process.env.DATAFORSEO_LOGIN, dfPassSet: !!process.env.DATAFORSEO_PASSWORD };
+    try {
+      var dfAuthPing = Buffer.from(process.env.DATAFORSEO_LOGIN + ':' + process.env.DATAFORSEO_PASSWORD).toString('base64');
+      var balResp = await fetch('https://api.dataforseo.com/v3/appendix/user_data', {
+        method: 'GET',
+        headers: { 'Authorization': 'Basic ' + dfAuthPing }
+      });
+      var balData = await balResp.json();
+      var balTask = balData.tasks && balData.tasks[0];
+      var balResult = balTask && balTask.result && balTask.result[0];
+      pingPayload.dfBalanceHttpStatus = balResp.status;
+      pingPayload.dfBalanceTopStatus = balData.status_code;
+      pingPayload.dfBalanceTaskStatus = balTask && balTask.status_code;
+      pingPayload.dfBalanceTaskMessage = balTask && balTask.status_message;
+      pingPayload.dfBalanceResult = balResult;
+    } catch (balErr) {
+      pingPayload.dfBalanceError = String((balErr && balErr.message) || balErr);
+    }
+    res.status(200).json(pingPayload);
+    return;
+  }
   var result = { competitors: [], pageRank: null, keywordResearch: null, narrative: null };
 
   var competitors = await findCompetitors(input);
