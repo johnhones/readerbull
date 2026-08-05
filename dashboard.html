@@ -59,6 +59,7 @@
 
       <hr class="shell-divider">
       <div class="shell-section-label">Account</div>
+      <button class="shell-nav-item" id="sidebar-billing"><i class="ti ti-credit-card"></i> Billing</button>
       <button class="shell-nav-item" id="sidebar-set-password"><i class="ti ti-key"></i> Set a password</button>
       <button class="shell-nav-item" id="sidebar-logout"><i class="ti ti-logout"></i> Log out</button>
     </div>
@@ -203,6 +204,47 @@
   </div>
 </div>
 
+<!-- BILLING MODAL -->
+<!-- Added for the Stripe payment system build, 5 August 2026. Shows the
+     author's current plan and book limit, starts Stripe Checkout for
+     Plus/Pro, or opens Stripe's own hosted Billing Portal to manage or
+     cancel an existing subscription, no custom billing UI beyond this.
+     Custom (11+ books) stays contact-us only, matches pricing.html, not
+     offered here. Also doubles as the "you're at your book limit"
+     upgrade prompt, see wireRefreshAuditButton's sibling gate on the
+     sidebar switcher's "Add another book" link below. -->
+<div class="modal-overlay" id="billing-modal">
+  <div class="modal-card">
+    <h3>Billing</h3>
+    <p id="billing-modal-current">Loading your plan&hellip;</p>
+    <div id="billing-modal-limit-note" style="display:none;background:#fff4e5;color:#8a5a00;border-radius:8px;padding:10px 12px;margin-bottom:12px;font-size:13px;"></div>
+    <div class="detail-error" id="billing-modal-error" style="display:none;"></div>
+
+    <div style="display:flex;flex-direction:column;gap:10px;margin:14px 0;">
+      <div style="border:1px solid var(--border);border-radius:10px;padding:12px 14px;display:flex;justify-content:space-between;align-items:center;gap:10px;flex-wrap:wrap;">
+        <div><strong>Plus</strong><div style="font-size:12px;color:var(--mid);">Up to 3 books</div></div>
+        <div style="display:flex;gap:8px;">
+          <button type="button" class="btn btn-outline" id="billing-plus-monthly" style="padding:6px 12px;font-size:13px;">$9/mo</button>
+          <button type="button" class="btn btn-outline" id="billing-plus-yearly" style="padding:6px 12px;font-size:13px;">$90/yr</button>
+        </div>
+      </div>
+      <div style="border:1px solid var(--border);border-radius:10px;padding:12px 14px;display:flex;justify-content:space-between;align-items:center;gap:10px;flex-wrap:wrap;">
+        <div><strong>Pro</strong><div style="font-size:12px;color:var(--mid);">4 to 10 books</div></div>
+        <div style="display:flex;gap:8px;">
+          <button type="button" class="btn btn-outline" id="billing-pro-monthly" style="padding:6px 12px;font-size:13px;">$28/mo</button>
+          <button type="button" class="btn btn-outline" id="billing-pro-yearly" style="padding:6px 12px;font-size:13px;">$280/yr</button>
+        </div>
+      </div>
+      <p style="font-size:12px;color:var(--mid);margin:0;">Need more than 10 books? <a href="mailto:coastlvibes@gmail.com?subject=Readerbull%20Custom%20plan" style="color:var(--teal-d);font-weight:700;">Contact us</a> for Custom pricing.</p>
+    </div>
+
+    <div class="modal-actions">
+      <button class="btn btn-outline" id="billing-modal-close">Close</button>
+      <button class="btn btn-primary" id="billing-modal-manage" style="display:none;">Manage billing</button>
+    </div>
+  </div>
+</div>
+
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.js"></script>
 <script src="supabase-client.js"></script>
 <script src="scoring.js"></script>
@@ -291,6 +333,115 @@
   books = books || [];
   var legacyBook = books.filter(function (b) { return b.dashboard_url; })[0];
 
+  // ---------- BILLING / SUBSCRIPTION (payment system build, 5 August 2026) ----------
+  // A missing row means Free, 1 book, same graceful-fallback convention
+  // used throughout this codebase, see the comment on this table in
+  // subscriptions_migration.sql. Read directly with the browser's own
+  // Supabase session (RLS scopes it to auth.uid() = user_id), no need
+  // for a serverless round trip just to display it.
+  var subResult = await readerbull.client
+    .from('subscriptions')
+    .select('plan,billing_interval,status,book_limit,stripe_customer_id')
+    .eq('user_id', user.id)
+    .maybeSingle();
+  var subscription = (subResult && subResult.data) || { plan: 'free', billing_interval: null, status: 'active', book_limit: 1, stripe_customer_id: null };
+
+  var billingModal = document.getElementById('billing-modal');
+  var billingError = document.getElementById('billing-modal-error');
+  var billingLimitNote = document.getElementById('billing-modal-limit-note');
+  var billingManageBtn = document.getElementById('billing-modal-manage');
+
+  function planLabel(p) {
+    return p === 'plus' ? 'Plus' : (p === 'pro' ? 'Pro' : 'Free');
+  }
+
+  function refreshBillingModalText() {
+    document.getElementById('billing-modal-current').textContent =
+      "You're on the " + planLabel(subscription.plan) + ' plan (' + subscription.book_limit +
+      (subscription.book_limit === 1 ? ' book allowed)' : ' books allowed)') +
+      (subscription.status === 'past_due' ? ', your last payment failed, please update your card.' : '.');
+    billingManageBtn.style.display = subscription.stripe_customer_id ? 'inline-flex' : 'none';
+  }
+
+  function openBillingModal(limitMessage) {
+    billingError.style.display = 'none';
+    if (limitMessage) {
+      billingLimitNote.textContent = limitMessage;
+      billingLimitNote.style.display = 'block';
+    } else {
+      billingLimitNote.style.display = 'none';
+    }
+    refreshBillingModalText();
+    billingModal.classList.add('active');
+  }
+
+  document.getElementById('sidebar-billing').addEventListener('click', function (e) {
+    e.preventDefault();
+    openBillingModal(null);
+  });
+  document.getElementById('billing-modal-close').addEventListener('click', function () {
+    billingModal.classList.remove('active');
+  });
+
+  async function startCheckout(plan, interval) {
+    billingError.style.display = 'none';
+    try {
+      var resp = await fetch('/api/create-checkout-session', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', Authorization: 'Bearer ' + accessToken },
+        body: JSON.stringify({ plan: plan, interval: interval, origin: window.location.origin })
+      });
+      var data = await resp.json();
+      if (!resp.ok || !data.url) {
+        billingError.textContent = data.error || 'Could not start checkout, please try again.';
+        billingError.style.display = 'block';
+        return;
+      }
+      window.location.href = data.url;
+    } catch (err) {
+      billingError.textContent = 'Could not reach Stripe, please try again.';
+      billingError.style.display = 'block';
+    }
+  }
+
+  document.getElementById('billing-plus-monthly').addEventListener('click', function () { startCheckout('plus', 'monthly'); });
+  document.getElementById('billing-plus-yearly').addEventListener('click', function () { startCheckout('plus', 'yearly'); });
+  document.getElementById('billing-pro-monthly').addEventListener('click', function () { startCheckout('pro', 'monthly'); });
+  document.getElementById('billing-pro-yearly').addEventListener('click', function () { startCheckout('pro', 'yearly'); });
+
+  billingManageBtn.addEventListener('click', async function () {
+    billingError.style.display = 'none';
+    billingManageBtn.disabled = true;
+    try {
+      var resp = await fetch('/api/create-portal-session', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', Authorization: 'Bearer ' + accessToken },
+        body: JSON.stringify({ origin: window.location.origin })
+      });
+      var data = await resp.json();
+      if (!resp.ok || !data.url) {
+        billingError.textContent = data.error || 'Could not open the billing portal.';
+        billingError.style.display = 'block';
+        billingManageBtn.disabled = false;
+        return;
+      }
+      window.location.href = data.url;
+    } catch (err) {
+      billingError.textContent = 'Could not reach Stripe, please try again.';
+      billingError.style.display = 'block';
+      billingManageBtn.disabled = false;
+    }
+  });
+
+  // Auto-open if pricing.html sent us here already signed in (#billing),
+  // or Stripe just redirected back after a successful payment.
+  if (/[?&]checkout=success\b/.test(window.location.search)) {
+    openBillingModal(null);
+    document.getElementById('billing-modal-current').textContent = 'Payment confirmed, thanks! Your plan updates below within a few seconds, refresh if it still shows your old plan.';
+  } else if (window.location.hash === '#billing') {
+    openBillingModal(null);
+  }
+
   document.getElementById('loading-state').style.display = 'none';
   document.getElementById('shell').style.display = 'flex';
 
@@ -376,7 +527,24 @@
       );
     }).join('');
 
-    switcherMenu.innerHTML = itemsHtml + '<a href="onboarding.html" class="book-switcher-add"><i class="ti ti-plus"></i> Add another book</a>';
+    switcherMenu.innerHTML = itemsHtml + '<a href="onboarding.html" class="book-switcher-add" id="switcher-add-book"><i class="ti ti-plus"></i> Add another book</a>';
+
+    // Book-limit gate (payment system build, 5 August 2026): blocks
+    // navigating to onboarding.html once the author is at their plan's
+    // book_limit, opening the Billing modal with an upgrade prompt
+    // instead. subscription/openBillingModal/planLabel are all defined
+    // above, before this function is ever called.
+    var addBookLink = document.getElementById('switcher-add-book');
+    if (addBookLink) {
+      addBookLink.addEventListener('click', function (e) {
+        if (books.length >= subscription.book_limit) {
+          e.preventDefault();
+          closeSwitcherMenu();
+          openBillingModal("You've reached your " + planLabel(subscription.plan) + ' plan\'s ' + subscription.book_limit +
+            (subscription.book_limit === 1 ? '-book limit. Upgrade to add another.' : '-book limit. Upgrade to add more.'));
+        }
+      });
+    }
 
     switcherMenu.querySelectorAll('[data-switch-book-id]').forEach(function (item) {
       item.addEventListener('click', function () {
