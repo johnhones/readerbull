@@ -108,6 +108,7 @@ module.exports = async function handler(req, res) {
   }
 
   var input = req.body || {};
+  if (input.__ping) { res.status(200).json({ pong: true, buildTag: 'DIAG3', dfLoginSet: !!process.env.DATAFORSEO_LOGIN, dfPassSet: !!process.env.DATAFORSEO_PASSWORD }); return; }
   var result = { competitors: [], pageRank: null, keywordResearch: null, narrative: null };
 
   var competitors = await findCompetitors(input);
@@ -633,7 +634,7 @@ function buildRevenueInsight(input, nicheStats) {
 async function findKeywordResearch(input) {
   var login = process.env.DATAFORSEO_LOGIN;
   var password = process.env.DATAFORSEO_PASSWORD;
-  if (!login || !password) return null;
+  if (!login || !password) return { __debug: { reason: 'missing dataforseo creds', hasLogin: !!login, hasPassword: !!password, loginLen: (login||'').length, passwordLen: (password||'').length } };
 
   var auth = Buffer.from(login + ':' + password).toString('base64');
 
@@ -658,7 +659,12 @@ async function findKeywordResearch(input) {
     .filter(Boolean)
     .filter(function (s, i, arr) { return arr.indexOf(s) === i; }); // dedupe, keep order
 
-  var found = await tryDataForSeoCandidates(mechanicalCandidates, auth);
+  // TEMP DIAGNOSTIC (5 Aug 2026, remove with the debugLog plumbing above
+  // once root-caused): collects what DataForSEO actually said for each
+  // candidate seed tried, surfaced on the result so it's visible in the
+  // API response without needing server log access.
+  var debugLog = [];
+  var found = await tryDataForSeoCandidates(mechanicalCandidates, auth, debugLog);
 
   // Standing rule (ReaderBull_Project_Rules.md, rule 12): keyword research
   // must never come back empty to the author. If every mechanical seed
@@ -669,19 +675,24 @@ async function findKeywordResearch(input) {
   // (well under a cent), it only fires on the book where every mechanical
   // seed dead-ends, confirmed live 29 July 2026 this happens for real
   // (a book categorised "Medical Child Psychology" with no author keyword).
+  var aiSeeds = [];
   if (!found.items.length) {
-    var aiSeeds = await generateSearchSeeds(input);
+    aiSeeds = await generateSearchSeeds(input);
     if (aiSeeds.length) {
-      found = await tryDataForSeoCandidates(aiSeeds, auth);
+      found = await tryDataForSeoCandidates(aiSeeds, auth, debugLog);
     }
   }
 
-  if (!found.items.length) return null;
+  if (!found.items.length) {
+    // TEMP DIAGNOSTIC (5 Aug 2026): surface why on the null path too.
+    return { __debug: { mechanicalCandidates: mechanicalCandidates, aiSeeds: aiSeeds, calls: debugLog } };
+  }
 
   var classified = await classifyKeywords(input, found.seed, found.items);
   if (classified) {
     classified.totalFound = found.totalFound;
     classified.seedKeyword = found.seed;
+    classified.__debug = { mechanicalCandidates: mechanicalCandidates, aiSeeds: aiSeeds, calls: debugLog };
     return classified;
   }
 
@@ -692,14 +703,15 @@ async function findKeywordResearch(input) {
     seedKeyword: found.seed,
     totalFound: found.totalFound,
     amazonKeywords: found.items.slice(0, 30).map(function (it) { return { keyword: it.keyword, volume: it.volume, status: 'Use' }; }),
-    recommendedKeywords: []
+    recommendedKeywords: [],
+    __debug: { mechanicalCandidates: mechanicalCandidates, aiSeeds: aiSeeds, calls: debugLog }
   };
 }
 
 // Tries each candidate seed against DataForSEO in order, stops at the first
 // one that returns at least one keyword. Shared by the mechanical-candidate
 // pass and the AI-guessed-candidate pass in findKeywordResearch above.
-async function tryDataForSeoCandidates(candidates, auth) {
+async function tryDataForSeoCandidates(candidates, auth, debugLog) {
   var items = [];
   var totalFound = 0;
   var seed = null;
@@ -730,9 +742,26 @@ async function tryDataForSeoCandidates(candidates, auth) {
         }])
       });
       var data = await response.json();
+      // TEMP DIAGNOSTIC (5 Aug 2026, remove once keyword research gap is
+      // root-caused): DataForSEO returns HTTP 200 even on task-level
+      // errors (bad auth, low balance, invalid params), the real error
+      // lives in data.status_code / tasks[0].status_message, which this
+      // endpoint has never surfaced anywhere, so failures here have been
+      // silent. Capturing it in the API response temporarily.
+      var task = data.tasks && data.tasks[0];
+      if (debugLog) {
+        debugLog.push({
+          seed: seed,
+          httpOk: response.ok,
+          httpStatus: response.status,
+          topStatusCode: data.status_code,
+          topStatusMessage: data.status_message,
+          taskStatusCode: task && task.status_code,
+          taskStatusMessage: task && task.status_message
+        });
+      }
       if (!response.ok) continue;
 
-      var task = data.tasks && data.tasks[0];
       var result = task && task.result && task.result[0];
       if (!result) continue;
 
@@ -745,6 +774,7 @@ async function tryDataForSeoCandidates(candidates, auth) {
 
       if (items.length) break; // this seed worked, stop trying further candidates
     } catch (err) {
+      if (debugLog) debugLog.push({ seed: seed, error: String(err && err.message || err) });
       // try the next candidate seed
       continue;
     }

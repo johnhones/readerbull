@@ -31,12 +31,12 @@
 // using this cached data, no repeat DataForSEO call per click.
 //
 // Standing rule (ReaderBull_Project_Rules.md, rule 12): keyword research
-// must never come back empty. findKeywordResearch tries category, then the
-// author's own keyword, then the book title against DataForSEO; if all of
-// those dead-end (or there was nothing to try), it asks Claude to guess two
-// natural shopper-style search phrases and retries with those before giving
-// up. This adds at most one extra cheap Anthropic call, only on the rare
-// book where every mechanical seed fails.
+// must never come back empty. findKeywordResearch tries the best available
+// seed against DataForSEO exactly once (cost-capped, see the comment on
+// findKeywordResearch below); if that single paid call comes back empty,
+// it asks Claude to suggest search-style keywords with no live search
+// volume, so the author is never shown a truly empty result, without ever
+// paying for a second DataForSEO lookup.
 //
 // POST { title, category, keywords, asin, price, rating, reviewCount,
 //        bestsellerRank, storeWideRank, boughtTogether }
@@ -77,6 +77,16 @@
 // findKeywordResearch) mean a garbage or empty request walks every
 // fallback before giving up, so one hit could trigger far more paid
 // SerpApi/DataForSEO/Anthropic calls than a real, valid audit does.
+//
+// Cost cap (5 August 2026, per John: worst case must never exceed a few
+// cents): findKeywordResearch previously retried up to 3 mechanical seeds
+// then up to 3 AI-guessed seeds against DataForSEO, up to 6 paid calls on
+// a bad book. Now capped at exactly one paid DataForSEO call per audit,
+// backed by a shared cross-author cache (keyword_research_cache table) so
+// repeat seeds across different authors' books cost nothing at all. If
+// that single call comes back empty, falls back to free AI-suggested
+// keywords (Claude-generated, no live search volume) rather than a second
+// paid lookup, see findKeywordResearch and tryDataForSeoSingleCall below.
 
 var rateLimit = require('./_auth');
 var MAX_PER_HOUR = 15;
@@ -246,7 +256,8 @@ async function findCompetitors(input) {
 
 // Tries each candidate search term against SerpApi's Amazon Search engine
 // in order, stops at the first one that returns at least one real
-// (non-own-ASIN, titled) result. Mirrors tryDataForSeoCandidates below.
+// (non-own-ASIN, titled) result. Mirrors the single-call DataForSEO helper
+// used by findKeywordResearch.
 async function trySerpApiCompetitorCandidates(candidates, apiKey, ownAsin) {
   for (var c = 0; c < candidates.length; c++) {
     var query = candidates[c];
@@ -616,12 +627,91 @@ function buildRevenueInsight(input, nicheStats) {
 }
 
 // ---------- Keyword research (DataForSEO Amazon Related Keywords + Anthropic classification) ----------
-// Two paid calls: one DataForSEO request for related keywords with
-// volume, one Anthropic call to classify them the way the legacy
-// dashboards were hand-built (Use/Skip on the full list, a curated
-// Priority/Best Fit subset), since DataForSEO returns raw related terms
-// with no relevance judgment of its own (it doesn't know this is a
-// non-fiction reincarnation book vs a manga, for example).
+// Cost-capped (5 August 2026, per John: worst case must never exceed a
+// couple of cents, zero exceptions). Picks the single best available seed
+// term (author's own primary keyword first, since that's the most
+// deliberate signal, falling back to category then title), checks a
+// shared cross-author cache first (keyword_research_cache table, so a
+// popular seed only ever costs DataForSEO money once across every author
+// using Readerbull), and if it's a genuine cache miss makes exactly ONE
+// paid DataForSEO call, never a chain of retries. If that single call
+// comes back empty, falls back to free Claude-suggested search terms
+// (generateSearchSeeds, already existed for the old retry chain) with no
+// live search volume attached, rather than paying for a second DataForSEO
+// lookup. This satisfies ReaderBull_Project_Rules.md rule 12 (keyword
+// research must never come back completely empty) without the old
+// worst-case cost of up to 6 paid calls per audit.
+var KEYWORD_CACHE_SUPABASE_URL = 'https://tqkeqjisqqvxasyzrfax.supabase.co';
+
+function normalizeSeed(seed) {
+  return String(seed || '').toLowerCase().trim().replace(/\s+/g, ' ');
+}
+
+// Looks up a previously-fetched DataForSEO result for this normalized
+// seed. TTL is 30 days for a real (non-empty) result, 7 days for a
+// confirmed-empty one (so a temporarily-thin term gets retried sooner
+// than a well-established one). Service-role key only, this table has no
+// public policies. Best-effort: any lookup failure is treated as a cache
+// miss rather than blocking the audit.
+async function lookupKeywordCache(seed) {
+  var serviceKey = process.env.SUPABASE_SERVICE_ROLE_KEY;
+  if (!serviceKey) return null;
+  var normalized = normalizeSeed(seed);
+  if (!normalized) return null;
+
+  try {
+    var response = await fetch(
+      KEYWORD_CACHE_SUPABASE_URL + '/rest/v1/keyword_research_cache?select=*&normalized_seed=eq.' + encodeURIComponent(normalized),
+      { headers: { apikey: serviceKey, Authorization: 'Bearer ' + serviceKey } }
+    );
+    if (!response.ok) return null;
+    var rows = await response.json();
+    var row = Array.isArray(rows) ? rows[0] : null;
+    if (!row) return null;
+
+    var ttlMs = row.is_empty ? (7 * 24 * 60 * 60 * 1000) : (30 * 24 * 60 * 60 * 1000);
+    var ageMs = Date.now() - new Date(row.fetched_at).getTime();
+    if (ageMs > ttlMs) return null; // stale, treat as a miss, pay for a fresh lookup
+
+    return { items: row.items || [], totalFound: row.total_found || 0, seed: row.seed_keyword };
+  } catch (err) {
+    return null;
+  }
+}
+
+// Upserts a fresh DataForSEO result into the shared cache, keyed by the
+// normalized seed. Best-effort: a write failure never blocks the audit,
+// it just means the next author with the same seed pays for a fresh call
+// too, no different from the cache not existing at all.
+async function writeKeywordCache(seed, found) {
+  var serviceKey = process.env.SUPABASE_SERVICE_ROLE_KEY;
+  if (!serviceKey) return;
+  var normalized = normalizeSeed(seed);
+  if (!normalized) return;
+
+  try {
+    await fetch(KEYWORD_CACHE_SUPABASE_URL + '/rest/v1/keyword_research_cache?on_conflict=normalized_seed', {
+      method: 'POST',
+      headers: {
+        apikey: serviceKey,
+        Authorization: 'Bearer ' + serviceKey,
+        'Content-Type': 'application/json',
+        Prefer: 'resolution=merge-duplicates,return=minimal'
+      },
+      body: JSON.stringify({
+        normalized_seed: normalized,
+        seed_keyword: seed,
+        items: found.items || [],
+        total_found: found.totalFound || 0,
+        is_empty: !(found.items && found.items.length),
+        fetched_at: new Date().toISOString()
+      })
+    });
+  } catch (err) {
+    // best-effort, a cache write failure just means no caching this time
+  }
+}
+
 async function findKeywordResearch(input) {
   var login = process.env.DATAFORSEO_LOGIN;
   var password = process.env.DATAFORSEO_PASSWORD;
@@ -629,15 +719,12 @@ async function findKeywordResearch(input) {
 
   var auth = Buffer.from(login + ':' + password).toString('base64');
 
-  // Build a short list of mechanical candidate seed terms to try, in order.
-  // Amazon's real category names (pulled by import-book.js) are often formal
-  // browse node labels like "Personal Transformation Self-Help" rather than
-  // something a reader would actually type into search, and DataForSEO's
-  // related-keywords endpoint returns zero results for a lot of those
-  // (confirmed live 29 July 2026: "Personal Transformation Self-Help"
-  // returned 0 items, "self help" returned 30). So try the category leaf
-  // first, then the author's own primary backend keyword if they gave one,
-  // then the book title as a last mechanical option.
+  // Single best seed, not a candidate list: the author's own primary
+  // backend keyword is the most deliberate signal when they gave one,
+  // falling back to the category leaf (stripped to its last segment,
+  // Amazon's formal browse-node labels are often stiff catalogue terms
+  // rather than something a shopper would type), then the book title as
+  // a last mechanical option.
   var categorySeed = String(input.category || '').trim();
   if (categorySeed.indexOf('>') !== -1) {
     var segments = categorySeed.split('>').map(function (s) { return s.trim(); }).filter(Boolean);
@@ -646,29 +733,33 @@ async function findKeywordResearch(input) {
   var primaryKeywordSeed = String(input.keywords || '').split(',').map(function (k) { return k.trim(); }).filter(Boolean)[0] || '';
   var titleSeed = String(input.title || '').trim();
 
-  var mechanicalCandidates = [categorySeed, primaryKeywordSeed, titleSeed]
-    .filter(Boolean)
-    .filter(function (s, i, arr) { return arr.indexOf(s) === i; }); // dedupe, keep order
+  var bestSeed = primaryKeywordSeed || categorySeed || titleSeed || null;
+  if (!bestSeed) return null;
 
-  var found = await tryDataForSeoCandidates(mechanicalCandidates, auth);
-
-  // Standing rule (ReaderBull_Project_Rules.md, rule 12): keyword research
-  // must never come back empty to the author. If every mechanical seed
-  // (category, author keyword, title) failed to return anything, or there
-  // was no author keyword to try at all, ask Claude to guess a couple of
-  // short, natural phrases a reader would actually type into Amazon search
-  // for a book like this, then retry with those. One extra cheap AI call
-  // (well under a cent), it only fires on the book where every mechanical
-  // seed dead-ends, confirmed live 29 July 2026 this happens for real
-  // (a book categorised "Medical Child Psychology" with no author keyword).
-  if (!found.items.length) {
-    var aiSeeds = await generateSearchSeeds(input);
-    if (aiSeeds.length) {
-      found = await tryDataForSeoCandidates(aiSeeds, auth);
-    }
+  var found = await lookupKeywordCache(bestSeed);
+  if (!found) {
+    found = await tryDataForSeoSingleCall(bestSeed, auth);
+    writeKeywordCache(bestSeed, found); // fire-and-forget, don't block the response on a cache write
   }
 
-  if (!found.items.length) return null;
+  // Standing rule (ReaderBull_Project_Rules.md, rule 12): keyword research
+  // must never come back empty to the author. But the single paid
+  // DataForSEO call above (or a cached miss) is as far as this ever pays
+  // for. If it's genuinely empty, fall back to free Claude-suggested
+  // search terms with no live search volume, rather than a second paid
+  // DataForSEO lookup.
+  if (!found.items.length) {
+    var aiSeeds = await generateSearchSeeds(input);
+    if (!aiSeeds.length) return null;
+
+    return {
+      seedKeyword: bestSeed,
+      totalFound: 0,
+      suggestedOnly: true,
+      amazonKeywords: [],
+      recommendedKeywords: aiSeeds.map(function (s) { return { keyword: s, volume: null, status: 'Suggested' }; })
+    };
+  }
 
   var classified = await classifyKeywords(input, found.seed, found.items);
   if (classified) {
@@ -688,61 +779,44 @@ async function findKeywordResearch(input) {
   };
 }
 
-// Tries each candidate seed against DataForSEO in order, stops at the first
-// one that returns at least one keyword. Shared by the mechanical-candidate
-// pass and the AI-guessed-candidate pass in findKeywordResearch above.
-async function tryDataForSeoCandidates(candidates, auth) {
-  var items = [];
-  var totalFound = 0;
-  var seed = null;
+// Exactly one HTTP call to DataForSEO for the given seed. Replaces the old
+// tryDataForSeoCandidates loop (which retried up to 3 candidates per
+// pass), see the cost-cap comment above findKeywordResearch.
+async function tryDataForSeoSingleCall(seed, auth) {
+  try {
+    var response = await fetch('https://api.dataforseo.com/v3/dataforseo_labs/amazon/related_keywords/live', {
+      method: 'POST',
+      headers: {
+        'Authorization': 'Basic ' + auth,
+        'Content-Type': 'application/json'
+      },
+      body: JSON.stringify([{
+        keyword: seed.toLowerCase(),
+        language_name: 'English',
+        location_code: 2840,
+        depth: 2,
+        limit: 30,
+        include_seed_keyword: true
+      }])
+    });
+    var data = await response.json();
+    if (!response.ok) return { items: [], totalFound: 0, seed: seed };
 
-  for (var c = 0; c < candidates.length; c++) {
-    seed = candidates[c];
-    try {
-      var response = await fetch('https://api.dataforseo.com/v3/dataforseo_labs/amazon/related_keywords/live', {
-        method: 'POST',
-        headers: {
-          'Authorization': 'Basic ' + auth,
-          'Content-Type': 'application/json'
-        },
-        // Cost control (tightened 29 July 2026): a 7-keyword KDP author
-        // never needs 60 candidates, 30 is plenty of choice while keeping
-        // the Anthropic classification step (which reads every keyword)
-        // smaller and faster. DataForSEO itself barely notices the
-        // difference, it is roughly a flat $0.01 per request plus $0.0001
-        // per item, so 30 vs 60 items is a difference of about half a cent
-        // per audit either way.
-        body: JSON.stringify([{
-          keyword: seed.toLowerCase(),
-          language_name: 'English',
-          location_code: 2840,
-          depth: 2,
-          limit: 30,
-          include_seed_keyword: true
-        }])
-      });
-      var data = await response.json();
-      if (!response.ok) continue;
+    var task = data.tasks && data.tasks[0];
+    var result = task && task.result && task.result[0];
+    if (!result) return { items: [], totalFound: 0, seed: seed };
 
-      var task = data.tasks && data.tasks[0];
-      var result = task && task.result && task.result[0];
-      if (!result) continue;
+    var totalFound = result.total_count || (result.items ? result.items.length : 0);
+    var items = (result.items || []).map(function (it) {
+      var kd = it.keyword_data || {};
+      var info = kd.keyword_info || {};
+      return { keyword: kd.keyword || null, volume: (typeof info.search_volume === 'number') ? info.search_volume : null };
+    }).filter(function (it) { return it.keyword; });
 
-      totalFound = result.total_count || (result.items ? result.items.length : 0);
-      items = (result.items || []).map(function (it) {
-        var kd = it.keyword_data || {};
-        var info = kd.keyword_info || {};
-        return { keyword: kd.keyword || null, volume: (typeof info.search_volume === 'number') ? info.search_volume : null };
-      }).filter(function (it) { return it.keyword; });
-
-      if (items.length) break; // this seed worked, stop trying further candidates
-    } catch (err) {
-      // try the next candidate seed
-      continue;
-    }
+    return { items: items, totalFound: totalFound, seed: seed };
+  } catch (err) {
+    return { items: [], totalFound: 0, seed: seed };
   }
-
-  return { items: items, totalFound: totalFound, seed: seed };
 }
 
 // Last-resort seed guesser (ReaderBull_Project_Rules.md, rule 12). Asks

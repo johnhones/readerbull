@@ -99,12 +99,9 @@
         <div class="pricing-books">Up to 3 books</div>
         <div class="pricing-price" id="plus-price" data-monthly="$9<span>/month</span>" data-yearly="$90<span>/year</span>">$9<span>/month</span></div>
         <div class="pricing-period-note" id="plus-note" data-monthly="Billed monthly" data-yearly="Billed yearly, about $7.50/month">Billed monthly</div>
-        <a href="signup.html" class="btn btn-primary">Get started</a>
-        <div class="pricing-includes">Includes:</div>
+        <button type="button" class="btn btn-primary" id="plus-cta">Get started</button>
+        <div class="pricing-includes">Everything in Free, plus:</div>
         <ul>
-          <li><i class="ti ti-circle-check"></i> Full Discoverability Score and action plan</li>
-          <li><i class="ti ti-circle-check"></i> <span><strong style="color:var(--navy);">Build Your ARC:</strong> earn regular, free, Amazon-compliant reviews for your book, read others' in return</span></li>
-          <li><i class="ti ti-circle-check"></i> Real competitor and keyword research</li>
           <li><i class="ti ti-circle-check"></i> More frequent score refreshes</li>
           <li><i class="ti ti-circle-check"></i> <span><strong style="color:var(--navy);">Guided Readerbull Ads Campaign Tool:</strong> run book ads across Amazon and other social media sites</span></li>
         </ul>
@@ -115,15 +112,10 @@
         <h3>Pro</h3>
         <div class="pricing-books">4 to 10 books</div>
         <div class="pricing-price" id="pro-price" data-monthly="$28<span>/month</span>" data-yearly="$280<span>/year</span>">$28<span>/month</span></div>
-        <div class="pricing-period-note" id="pro-note" data-monthly="Billed monthly" data-yearly="Billed yearly, about $23/month">Billed monthly</div>
-        <a href="signup.html" class="btn btn-outline">Get started</a>
-        <div class="pricing-includes">Includes:</div>
+        <div class="pricing-period-note" id="pro-note" data-monthly="Billed monthly" data-yearly="Billed yearly, about $23.33/month">Billed monthly</div>
+        <button type="button" class="btn btn-outline" id="pro-cta">Get started</button>
+        <div class="pricing-includes">Everything in Plus, plus:</div>
         <ul>
-          <li><i class="ti ti-circle-check"></i> Full Discoverability Score and action plan</li>
-          <li><i class="ti ti-circle-check"></i> <span><strong style="color:var(--navy);">Build Your ARC:</strong> earn regular, free, Amazon-compliant reviews for your book, read others' in return</span></li>
-          <li><i class="ti ti-circle-check"></i> Real competitor and keyword research</li>
-          <li><i class="ti ti-circle-check"></i> More frequent score refreshes</li>
-          <li><i class="ti ti-circle-check"></i> <span><strong style="color:var(--navy);">Guided Readerbull Ads Campaign Tool:</strong> run book ads across Amazon and other social media sites</span></li>
           <li><i class="ti ti-circle-check"></i> Portfolio-level analysis across your whole catalogue, series and cross-promotion opportunities</li>
           <li><i class="ti ti-circle-check"></i> Deeper competitor tracking over time</li>
         </ul>
@@ -136,15 +128,8 @@
         <div class="pricing-price" style="font-size:24px;">Custom pricing</div>
         <div class="pricing-period-note">Contact us for a quote</div>
         <a href="mailto:coastlvibes@gmail.com?subject=Readerbull%20Custom%20plan" class="btn btn-outline">Contact us</a>
-        <div class="pricing-includes">Includes:</div>
+        <div class="pricing-includes">Everything in Pro, plus:</div>
         <ul>
-          <li><i class="ti ti-circle-check"></i> Full Discoverability Score and action plan</li>
-          <li><i class="ti ti-circle-check"></i> <span><strong style="color:var(--navy);">Build Your ARC:</strong> earn regular, free, Amazon-compliant reviews for your book, read others' in return</span></li>
-          <li><i class="ti ti-circle-check"></i> Real competitor and keyword research</li>
-          <li><i class="ti ti-circle-check"></i> More frequent score refreshes</li>
-          <li><i class="ti ti-circle-check"></i> <span><strong style="color:var(--navy);">Guided Readerbull Ads Campaign Tool:</strong> run book ads across Amazon and other social media sites</span></li>
-          <li><i class="ti ti-circle-check"></i> Portfolio-level analysis across your whole catalogue, series and cross-promotion opportunities</li>
-          <li><i class="ti ti-circle-check"></i> Deeper competitor tracking over time</li>
           <li><i class="ti ti-circle-check"></i> Usage-based add-ons for heavier refresh frequency</li>
           <li><i class="ti ti-circle-check"></i> Dedicated handling for presses and agencies</li>
         </ul>
@@ -152,7 +137,8 @@
 
     </div>
 
-    <p class="pricing-disclaimer">Plus, Pro and Custom pricing is shown for reference. Payment isn't live yet, every account today gets full access to the Discoverability Score and action plan at no cost while we finish building the paid tiers.</p>
+    <p class="pricing-disclaimer" id="pricing-disclaimer">Plus, Pro and Custom pricing is shown for reference. Payment isn't live yet, every account today gets full access to the Discoverability Score and action plan at no cost while we finish building the paid tiers.</p>
+    <div class="detail-error" id="pricing-cta-error" style="display:none;max-width:420px;margin:12px auto 0;text-align:center;"></div>
   </div>
 </div>
 
@@ -160,18 +146,21 @@
 <div class="ftr">
   <div class="wrap">
     <div class="ftr-logo"><span class="logo-mark"><img src="readerbull-icon.png" alt="Readerbull"></span>readerbull</div>
-    <div class="ftr-links"><a href="privacy.html">Privacy Policy</a><a href="terms.html">Terms of Service</a></div>
     <small>&copy; 2026 Readerbull. A platform that helps you sell more books.</small>
   </div>
 </div>
 
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.js"></script>
+<script src="supabase-client.js"></script>
 <script>
 var toggleMonthly = document.getElementById('toggle-monthly');
 var toggleYearly = document.getElementById('toggle-yearly');
 var priceEls = document.querySelectorAll('.pricing-price[data-monthly]');
 var noteEls = document.querySelectorAll('.pricing-period-note[data-monthly]');
+var selectedInterval = 'monthly';
 
 function setPeriod(period) {
+  selectedInterval = period;
   toggleMonthly.classList.toggle('active', period === 'monthly');
   toggleYearly.classList.toggle('active', period === 'yearly');
   priceEls.forEach(function (el) { el.innerHTML = el.getAttribute('data-' + period); });
@@ -180,9 +169,47 @@ function setPeriod(period) {
 
 toggleMonthly.addEventListener('click', function () { setPeriod('monthly'); });
 toggleYearly.addEventListener('click', function () { setPeriod('yearly'); });
+
+// Plus/Pro checkout (payment system build, 5 August 2026). Signed-in
+// authors go straight to Stripe Checkout via the same endpoint
+// dashboard.html's Billing modal uses; signed-out visitors go to signup
+// first (checkout only makes sense once there's an account to attach the
+// subscription to), landing back here to try again once they're in.
+var ctaError = document.getElementById('pricing-cta-error');
+
+async function startPlan(plan) {
+  ctaError.style.display = 'none';
+  var sessionResult = await readerbull.client.auth.getSession();
+  var session = sessionResult.data && sessionResult.data.session;
+
+  if (!session) {
+    window.location.href = 'signup.html';
+    return;
+  }
+
+  try {
+    var resp = await fetch('/api/create-checkout-session', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', Authorization: 'Bearer ' + session.access_token },
+      body: JSON.stringify({ plan: plan, interval: selectedInterval, origin: window.location.origin })
+    });
+    var data = await resp.json();
+    if (!resp.ok || !data.url) {
+      ctaError.textContent = data.error || 'Could not start checkout, please try again.';
+      ctaError.style.display = 'block';
+      return;
+    }
+    window.location.href = data.url;
+  } catch (err) {
+    ctaError.textContent = 'Could not reach Stripe, please try again.';
+    ctaError.style.display = 'block';
+  }
+}
+
+document.getElementById('plus-cta').addEventListener('click', function () { startPlan('plus'); });
+document.getElementById('pro-cta').addEventListener('click', function () { startPlan('pro'); });
 </script>
 <script src="nav.js"></script>
-<script src="cookie-notice.js"></script>
 
 </body>
 </html>
