@@ -641,6 +641,14 @@ function buildRevenueInsight(input, nicheStats) {
 // lookup. This satisfies ReaderBull_Project_Rules.md rule 12 (keyword
 // research must never come back completely empty) without the old
 // worst-case cost of up to 6 paid calls per audit.
+//
+// Book portfolio opportunity (8 August 2026): classifyKeywords below also
+// flags up to 2 keywords from this same DataForSEO pull that read as a
+// genuinely different book topic, not just a variant of this book. Zero
+// new paid calls, rides on the existing classification call. Surfaced in
+// dashboard.html as a small "Book Portfolio Opportunity" card on the
+// Keywords tab, only when non-empty. New/refreshed audits only, per John,
+// the ~15 existing legacy audits were deliberately not backfilled.
 var KEYWORD_CACHE_SUPABASE_URL = 'https://tqkeqjisqqvxasyzrfax.supabase.co';
 
 function normalizeSeed(seed) {
@@ -757,7 +765,11 @@ async function findKeywordResearch(input) {
       totalFound: 0,
       suggestedOnly: true,
       amazonKeywords: [],
-      recommendedKeywords: aiSeeds.map(function (s) { return { keyword: s, volume: null, status: 'Suggested' }; })
+      recommendedKeywords: aiSeeds.map(function (s) { return { keyword: s, volume: null, status: 'Suggested' }; }),
+      // No portfolio opportunity signal here either, classifyKeywords never ran
+      // (there was nothing from DataForSEO to classify), same empty-array
+      // convention used throughout this file.
+      portfolioOpportunities: []
     };
   }
 
@@ -775,7 +787,12 @@ async function findKeywordResearch(input) {
     seedKeyword: found.seed,
     totalFound: found.totalFound,
     amazonKeywords: found.items.slice(0, 30).map(function (it) { return { keyword: it.keyword, volume: it.volume, status: 'Use' }; }),
-    recommendedKeywords: []
+    recommendedKeywords: [],
+    // Classification (classifyKeywords) is what actually spots portfolio
+    // opportunities, this branch only runs when that call failed (e.g. no
+    // Anthropic key), so there's nothing to report, same empty-array
+    // convention as recommendedKeywords above.
+    portfolioOpportunities: []
   };
 }
 
@@ -904,9 +921,21 @@ async function classifyKeywords(input, seed, items) {
     'From the "Use" keywords, pick up to 8 for a "Recommended" list, the strongest few as ' +
     '"Priority" and the rest as "Best Fit", the ones most worth putting in the author\'s 7 KDP ' +
     'backend keyword fields. ' +
+    'Portfolio opportunity (added 8 August 2026, reuses this same keyword list, no extra paid ' +
+    'call): separately from the Use/Skip/Recommended judgment above, look for up to 2 keywords in ' +
+    'the SAME list that represent a genuinely different book topic or niche, not a variant, synonym ' +
+    'or sub-angle of THIS book (for example, if this book is about reincarnation, "twin flame" or ' +
+    '"shadow work" would qualify as a different topic, but "past life regression" would not, that\'s ' +
+    'still this book\'s own topic). Only include a keyword here if a knowledgeable KDP consultant ' +
+    'would genuinely say "that\'s a different book", not just a different phrasing of this one. It is ' +
+    'completely fine, and expected most of the time, for this list to be empty, only include a ' +
+    'keyword when the fit is real. For each one, write a single short sentence explaining why it ' +
+    'reads as a distinct opportunity rather than an angle on the current book. Never invent a ' +
+    'keyword or volume beyond what is given in the list below. ' +
     'Respond with ONLY a JSON object, no markdown fences, no commentary, matching exactly this shape: ' +
     '{"amazonKeywords": [{"keyword": "...", "volume": <number or null>, "status": "Use"|"Skip"}], ' +
-    '"recommendedKeywords": [{"keyword": "...", "volume": <number or null>, "status": "Priority"|"Best Fit"}]}. ' +
+    '"recommendedKeywords": [{"keyword": "...", "volume": <number or null>, "status": "Priority"|"Best Fit"}], ' +
+    '"portfolioOpportunities": [{"keyword": "...", "volume": <number or null>, "why": "one short sentence"}]}. ' +
     'Include every keyword given to you exactly once in amazonKeywords, preserve the volume value given. ' +
     'Output MINIFIED JSON on a single line, no indentation, no line breaks, no extra spaces, this keeps ' +
     'the response short enough to never get cut off.';
@@ -962,6 +991,11 @@ async function classifyKeywords(input, seed, items) {
 
     if (!parsed || !Array.isArray(parsed.amazonKeywords)) return null;
     parsed.recommendedKeywords = Array.isArray(parsed.recommendedKeywords) ? parsed.recommendedKeywords.slice(0, 8) : [];
+    // Portfolio opportunity (8 August 2026): defensive default so
+    // dashboard.html can always assume an array, never undefined, same
+    // convention as recommendedKeywords above. Capped at 2, matching the
+    // limit already told to the model in the system prompt.
+    parsed.portfolioOpportunities = Array.isArray(parsed.portfolioOpportunities) ? parsed.portfolioOpportunities.slice(0, 2) : [];
     return parsed;
   } catch (err) {
     return null;
