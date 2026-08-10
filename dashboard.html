@@ -1653,6 +1653,36 @@
     );
   }
 
+  // Book portfolio opportunity (8 August 2026): surfaces up to 2 keywords
+  // from this book's own keyword research (api/enrich-audit.js's
+  // findKeywordResearch, one paid DataForSEO call, already fetched) that
+  // classifyKeywords flagged as a genuinely different book topic, not a
+  // variant of this book. No new paid call, reuses data already on the
+  // page. Most books won't have one, an empty array is expected and not
+  // treated as a gap, so this simply renders nothing in that case.
+  function portfolioOpportunityHtml(items) {
+    if (!items || !items.length) return '';
+    var rows = items.map(function (item) {
+      var volume = (item.volume === null || item.volume === undefined || item.volume === '')
+        ? ''
+        : (' &middot; ' + escapeHtml(String(item.volume)) + ' searches/mo');
+      return (
+        '<div style="padding:10px 0;border-bottom:1px solid var(--border);">' +
+          '<strong>' + escapeHtml(item.keyword || '') + '</strong>' + volume +
+          (item.why ? '<div style="color:var(--muted);font-size:13px;margin-top:4px;">' + escapeHtml(item.why) + '</div>' : '') +
+        '</div>'
+      );
+    }).join('');
+
+    return (
+      '<div class="breakdown-card" style="margin-top:24px;">' +
+        '<h2>Book Portfolio Opportunity</h2>' +
+        '<p>Spotted in this book\'s own keyword research: a related topic with real search demand that reads as a genuinely different book, not just another angle on this one.</p>' +
+        rows +
+      '</div>'
+    );
+  }
+
   function keywordsHtml(b) {
     var list = currentKeywordList(b);
     var chipsHtml = list.length
@@ -1695,7 +1725,8 @@
           ? '<p style="font-size:13px;color:var(--muted);margin-top:16px;">Researched ' + escapeHtml(String(research.totalFound)) + ' keywords for "' + escapeHtml(research.seedKeyword || '') + '". Add any of them straight to your 7 KDP fields below.</p>'
           : '') +
         keywordTableHtml('Amazon Keywords', 'Every related keyword found for this niche, flagged Use or Skip.', research.amazonKeywords, list, null) +
-        keywordTableHtml('Readerbull Recommended Keywords', 'The strongest picks for your 7 KDP backend keyword fields, ranked by fit.', recommended, list, recommendedBlurAfter);
+        keywordTableHtml('Readerbull Recommended Keywords', 'The strongest picks for your 7 KDP backend keyword fields, ranked by fit.', recommended, list, recommendedBlurAfter) +
+        portfolioOpportunityHtml(research.portfolioOpportunities);
     } else {
       researchHtml = '<p style="font-size:13px;color:var(--muted);margin-top:16px;">Keyword research for this book has not run yet, or turned up nothing usable. It runs automatically the next time this book is re-submitted through onboarding.</p>';
     }
