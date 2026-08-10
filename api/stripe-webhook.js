@@ -39,15 +39,20 @@ var PLAN_BY_PRICE = {
   'price_1U0rTrBqkDn8JXbQ7Vn3GACI': { plan: 'pro', interval: 'yearly' }
 };
 
-// Matches the live pricing page (pricing.html): Free up to 3 books,
-// Plus 4 to 10, Pro 11 to 30. Publisher (30+) is contact-us only,
+// Matches the live pricing page (pricing.html): Free 1 book, Plus up
+// to 3 books, Pro 4 to 10 books. Custom (11+) is contact-us only,
 // handled manually by John via Supabase directly, same as legacy
-// dashboard onboarding, never reached through this webhook. Fixed 6
-// August 2026: this previously said { free: 1, plus: 3, pro: 10 },
-// which didn't match pricing.html's actual copy at all (it matched an
-// older draft of the tiers), so a real Plus subscriber would have been
-// capped at 3 books instead of the 10 they were promised.
-var BOOK_LIMIT_BY_PLAN = { free: 3, plus: 10, pro: 30 };
+// dashboard onboarding, never reached through this webhook.
+//
+// Fixed 10 August 2026: this had drifted to { free: 3, plus: 10,
+// pro: 30 } via a commit that mistakenly believed those numbers
+// matched pricing.html. They didn't. Verified directly against the
+// live pricing.html copy today, which is the single source of truth
+// for these numbers, not any past commit message or handover
+// document (see ReaderBull_Master_Handover.md Section 7.1). A real
+// Plus subscriber was being granted 10 books instead of the 3 they
+// paid for.
+var BOOK_LIMIT_BY_PLAN = { free: 1, plus: 3, pro: 10 };
 
 module.exports = async function handler(req, res) {
   if (req.method !== 'POST') {
