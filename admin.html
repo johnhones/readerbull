@@ -1,0 +1,160 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<meta name="robots" content="noindex, nofollow">
+<link rel="stylesheet" href="style.css">
+<title>Readerbull: Admin</title>
+<style>
+  /* Page-specific only, everything else reuses style.css so this looks
+     like the rest of the site rather than a bolted-on tool. */
+  .admin-wrap { max-width: 1100px; margin: 40px auto; padding: 0 20px; }
+  .admin-gate { max-width: 360px; margin: 120px auto; text-align: center; }
+  .admin-gate input { width: 100%; padding: 11px 14px; border: 1.5px solid var(--border); border-radius: 6px; font-size: 14px; margin: 16px 0; }
+  .admin-summary { display: flex; gap: 12px; margin-bottom: 20px; flex-wrap: wrap; }
+  .admin-stat { background: var(--light); border-radius: 8px; padding: 12px 18px; font-size: 13px; color: var(--mid); }
+  .admin-stat b { display: block; font-size: 20px; color: var(--navy); }
+  .plan-pill { display: inline-block; padding: 2px 9px; border-radius: 20px; font-size: 11px; font-weight: 700; text-transform: uppercase; letter-spacing: .3px; }
+  .plan-free { background: #eef0f2; color: var(--mid); }
+  .plan-plus { background: #e6f4f1; color: var(--teal-d); }
+  .plan-pro { background: #fdeee0; color: var(--orange); }
+  .status-past_due { color: #b91c1c; font-weight: 700; }
+</style>
+</head>
+<body style="background:var(--light);">
+
+<div class="admin-gate" id="admin-gate">
+  <h2 style="color:var(--navy);">Admin</h2>
+  <p style="color:var(--mid);font-size:13px;">This page is not linked from anywhere else and holds no session, enter the admin secret each visit.</p>
+  <input type="password" id="admin-secret-input" placeholder="Admin secret" autocomplete="off">
+  <div>
+    <button class="btn btn-primary" id="admin-secret-submit">View users</button>
+  </div>
+  <p id="admin-gate-error" style="color:#b91c1c;font-size:13px;display:none;margin-top:10px;"></p>
+</div>
+
+<div class="admin-wrap" id="admin-content" style="display:none;">
+  <h2 style="color:var(--navy);margin-bottom:4px;">Users</h2>
+  <p style="color:var(--mid);font-size:13px;margin-bottom:20px;">Read-only. Signup date, plan and status come from Supabase Auth and the subscriptions table; name is the author name on each user's most recent book (captured per book at onboarding, not per account).</p>
+
+  <div class="admin-summary" id="admin-summary"></div>
+
+  <div style="overflow-x:auto;">
+    <table class="dash-table" id="admin-table">
+      <thead>
+        <tr>
+          <th>Author name</th>
+          <th>Email</th>
+          <th>Plan</th>
+          <th>Status</th>
+          <th>Book limit</th>
+          <th>Signed up</th>
+        </tr>
+      </thead>
+      <tbody id="admin-table-body"></tbody>
+    </table>
+  </div>
+</div>
+
+<script>
+(function () {
+  var gate = document.getElementById('admin-gate');
+  var content = document.getElementById('admin-content');
+  var input = document.getElementById('admin-secret-input');
+  var submitBtn = document.getElementById('admin-secret-submit');
+  var errorEl = document.getElementById('admin-gate-error');
+  var summaryEl = document.getElementById('admin-summary');
+  var tbody = document.getElementById('admin-table-body');
+
+  function planPillClass(plan) {
+    if (plan === 'plus') return 'plan-plus';
+    if (plan === 'pro') return 'plan-pro';
+    return 'plan-free';
+  }
+
+  function formatDate(iso) {
+    if (!iso) return '–';
+    var d = new Date(iso);
+    if (isNaN(d.getTime())) return '–';
+    return d.toLocaleDateString('en-GB', { day: 'numeric', month: 'short', year: 'numeric' });
+  }
+
+  function escapeHtml(s) {
+    var div = document.createElement('div');
+    div.textContent = s == null ? '' : String(s);
+    return div.innerHTML;
+  }
+
+  function render(users) {
+    var planCounts = { free: 0, plus: 0, pro: 0 };
+    var pastDueCount = 0;
+    users.forEach(function (u) {
+      planCounts[u.plan] = (planCounts[u.plan] || 0) + 1;
+      if (u.status === 'past_due') pastDueCount += 1;
+    });
+
+    summaryEl.innerHTML =
+      '<div class="admin-stat"><b>' + users.length + '</b>Total authors</div>' +
+      '<div class="admin-stat"><b>' + (planCounts.free || 0) + '</b>Free</div>' +
+      '<div class="admin-stat"><b>' + (planCounts.plus || 0) + '</b>Plus</div>' +
+      '<div class="admin-stat"><b>' + (planCounts.pro || 0) + '</b>Pro</div>' +
+      (pastDueCount ? '<div class="admin-stat"><b style="color:#b91c1c;">' + pastDueCount + '</b>Past due</div>' : '');
+
+    tbody.innerHTML = users.map(function (u) {
+      var statusClass = u.status === 'past_due' ? 'status-past_due' : '';
+      return '<tr>' +
+        '<td>' + (escapeHtml(u.authorName) || '<span style="color:var(--border);">–</span>') + '</td>' +
+        '<td>' + escapeHtml(u.email) + '</td>' +
+        '<td><span class="plan-pill ' + planPillClass(u.plan) + '">' + escapeHtml(u.plan) + '</span></td>' +
+        '<td class="' + statusClass + '">' + (escapeHtml(u.status) || '–') + '</td>' +
+        '<td>' + escapeHtml(u.bookLimit) + '</td>' +
+        '<td>' + formatDate(u.createdAt) + '</td>' +
+        '</tr>';
+    }).join('');
+  }
+
+  function attempt() {
+    var secret = input.value;
+    if (!secret) return;
+    submitBtn.disabled = true;
+    submitBtn.textContent = 'Checking…';
+    errorEl.style.display = 'none';
+
+    fetch('/api/admin-users', { headers: { 'x-admin-secret': secret } })
+      .then(function (r) { return r.json().then(function (body) { return { ok: r.ok, body: body }; }); })
+      .then(function (result) {
+        if (!result.ok) {
+          throw new Error((result.body && result.body.error) || 'Could not load the user list.');
+        }
+        sessionStorage.setItem('rb_admin_secret', secret);
+        gate.style.display = 'none';
+        content.style.display = 'block';
+        render(result.body.users || []);
+      })
+      .catch(function (err) {
+        errorEl.textContent = err.message === 'Failed to fetch' ? 'Network error, try again.' : (err.message.indexOf('Unauthorized') > -1 ? 'Incorrect secret.' : err.message);
+        errorEl.style.display = 'block';
+      })
+      .finally(function () {
+        submitBtn.disabled = false;
+        submitBtn.textContent = 'View users';
+      });
+  }
+
+  submitBtn.addEventListener('click', attempt);
+  input.addEventListener('keydown', function (e) { if (e.key === 'Enter') attempt(); });
+
+  // Convenience only, cleared when the tab closes, session storage is not
+  // sent anywhere and this page is still gated behind the real check above
+  // on every load, this just saves re-typing the secret on a refresh.
+  var remembered = sessionStorage.getItem('rb_admin_secret');
+  if (remembered) {
+    input.value = remembered;
+    attempt();
+  }
+})();
+</script>
+
+</body>
+</html>
