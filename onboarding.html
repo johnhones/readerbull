@@ -104,7 +104,7 @@ readerbull
 <div id="submit-modal-loading-view" class="submit-loading" style="display:none;">
 <div class="submit-loading-icon"><img src="readerbull-icon.png" alt=""></div>
 <p class="submit-loading-message" id="submit-loading-message">Checking your competitors&hellip;</p>
-<p class="submit-loading-timer" id="submit-loading-timer">0s</p>
+<div class="submit-loading-bar-track"><div class="submit-loading-bar-fill" id="submit-loading-bar"></div></div>
 </div>
 </div>
 </div>
@@ -524,26 +524,32 @@ confirmBtn.textContent = 'Submitting...';
 document.getElementById('submit-modal-confirm-view').style.display = 'none';
 var loadingView = document.getElementById('submit-modal-loading-view');
 loadingView.style.display = 'block';
-var loadingMessages = ['Checking your competitors…', 'Researching keywords…', 'Writing your strategy…', 'Almost there…'];
-var loadingMsgIndex = 0;
-var loadingMessageEl = document.getElementById('submit-loading-message');
-var loadingTimerEl = document.getElementById('submit-loading-timer');
-loadingMessageEl.textContent = loadingMessages[0];
-loadingTimerEl.textContent = '0s';
-var loadingStart = Date.now();
-var loadingMessageInterval = setInterval(function () {
-loadingMsgIndex = (loadingMsgIndex + 1) % loadingMessages.length;
-loadingMessageEl.textContent = loadingMessages[loadingMsgIndex];
-}, 4000);
-var loadingTimerInterval = setInterval(function () {
-loadingTimerEl.textContent = Math.floor((Date.now() - loadingStart) / 1000) + 's';
-}, 1000);
-function stopLoadingView() {
-clearInterval(loadingMessageInterval);
-clearInterval(loadingTimerInterval);
-document.getElementById('submit-modal-confirm-view').style.display = 'block';
-loadingView.style.display = 'none';
-}
+var loadingMessages = ['Readerbull is sniffing out your competition…', 'Researching bullish keywords…', 'Finding profitable categories for your book…', 'Creating your Readerbull strategy…'];
+  var loadingMsgIndex = 0;
+  var loadingMessageEl = document.getElementById('submit-loading-message');
+  var loadingBarEl = document.getElementById('submit-loading-bar');
+  loadingMessageEl.textContent = loadingMessages[0];
+  loadingBarEl.style.width = '0%';
+  var loadingStart = Date.now();
+  var loadingMessageInterval = setInterval(function () {
+    loadingMsgIndex = (loadingMsgIndex + 1) % loadingMessages.length;
+    loadingMessageEl.textContent = loadingMessages[loadingMsgIndex];
+  }, 4000);
+  var loadingBarInterval = setInterval(function () {
+    var elapsedSec = (Date.now() - loadingStart) / 1000;
+    var fraction = Math.min(1, elapsedSec / 20);
+    var percent = 90 * (1 - Math.pow(1 - fraction, 2));
+    loadingBarEl.style.width = percent + '%';
+  }, 300);
+  function stopLoadingView() {
+    clearInterval(loadingMessageInterval);
+    clearInterval(loadingBarInterval);
+    loadingBarEl.style.width = '100%';
+    setTimeout(function () {
+      document.getElementById('submit-modal-confirm-view').style.display = 'block';
+      loadingView.style.display = 'none';
+    }, 250);
+  }
 
 var language = document.getElementById('lang-' + tempId).value;
 var description = document.getElementById('desc-' + tempId).value;
