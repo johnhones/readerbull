@@ -32,11 +32,15 @@ var SUPABASE_URL = 'https://tqkeqjisqqvxasyzrfax.supabase.co';
 // build step or shared-module pattern between /api files (each one is
 // deployed as its own standalone Vercel function), see the note on that
 // in create-checkout-session.js.
+//
+// Live-mode IDs (11 August 2026), this is main/production. staging
+// keeps the test-mode IDs, see the git log on this file for that
+// version, do not copy this block over there.
 var PLAN_BY_PRICE = {
-  'price_1U0rBjBqkDn8JXbQ7MpdlHOG': { plan: 'plus', interval: 'monthly' },
-  'price_1U0rVtBqkDn8JXbQec4mJSdw': { plan: 'plus', interval: 'yearly' },
-  'price_1U0rHBBqkDn8JXbQiDSbabmP': { plan: 'pro', interval: 'monthly' },
-  'price_1U0rTrBqkDn8JXbQ7Vn3GACI': { plan: 'pro', interval: 'yearly' }
+  'price_1U3KycBqkDn8JXbQJvOCJhlP': { plan: 'plus', interval: 'monthly' },
+  'price_1U3L37BqkDn8JXbQXN76YSHO': { plan: 'plus', interval: 'yearly' },
+  'price_1U3L5qBqkDn8JXbQq5nQJRnL': { plan: 'pro', interval: 'monthly' },
+  'price_1U3L5qBqkDn8JXbQJxzavRS6': { plan: 'pro', interval: 'yearly' }
 };
 
 // Matches the live pricing page (pricing.html): Free 1 book, Plus up
