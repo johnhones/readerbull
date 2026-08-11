@@ -133,8 +133,44 @@
 <script>
 var currentEmail = '';
 
+// If this visitor arrived here from a Plus/Pro click on pricing.html
+// (see the fix there, 11 August 2026), remember which plan they
+// wanted so we can send them straight to Stripe Checkout once they've
+// verified, instead of dropping them into free onboarding and losing
+// the sale.
+var requestedPlan = new URLSearchParams(window.location.search).get('plan');
+var requestedInterval = new URLSearchParams(window.location.search).get('interval') || 'monthly';
+
 function onboardingUrl() {
   return window.location.origin + window.location.pathname.replace(/signup\.html$/, '').replace(/\/$/, '') + '/onboarding.html';
+}
+
+// Only covers the same-page code-entry path below (verifyOtp), which is
+// the flow actually used in production. The magic-link-click fallback
+// (emailRedirectTo) still lands on plain onboarding, not covered by
+// this fix, a visitor who abandons the tab and clicks the email link
+// later will need to go back to pricing.html themselves.
+async function goToCheckoutOrOnboarding(accessToken) {
+  if (!requestedPlan) {
+    window.location.href = onboardingUrl();
+    return;
+  }
+  try {
+    var resp = await fetch('/api/create-checkout-session', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', Authorization: 'Bearer ' + accessToken },
+      body: JSON.stringify({ plan: requestedPlan, interval: requestedInterval, origin: window.location.origin })
+    });
+    var data = await resp.json();
+    if (resp.ok && data.url) {
+      window.location.href = data.url;
+      return;
+    }
+  } catch (err) {
+    // fall through to onboarding below, a failed checkout call should
+    // never strand a brand new author on a dead page
+  }
+  window.location.href = onboardingUrl();
 }
 
 document.getElementById('lead-form').addEventListener('submit', async function (e) {
@@ -201,7 +237,7 @@ document.getElementById('otp-step').addEventListener('submit', async function (e
   submitBtn.disabled = true;
   submitBtn.textContent = 'Verifying...';
 
-  var { error } = await readerbull.client.auth.verifyOtp({
+  var { data, error } = await readerbull.client.auth.verifyOtp({
     email: currentEmail,
     token: code,
     type: 'email'
@@ -215,7 +251,12 @@ document.getElementById('otp-step').addEventListener('submit', async function (e
     return;
   }
 
-  window.location.href = onboardingUrl();
+  var accessToken = data && data.session && data.session.access_token;
+  if (accessToken) {
+    await goToCheckoutOrOnboarding(accessToken);
+  } else {
+    window.location.href = onboardingUrl();
+  }
 });
 </script>
 

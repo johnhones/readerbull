@@ -183,7 +183,11 @@ async function startPlan(plan) {
   var session = sessionResult.data && sessionResult.data.session;
 
   if (!session) {
-    window.location.href = 'signup.html';
+    // Carry the plan the visitor actually wanted through signup, fixed
+    // 11 August 2026: this used to drop the intent entirely and dump
+    // every new customer into free onboarding instead of finishing
+    // their purchase, see signup.html for the other half of this fix.
+    window.location.href = 'signup.html?plan=' + encodeURIComponent(plan) + '&interval=' + encodeURIComponent(selectedInterval);
     return;
   }
 
