@@ -1373,14 +1373,7 @@
 
   // Narrative text from the LLM may contain paragraph breaks, render each
   // as its own <p> rather than collapsing into one escaped block.
-  function narrativeHtml(text) {
-    return String(text || '')
-      .split(/\n\s*\n/)
-      .map(function (p) { return p.trim(); })
-      .filter(Boolean)
-      .map(function (p) { return '<p>' + escapeHtml(p) + '</p>'; })
-      .join('');
-  }
+  function narrativeHtml(text) { var raw = String(text || '').trim(); var paragraphs = raw.split(/\n\s*\n/).map(function (p) { return p.trim(); }).filter(Boolean); if (paragraphs.length <= 1 && raw) { var sentences = raw.match(/[^.!?]+[.!?]+(\s+|$)/g) || [raw]; var chunks = []; var current = ''; var count = 0; sentences.forEach(function (s) { current += s; count++; if (count >= 3) { chunks.push(current.trim()); current = ''; count = 0; } }); if (current.trim()) chunks.push(current.trim()); paragraphs = chunks.length ? chunks : paragraphs; } return paragraphs.map(function (p) { return '<p>' + escapeHtml(p) + '</p>'; }).join(''); }
 
   function statRow(label, value) {
     return '<div style="display:flex;justify-content:space-between;padding:10px 0;border-bottom:1px solid var(--border);font-size:14px;">' +
