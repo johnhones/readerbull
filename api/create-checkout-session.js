@@ -23,19 +23,21 @@
 // Header: Authorization: Bearer <supabase access token>
 // -> { url: "https://checkout.stripe.com/..." }
 
-// Price IDs created in Stripe (test mode, 4 August 2026), confirmed
+// Live-mode Price IDs (created in Stripe 11 August 2026), confirmed
 // against the live pricing page's own figures ($9/$90 Plus, $28/$280
-// Pro). Swap these for the live-mode equivalents when this goes live on
-// main, see the note in ReaderBull_Infrastructure.md's payment section
-// once that's added.
+// Pro). This is main/production, so these are real, chargeable prices,
+// not test-mode ones, STRIPE_SECRET_KEY in Vercel's Production
+// environment must be the matching live secret key or these Price IDs
+// will not resolve. staging keeps the test-mode IDs, see the git log
+// on this file for that version.
 var PRICE_IDS = {
   plus: {
-    monthly: 'price_1U0rBjBqkDn8JXbQ7MpdlHOG',
-    yearly: 'price_1U0rVtBqkDn8JXbQec4mJSdw'
+    monthly: 'price_1U3KycBqkDn8JXbQJvOCJhlP',
+    yearly: 'price_1U3L37BqkDn8JXbQXN76YSHO'
   },
   pro: {
-    monthly: 'price_1U0rHBBqkDn8JXbQiDSbabmP',
-    yearly: 'price_1U0rTrBqkDn8JXbQ7Vn3GACI'
+    monthly: 'price_1U3L5qBqkDn8JXbQq5nQJRnL',
+    yearly: 'price_1U3L5qBqkDn8JXbQJxzavRS6'
   }
 };
 
