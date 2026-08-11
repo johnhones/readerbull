@@ -134,23 +134,15 @@ module.exports = async function handler(req, res) {
       : [];
 
     // Plain book listings rarely have a `product_results.description` field.
-    // The real description text (Amazon's "A+ content") lives under the
-    // top-level `product_description` block instead, as a list of feature
-    // entries with their own text. Fall back to feature_bullets after that,
-    // so the author always has real pulled text to start from rather than
-    // an empty box they have to write from scratch.
-    //
-    // Known gap, confirmed by hand (ASIN B0F4L6TMDP, 28 July 2026): for at
-    // least some Kindle eBook listings, SerpApi's amazon_product engine
-    // returns no description anywhere in the payload at all (checked with
-    // no_cache=true too, not a stale-cache issue), even though the listing
-    // visibly has one on the real Amazon page. This isn't fixable by
-    // reading a different field, the text simply isn't in SerpApi's
-    // response for those listings. onboarding.html handles this by letting
-    // the author type their own description when this comes back null.
+    // `product_description` (Amazon's A+ content) and `about_item`/
+    // `feature_bullets` (the generic "About this item" bullets most
+    // physical/grocery products show) are cheap to check first since
+    // they're already sitting in this same response, so try those before
+    // paying for an extra fetch below.
     var descriptionParts = [];
     if (Array.isArray(data.product_description)) {
       data.product_description.forEach(function (block) {
+        if (block && block.text) descriptionParts.push(block.text);
         if (Array.isArray(block.features)) {
           block.features.forEach(function (f) {
             if (f && f.text) descriptionParts.push(f.text);
@@ -162,7 +154,29 @@ module.exports = async function handler(req, res) {
     var description = product.description
       || (descriptionParts.length ? descriptionParts.join('\n\n') : null)
       || (Array.isArray(product.feature_bullets) ? product.feature_bullets.join(' ') : null)
+      || (Array.isArray(data.about_item) && data.about_item.length ? data.about_item.join(' ') : null)
       || null;
+
+    // Real fix (11 August 2026), replacing the 28 July/3 August diagnostic
+    // effort below. Confirmed by hand across 6 live listings (Kindle,
+    // Paperback and Hardcover, including two of John's own books and two
+    // outside bestsellers, Atomic Habits and The Let Them Theory): none of
+    // the fields above are where Amazon actually puts a book's synopsis.
+    // That text lives in its own dedicated section of the listing page,
+    // Amazon's `#bookDescription_feature_div` block, a book-category
+    // fixture, separate from A+ content and separate from the generic
+    // "About this item" bullets, which is why the fields above kept
+    // coming back empty regardless of format. SerpApi doesn't parse that
+    // section into a JSON field, but every amazon_product call already
+    // includes a link to the raw HTML page it scraped
+    // (search_metadata.raw_html_file), retrieving it costs no extra
+    // SerpApi search credit, so when nothing above found real text, pull
+    // the description out of that page ourselves instead of asking the
+    // author to retype something that genuinely exists on the real
+    // listing.
+    if (!description && data.search_metadata && data.search_metadata.raw_html_file) {
+      description = await extractBookDescriptionFromHtml(data.search_metadata.raw_html_file, apiKey);
+    }
 
     // Format availability (3 August 2026): confirmed live that SerpApi's
     // top-level `prices` array lists every format Amazon shows a buy box
@@ -190,28 +204,6 @@ module.exports = async function handler(req, res) {
     // fact, dashboard.html should word this as "content" rather than
     // certainty if it can't be confirmed another way.
     var hasEnhancedContent = descriptionParts.length > 0;
-
-    // Temporary diagnostic (3 August 2026, matches the same debug-then-fix
-    // pattern used 28 July to confirm the Kindle description gap above):
-    // a paperback (ASIN 1998449416) came back with no description despite
-    // having a real one on its actual Amazon page, which the existing
-    // Kindle-only gap doesn't explain. Emails the raw shape of whichever
-    // description-bearing fields SerpApi actually returned, only when
-    // description ends up null, so the next real import that hits this
-    // reveals what field the text is actually sitting in. Remove this
-    // block once that's confirmed and the real fallback is added.
-    if (!description) {
-      var diagnosticShape = {
-        asin: asin,
-        hasProductDescription: !!product.description,
-        productDescriptionBlockCount: Array.isArray(data.product_description) ? data.product_description.length : 0,
-        productDescriptionSample: Array.isArray(data.product_description) ? JSON.stringify(data.product_description).slice(0, 1500) : null,
-        hasFeatureBullets: Array.isArray(product.feature_bullets),
-        featureBulletsSample: Array.isArray(product.feature_bullets) ? JSON.stringify(product.feature_bullets).slice(0, 800) : null,
-        topLevelProductKeys: Object.keys(product).join(', ')
-      };
-      await sendErrorAlert('import-book (description diagnostic)', JSON.stringify(diagnosticShape, null, 2));
-    }
 
     res.status(200).json({
       asin: asin,
@@ -262,6 +254,63 @@ async function resolveAsin(input) {
   try {
     var resolved = await fetch(trimmed, { method: 'GET', redirect: 'follow' });
     return extractAsin(resolved.url || '');
+  } catch (err) {
+    return null;
+  }
+}
+
+// Pulls the real book synopsis out of Amazon's own listing HTML, see the
+// long comment where this is called from for why this exists. No HTML
+// parser library is available in this project (no package.json, kept
+// dependency-free deliberately), so this walks the tags by hand: find
+// Amazon's #bookDescription_feature_div, count nested <div> tags to find
+// its true matching closing tag (a naive "stop at the next </div>" would
+// truncate at the first nested div instead of the whole block), then
+// strip markup down to plain text.
+async function extractBookDescriptionFromHtml(rawHtmlUrl, apiKey) {
+  try {
+    var sep = rawHtmlUrl.indexOf('?') === -1 ? '?' : '&';
+    var resp = await fetch(rawHtmlUrl + sep + 'api_key=' + encodeURIComponent(apiKey));
+    if (!resp.ok) return null;
+    var html = await resp.text();
+
+    var marker = html.indexOf('id="bookDescription_feature_div"');
+    if (marker === -1) return null;
+    var divStart = html.lastIndexOf('<div', marker);
+    if (divStart === -1) return null;
+
+    var tagRegex = /<div\b[^>]*>|<\/div>/gi;
+    tagRegex.lastIndex = divStart;
+    var depth = 0;
+    var divEnd = -1;
+    var match;
+    while ((match = tagRegex.exec(html))) {
+      if (match[0].charAt(1) === '/') {
+        depth--;
+        if (depth === 0) { divEnd = match.index + match[0].length; break; }
+      } else {
+        depth++;
+      }
+    }
+    if (divEnd === -1) return null;
+
+    var text = html.slice(divStart, divEnd)
+      .replace(/<script[\s\S]*?<\/script>/gi, ' ')
+      .replace(/<style[\s\S]*?<\/style>/gi, ' ')
+      .replace(/<[^>]+>/g, ' ')
+      .replace(/&nbsp;/g, ' ')
+      .replace(/&amp;/g, '&')
+      .replace(/&quot;/g, '"')
+      .replace(/&#39;/g, "'")
+      .replace(/&lt;/g, '<')
+      .replace(/&gt;/g, '>')
+      .replace(/\s+/g, ' ')
+      .trim();
+
+    // Guards against an empty/near-empty match on one side, and an
+    // absurdly long one (parsing gone wrong) on the other.
+    if (text.length < 20) return null;
+    return text.slice(0, 3000);
   } catch (err) {
     return null;
   }
