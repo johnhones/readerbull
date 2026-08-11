@@ -199,7 +199,7 @@
     <div id="refresh-audit-loading-view" class="submit-loading" style="display:none;">
       <div class="submit-loading-icon"><img src="readerbull-icon.png" alt=""></div>
       <p class="submit-loading-message" id="refresh-audit-loading-message">Pulling your live Amazon listing&hellip;</p>
-      <p class="submit-loading-timer" id="refresh-audit-loading-timer">0s</p>
+      <div class="submit-loading-bar-track"><div class="submit-loading-bar-fill" id="refresh-audit-loading-bar"></div></div>
     </div>
   </div>
 </div>
@@ -1129,7 +1129,7 @@
   var refreshConfirmBtn = document.getElementById('refresh-audit-confirm');
   var refreshCancelBtn = document.getElementById('refresh-audit-cancel');
   var refreshLoadingMessageEl = document.getElementById('refresh-audit-loading-message');
-  var refreshLoadingTimerEl = document.getElementById('refresh-audit-loading-timer');
+  var refreshLoadingBarEl = document.getElementById('refresh-audit-loading-bar');
   var pendingRefreshBook = null;
 
   function openRefreshAuditModal(b) {
@@ -1156,22 +1156,29 @@
     refreshConfirmView.style.display = 'none';
     refreshLoadingView.style.display = 'block';
 
-    var loadingMessages = ['Pulling your live Amazon listing…', 'Checking your competitors…', 'Researching keywords…', 'Writing your strategy…', 'Almost there…'];
+// Paced progress bar, not tied to real elapsed time: eases toward
+    // 90% over ~20s then holds until the response actually lands, so
+    // it never shows a raw ticking second count.
+    var loadingMessages = ['Pulling your live Amazon listing…', 'Readerbull is sniffing out your competition…', 'Researching bullish keywords…', 'Finding profitable categories for your book…', 'Creating your Readerbull strategy…'];
     var loadingMsgIndex = 0;
     refreshLoadingMessageEl.textContent = loadingMessages[0];
-    refreshLoadingTimerEl.textContent = '0s';
+    refreshLoadingBarEl.style.width = '0%';
     var loadingStart = Date.now();
     var loadingMessageInterval = setInterval(function () {
       loadingMsgIndex = (loadingMsgIndex + 1) % loadingMessages.length;
       refreshLoadingMessageEl.textContent = loadingMessages[loadingMsgIndex];
     }, 4000);
-    var loadingTimerInterval = setInterval(function () {
-      refreshLoadingTimerEl.textContent = Math.floor((Date.now() - loadingStart) / 1000) + 's';
-    }, 1000);
+    var loadingBarInterval = setInterval(function () {
+      var elapsedSec = (Date.now() - loadingStart) / 1000;
+      var fraction = Math.min(1, elapsedSec / 20);
+      var percent = 90 * (1 - Math.pow(1 - fraction, 2));
+      refreshLoadingBarEl.style.width = percent + '%';
+    }, 300);
 
     function stopLoadingView() {
       clearInterval(loadingMessageInterval);
-      clearInterval(loadingTimerInterval);
+      clearInterval(loadingBarInterval);
+      refreshLoadingBarEl.style.width = '100%';
     }
 
     function failWithMessage(msg) {
