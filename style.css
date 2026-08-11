@@ -356,8 +356,8 @@ failures (e.g. a failed import), which is what made this feel loud. */
 
 .card { background: var(--white); border-radius: 10px; padding: 28px 32px; border: 1px solid var(--border); }
 .card-hdr { font-size: 10px; font-weight: 700; letter-spacing: 2px; text-transform: uppercase; color: var(--orange); margin-bottom: 18px; padding-bottom: 10px; border-bottom: 1px solid var(--border); }
-.card-title { font-size: 15px; font-weight: 700; color: var(--teal-d); margin-bottom: 10px; line-height: 1.3; }
-.card > p, .hb-card > p { font-size: 13px; color: var(--mid); line-height: 1.7; margin-bottom: 12px; }
+.card-title { font-size: 16px; font-weight: 700; color: var(--teal-d); margin-bottom: 10px; line-height: 1.3; }
+.card > p, .hb-card > p { font-size: 15px; color: var(--mid); line-height: 1.7; margin-bottom: 12px; }
 .card > p:last-child, .hb-card > p:last-child { margin-bottom: 0; }
 
 .stat-strip { display: grid; grid-template-columns: repeat(3,1fr); gap: 1px; background: var(--border); border: 1px solid var(--border); border-radius: 6px; overflow: hidden; margin-top: 20px; }
@@ -377,8 +377,8 @@ failures (e.g. a failed import), which is what made this feel loud. */
 .item-icon { width: 28px; height: 28px; border-radius: 50%; display: flex; align-items: center; justify-content: center; font-size: 12px; font-weight: 800; flex-shrink: 0; margin-top: 1px; }
 .icon-teal   { background: var(--teal-l);   color: var(--teal-d); }
 .icon-orange { background: var(--orange-l); color: var(--orange-d); }
-.item-t { font-size: 15px; font-weight: 700; color: var(--teal-d); margin-bottom: 3px; }
-.item-b { font-size: 13px; color: var(--mid); line-height: 1.6; }
+.item-t { font-size: 16px; font-weight: 700; color: var(--teal-d); margin-bottom: 3px; }
+.item-b { font-size: 15px; color: var(--mid); line-height: 1.65; }
 
 .callout { border-left: 3px solid var(--teal); background: var(--teal-l); padding: 14px 18px; border-radius: 0 4px 4px 0; font-size: 13px; color: var(--navy); line-height: 1.65; }
 .callout-orange { border-left-color: var(--orange); background: var(--orange-l); }
@@ -391,8 +391,8 @@ failures (e.g. a failed import), which is what made this feel loud. */
 .step-num { width: 30px; height: 30px; border-radius: 50%; display: flex; align-items: center; justify-content: center; font-weight: 800; font-size: 12px; flex-shrink: 0; color: #fff; }
 .num-teal   { background: var(--teal); }
 .num-orange { background: var(--orange); }
-.step-t { font-size: 13px; font-weight: 700; color: var(--teal-d); margin-bottom: 4px; }
-.step-b { font-size: 13px; color: var(--mid); line-height: 1.55; }
+.step-t { font-size: 16px; font-weight: 700; color: var(--teal-d); margin-bottom: 4px; }
+.step-b { font-size: 15px; color: var(--mid); line-height: 1.6; }
 
 .hb-card { background: var(--white); border: 1px solid var(--border); border-top: 4px solid var(--teal); border-radius: 10px; padding: 28px 32px; margin-bottom: 24px; }
 .hb-eyebrow { font-size: 17px; font-weight: 700; letter-spacing: 1px; color: var(--teal-d); margin-bottom: 8px; }
