@@ -357,8 +357,8 @@ failures (e.g. a failed import), which is what made this feel loud. */
 .card { background: var(--white); border-radius: 10px; padding: 28px 32px; border: 1px solid var(--border); }
 .card-hdr { font-size: 10px; font-weight: 700; letter-spacing: 2px; text-transform: uppercase; color: var(--orange); margin-bottom: 18px; padding-bottom: 10px; border-bottom: 1px solid var(--border); }
 .card-title { font-size: 16px; font-weight: 700; color: var(--teal-d); margin-bottom: 10px; line-height: 1.3; }
-.card > p, .hb-card > p { font-size: 15px; color: var(--mid); line-height: 1.7; margin-bottom: 12px; }
-.card > p:last-child, .hb-card > p:last-child { margin-bottom: 0; }
+.card > p, .hb-card > p, .card-text > p { font-size: 15px; color: var(--mid); line-height: 1.7; margin-bottom: 12px; }
+.card > p:last-child, .hb-card > p:last-child, .card-text > p:last-child { margin-bottom: 0; }
 
 .stat-strip { display: grid; grid-template-columns: repeat(3,1fr); gap: 1px; background: var(--border); border: 1px solid var(--border); border-radius: 6px; overflow: hidden; margin-top: 20px; }
 .stat-cell { background: var(--white); padding: 16px; text-align: center; display: flex; flex-direction: column; align-items: center; }
@@ -380,7 +380,7 @@ failures (e.g. a failed import), which is what made this feel loud. */
 .item-t { font-size: 16px; font-weight: 700; color: var(--teal-d); margin-bottom: 3px; }
 .item-b { font-size: 15px; color: var(--mid); line-height: 1.65; }
 
-.callout { border-left: 3px solid var(--teal); background: var(--teal-l); padding: 14px 18px; border-radius: 0 4px 4px 0; font-size: 13px; color: var(--navy); line-height: 1.65; }
+.callout { border-left: 3px solid var(--teal); background: var(--teal-l); padding: 14px 18px; border-radius: 0 4px 4px 0; font-size: 13px; color: var(--navy); line-height: 1.65; margin-bottom: 16px; }
 .callout-orange { border-left-color: var(--orange); background: var(--orange-l); }
 .callout strong { color: var(--black); }
 
