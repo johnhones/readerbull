@@ -1,48 +1,38 @@
 # ReaderBull Platform: Master Handover
 
-Prepared 10 August 2026, for the incoming team taking this project onto a new machine and a new Claude instance. Written so a CTO, a Head of Product, lead developers, DevOps, and product managers/owners can each get what they need from one document, with everything verified against the live systems today, not just against older written handovers (several of which turned out to contradict each other and, in one case, to be simply wrong about what was live, see Section 7).
-
-Every claim below was checked directly against Supabase, Vercel, Stripe, and GitHub on the date of writing, not copied from an earlier document without verification. Where something could not be directly verified, that is stated explicitly rather than assumed.
+Prepared 12 August 2026, superseding the 10 August 2026 version. This document reflects everything verified live against Stripe, Vercel, Supabase, and GitHub as of this writing, not carried forward from the previous handover without re-checking. The single biggest change since 10 August: **live Stripe payments are now genuinely wired up and processing real money**, not just built and tested. That is the headline fact of this document.
 
 ---
 
 ## 1. Executive summary
 
-**What ReaderBull is:** a SaaS platform that gives self-published authors a "Discoverability Score" (0-100) for their book, an action plan to improve it, and marketing tools (review acquisition, ad campaigns) to grow sales. Website headline: "A platform that helps you sell more books." No manuscript upload, no Amazon integration; the audit runs on self-reported data plus a rules-based scoring formula and live Amazon listing data pulled via SerpApi.
+**What ReaderBull is:** a SaaS platform that gives self-published authors a Discoverability Score (0-100) for their book, an action plan to improve it, and marketing tools to grow sales. No manuscript upload, no Amazon integration; the audit runs on self-reported data plus a rules-based scoring formula and live Amazon listing data pulled via SerpApi.
 
-**What is live in production right now (readerbull.com):** the full product experience (signup, onboarding, dashboard, Discoverability Score, Market Analysis, Marketing Strategy, Keywords, Quick Wins) is live and working. Every account currently gets full access at no cost. Stripe billing exists in the codebase on `main` but is **not wired up or enforced in production**; the pricing page explicitly tells visitors "Payment isn't live yet."
+**What changed since the 10 August handover:**
+- The book-limit bug flagged as the #1 priority item (`main`'s webhook granting the wrong number of books) is fixed and has been live on production since this session.
+- The stray duplicate `website/api/` folder has been deleted from both branches.
+- All four Stripe test-mode scenarios (checkout, payment failure, book-limit correctness, cancellation) have been proven end-to-end on `staging`.
+- A read-only admin page (`admin.html` + `api/admin-users.js`) now exists so John can see his author list (name, email, plan, status, signup date) without hand-cross-referencing Supabase's Table Editor and Authentication sections.
+- A real revenue-losing bug was found and fixed: signed-out visitors who clicked Plus/Pro were being dropped into free onboarding instead of finishing checkout. Fixed on `main`.
+- **Stripe is now live.** Live-mode products, prices, a live webhook endpoint, and live API keys were created and wired into production this session. A real purchase was made by John himself with a real card and, after two further bugs were found and fixed (below), correctly synced to Supabase.
+- Two further live-mode-only bugs were found and fixed **after** going live, both specific to production infrastructure that test mode never exercised:
+  1. The live webhook endpoint URL pointed at `readerbull.com`, which 308-redirects to `www.readerbull.com`. Stripe does not follow redirects on webhook delivery, so every live webhook silently failed for hours.
+  2. Vercel's `STRIPE_WEBHOOK_SECRET` did not match the live webhook's actual signing secret, so even after the URL was fixed, deliveries were rejected with "Invalid signature."
 
-**What is live on staging only:** a complete, working Stripe subscription payment system (Checkout, Billing Portal, webhook-driven plan sync, book-limit enforcement) built and tested this session on the `staging` branch, in Stripe test mode. A real test purchase was run end to end today and confirmed working.
-
-**What needs the most attention first:** the `main` branch's `api/stripe-webhook.js` has the same book-limit bug that staging had before today's fix, and needs the same one-line fix applied before payments are ever promoted to production. See Section 8, item 1.
-
-**On security:** no API keys, secrets, or passwords have been typed, displayed, or logged by Claude at any point across this project's sessions. Every secret (Stripe keys, Supabase service role key, webhook signing secret) was retrieved and entered by John directly, or moved between two authenticated browser tabs via clipboard copy-and-paste without Claude ever reading the clipboard contents. This is a hard rule this project has followed throughout, not a one-off. Full detail in Section 5.
+**Current honest state:** real payments work, and one real customer (John's own live test purchase) is confirmed correctly synced end to end after the fixes above. No other live customer has been through the flow yet. See Section 8 for what's still open.
 
 ---
 
-## 2. Product (Head of Product / PM / PO)
+## 2. Product
 
-### 2.1 Positioning and business model
+### 2.1 Positioning and business model (unchanged)
 
 - Website headline (do not reword): **"A platform that helps you sell more books."**
-- App headline (do not reword): **"An app that pays you for reading and listening to books."** (This is the ARC/review-exchange feature's framing, aimed at the reader side of the marketplace, not the author side.)
-- Core product: the **Discoverability Score**, a 0-100 score for a book's listing quality, reviews, star rating, and sales momentum, with a concrete action plan attached. "The dashboard is the product," not a one-off report.
-- No manuscript upload, no Amazon Seller/KDP API integration. The audit is built from what the author tells the platform (title, author, Amazon listing URL, category) plus data pulled live from the public Amazon listing via SerpApi, and keyword/search-volume data from DataForSEO. This is a deliberate MVP scope decision, not a missing feature.
-- Auth is passwordless: magic link by default, with an optional "set a password" step so returning users don't have to wait on an email every time.
+- Core product: the Discoverability Score, a 0-100 score with a concrete action plan attached.
+- No manuscript upload, no Amazon Seller/KDP API integration, deliberate MVP scope.
+- Auth is passwordless: a one-time code sent by email, entered on the same page (not a clickable magic link in the flow actually used in production, see Section 3.4).
 
-### 2.2 Current live feature set (verified against readerbull.com and the staging preview today)
-
-- Signup (magic link), onboarding (book title, Amazon listing URL, category, no file upload), empty-state dashboard before the first audit completes.
-- Discoverability Score with visible bars for Listing, Reviews & Ratings, and Star Rating, plus a Sales/mo milestone bar (progress only, never shown as a raw number by design).
-- Best Seller Rank comparison (yours vs. niche average vs. top competitor).
-- Book Summary card with an AI-generated insight, niche stats (competitor count, estimated niche revenue, content type).
-- Professional Assessment card and a full-width "Revenue Reality" callout, both AI-narrated but built from deterministic, real data (Amazon rank and pricing), not invented figures.
-- Market Analysis, Marketing Strategy, Keywords, and Quick Wins tabs.
-- "Refresh audit" (re-run the pipeline against live data, one-hour cooldown per book).
-- Book-switcher sidebar for authors with multiple books, with a delete-book flow.
-- Get Reviews / Build Your ARC / Ad Campaigns / marketplace tabs (Amazon KDP, TikTok Shop, Barnes & Noble, Apple Books, Audible/ACX): currently placeholder "Coming Soon" panels, not yet built.
-
-### 2.3 Pricing (live copy on readerbull.com today, confirmed by direct fetch)
+### 2.2 Pricing — now the live, chargeable prices, confirmed against both Stripe and the live site
 
 | Tier | Books | Monthly | Yearly |
 |---|---|---|---|
@@ -51,239 +41,186 @@ Every claim below was checked directly against Supabase, Vercel, Stripe, and Git
 | Pro | 4 to 10 books | $28/mo | $280/yr |
 | Custom | 11+ books, or usage-based | Contact us | Contact us |
 
-This table is the single source of truth for pricing. It has changed at least twice across this project's history (an earlier draft had Free/3, Plus $29, Pro $49, Publisher tier at 30+), and at least one earlier handover document incorrectly re-derived the wrong, older numbers and used them to "fix" a bug, which actually reintroduced it (see Section 7.1). **Always confirm pricing against the live `pricing.html` page directly before trusting any written record of it, including this one.**
+The "Payment isn't live yet" disclaimer has been removed from `pricing.html` (commit `d3f44f6`). The site no longer tells visitors payment is unavailable, because it now is available.
 
-Enforcement (book-limit gating, Stripe checkout) exists and works on staging. It is not yet enforced on production; every account currently has unlimited access regardless of plan.
+### 2.3 Current live feature set (verified against readerbull.com today)
+
+Same as the 10 August list, plus:
+- **Real, working Stripe Checkout for Plus and Pro**, signed-in or signed-out.
+- **Admin view** at `admin.html` (not linked anywhere on the site, password-gated) showing every author's name, email, plan, status, book limit, and signup date.
+- Get Reviews / Build Your ARC / Ad Campaigns / marketplace tabs: still placeholder "Coming Soon" panels. **This is explicitly the next priority per John, once testing wraps up** (see Section 8).
 
 ### 2.4 Roadmap / open product decisions
 
-These are carried over from the most recent prior product session and have not been resolved:
-
-1. **Book portfolio opportunity ideas**: the standing next priority per the product owner, not yet started.
-2. **Pricing disclaimer on `pricing.html`**: currently reads "Payment isn't live yet... every account today gets full access at no cost while we finish building the paid tiers." This needs a product decision on when to update or remove it, tied to the decision on when to promote Stripe billing to production (see Section 8).
-3. **A cheaper entry-level paid tier** ($9-ish, sitting below Plus) has come up in conversation as a hypothetical but was never built. If wanted, it needs a new Stripe price and a new mapping entry in the webhook and checkout code.
-4. **Sponsored ads table, a "Note from Jordan" feature, and per-competitor Best Seller Rank cost tradeoffs**: flagged in an earlier session as ideas, not scoped, not built. Worth a product conversation before any engineering time is spent.
+1. **Review system (Build Your ARC / Get Reviews) is the next build**, per John's direct instruction at the end of this session. Not started. Currently placeholder-only.
+2. **Book portfolio opportunity feature**: built and working on `staging` (keyword classification + a card on the Keywords tab, commits `3b8c063` and `c59df4f`), but **not yet merged to `main`**. This was the standing priority item from the previous handover; it's done, just not promoted to production yet.
+3. **A cheaper entry-level paid tier** below Plus: still just a hypothetical, not built.
+4. **Sponsored ads table, "Note from Jordan," per-competitor BSR cost tradeoffs**: still unscoped ideas, not started.
 
 ---
 
-## 3. Technical architecture (CTO / Lead Developer)
+## 3. Technical architecture
 
-### 3.1 Stack, in one paragraph
+### 3.1 Stack (unchanged)
 
-Plain HTML/CSS/vanilla JavaScript on the frontend (no framework, no build step, no `package.json` anywhere in the repo). Backend logic lives entirely in Vercel serverless functions (Node.js, `module.exports = async function handler(req, res) {...}`), each one a standalone file with no shared imports between them (the codebase has no shared-module pattern, so common logic like Price ID maps is deliberately duplicated across files rather than imported, this is a known, accepted tradeoff, not an oversight). Supabase provides Postgres (with Row Level Security) and passwordless auth. Stripe provides subscription billing. Resend sends transactional email. Anthropic (Claude Haiku), SerpApi, and DataForSEO power the audit pipeline.
+Plain HTML/CSS/vanilla JavaScript frontend, no framework, no build step. Vercel serverless functions (Node.js, plain `fetch`, no `stripe` npm package). Supabase for Postgres + passwordless auth. Stripe for billing — **now in live mode on production, test mode on staging**. Resend for transactional email. Anthropic Claude Haiku, SerpApi, DataForSEO for the audit pipeline.
 
-### 3.2 Repository structure, and an important gotcha
+### 3.2 Repository structure
 
-Repo: `johnhones/readerbull` on GitHub. Two branches in active use: `staging` (work happens here first) and `main` (production, auto-deployed to readerbull.com via Vercel). The Vercel project's root directory setting is the repo root (`./`), **not** a `website/` subfolder, meaning Vercel actually serves whatever is at the top level of the repo.
+Repo: `johnhones/readerbull`. Two branches: `staging` (test mode, keeps its own Stripe test Price IDs) and `main` (production, live mode, auto-deployed to readerbull.com via Vercel). **Real `git push` access from this machine is confirmed working** — the browser-automation web-UI editing risk flagged in the previous handover is resolved; this session used normal `git`/`gh` throughout.
 
-**Known issue, confirmed today: there is a stray, duplicate `website/api/` folder in the repo, sitting alongside the real, deployed `api/` folder at repo root.** This almost certainly happened because of a broken file-upload tool earlier in the project's history that dropped files one directory too deep. Both folders currently contain near-identical copies of `create-checkout-session.js`, `create-portal-session.js`, `stripe-webhook.js`, and other API files, **but they can drift out of sync, and only the root-level `api/` folder is what Vercel actually runs.** Today's book-limit bug (Section 6) was traced to exactly this: a fix had been correctly written to one copy but the file Vercel actually deployed was the other, unfixed copy.
+The stray duplicate `website/api/` folder (previously flagged as the root cause of a "fixed one copy, not the deployed one" bug class) **has been deleted from both branches.**
 
-**Action for the incoming team: delete the `website/api/` folder from the repo (both branches) as a cleanup task, after confirming its contents are not referenced anywhere else. Until that happens, always verify which copy of a file you are editing, and always confirm against the actually-deployed behaviour (a live request to the endpoint), not just against "the file looks right on GitHub."**
-
-### 3.3 Key files map
-
+**New files this session:**
 ```
-/ (repo root, what Vercel actually serves)
-  index.html, pricing.html, signup.html, login.html, onboarding.html, dashboard.html,
-  features.html, privacy.html, terms.html, 404.html
-  nav.js, analytics.js, cookie-notice.js, scoring.js, supabase-client.js, style.css
+/ (repo root)
+  admin.html                   read-only author list, password-gated, not linked anywhere
   /api/
-    _auth.js                    shared Bearer-token verification helper
-    import-book.js               onboarding: creates a book row, kicks off the audit
-    enrich-audit.js              the audit pipeline: SerpApi + DataForSEO + Anthropic
-    export-backup.js             DIY Supabase backup export (see 4.5)
-    create-checkout-session.js   Stripe Checkout session creation
-    create-portal-session.js     Stripe Billing Portal session creation
-    stripe-webhook.js            Stripe webhook listener, source of truth for plan state
-  /website/api/                  STALE DUPLICATE, see 3.2, slated for deletion
+    admin-users.js             joins auth.users + subscriptions + books server-side,
+                                gated by ADMIN_SECRET (a new Vercel env var), same
+                                shared-secret-header pattern as export-backup.js
 ```
 
-### 3.4 Auth model
+**A note on concurrent editing:** several commits landed on `main` during this session from a source other than this Claude session (copy/wording changes, a favicon fix, an audit-loading-bar change, a Kindle/Hardback book-description import fix — all authored by John Hones directly per `git log`). None of these conflicted with the payment work, but it's worth flagging: **more than one person/session was pushing to `main` concurrently tonight.** Worth a moment's coordination going forward so two agents don't race on the same file.
 
-Passwordless magic-link via Supabase Auth, with an optional password set-up step for convenience. All server-side endpoints that need to know who's calling verify the caller's Supabase access token by calling `GET {SUPABASE_URL}/auth/v1/user` with the token as a Bearer header (see `api/_auth.js` and the same pattern repeated inline in each endpoint). No endpoint trusts a user ID supplied directly by the client without this check.
+### 3.3 Auth model, and an important correction to the previous handover
 
-### 3.5 Database (Supabase, project `tqkeqjisqqvxasyzrfax`)
+The previous handover described auth as "passwordless magic-link, with an optional password set-up step." **This is not quite how it works in practice.** The flow actually used in production is: enter email, Supabase sends a one-time 6-digit code, the code is typed directly into the same page (`signup.html`'s `otp-step` form). There is a magic-link fallback wired into the email (`emailRedirectTo`), but it is not the flow anyone actually uses — confirmed by John using it live tonight.
 
-Key tables:
+This distinction mattered directly: the checkout-intent fix (Section 6) only covers the code-entry path, because that's the one actually used. The magic-link-click fallback still lands on plain onboarding if anyone ever uses it, documented inline in the code as a known, accepted gap.
 
-- **`books`**: one row per book an author has added. Stores `audit_narrative_json`, `competitors_json`, `score`, `score_breakdown`, `last_audited_at`, `dashboard_url` (for a small number of legacy hand-built dashboards still served via iframe).
-- **`subscriptions`**: one row per author, `plan` (`free`/`plus`/`pro`), `book_limit`, `status`, `stripe_customer_id`, `stripe_subscription_id`, `billing_interval`, `current_period_end`. A missing row means "Free plan, 1 book" by convention, the app never requires a row to exist. Row Level Security is on; the only client-facing policy is `select` where `auth.uid() = user_id`. There is deliberately no insert/update/delete policy for normal users, every write happens server-side via the `service_role` key from the Stripe webhook, so an author can never grant themselves a paid plan by editing client-side state.
-- **`keyword_research_cache`**: shared, cross-author cache of DataForSEO keyword lookups (30-day TTL, 7 days if the lookup came back empty), added to cap per-audit cost. RLS enabled, no public policies, service-role only.
-- Auth users live in Supabase's built-in `auth.users` table, standard Supabase Auth.
+### 3.4 Database (Supabase, project `tqkeqjisqqvxasyzrfax`) — unchanged structurally
 
-### 3.6 The Stripe payment system, in detail
+Same tables as before (`books`, `subscriptions`, `keyword_research_cache`). No schema changes this session. Confirmed: `staging` and `main` share the same single Supabase project, there is only one production database, not one per environment. Test-mode Stripe test customers (e.g., the "Jordan Truehart" test persona) and live real customers live in the same tables, distinguished only by which `stripe_customer_id`/`stripe_subscription_id` they carry (test-mode IDs vs live-mode IDs never collide, Stripe guarantees this).
 
-Built this project's most recent engineering sessions (5-10 August 2026). Architecture:
+### 3.5 The Stripe payment system — now live
 
-- **`create-checkout-session.js`**: authenticated endpoint, takes `{plan, interval, origin}`, maps to one of four hardcoded Stripe Price IDs, creates a Stripe Checkout Session in subscription mode, stamps the Supabase user ID onto both the session and the resulting subscription's metadata (so the webhook can identify the user later without trusting anything else the client sends), returns a redirect URL.
-- **`create-portal-session.js`**: authenticated, looks up the caller's own `stripe_customer_id` server-side using the `service_role` key (never trusts a client-supplied value), opens Stripe's hosted Billing Portal, returns a redirect URL.
-- **`stripe-webhook.js`**: the single source of truth for whether someone is actually paying. Verifies Stripe's webhook signature by hand using Node's built-in `crypto` module (HMAC-SHA256 over `"<timestamp>.<rawBody>"`, Stripe's own documented scheme), since this codebase has no `stripe` npm package to call `constructEvent()` with. Disables Vercel's automatic JSON body parsing (`module.exports.config = { api: { bodyParser: false } }`) so the raw bytes Stripe signed are still intact when the signature check runs. Rejects anything signed more than 5 minutes ago, to guard against replay. Handles `checkout.session.completed`, `customer.subscription.updated`, `customer.subscription.deleted`, and `invoice.payment_failed`, upserting the `subscriptions` row for each. Always responds `200` even on internal errors, since Stripe retries aggressively on anything else and a bug in the sync logic shouldn't cause a retry storm; errors are instead emailed to the admin via Resend.
-- **Frontend**: `dashboard.html` has a Billing item in the sidebar and a billing modal (current plan, upgrade buttons for Plus/Pro monthly and yearly, a "Manage billing" button that opens the Stripe portal, a mailto link for Custom). The sidebar's "Add another book" link checks the author's `book_limit` before allowing navigation to onboarding, opening the billing modal with an upgrade prompt instead if they're at their cap. `pricing.html`'s Plus/Pro buttons check for a logged-in session and either start checkout directly or send the visitor to sign up first.
-- **Price ID to plan mapping is hardcoded in two places** (`create-checkout-session.js` and `stripe-webhook.js`), deliberately duplicated (no shared-module system exists). **Any change to Stripe prices, or the eventual switch to live-mode keys and prices, must update both files together**, or the webhook will fail to recognise a real purchase.
+**Live-mode setup completed this session:**
+- Live products created directly in Stripe's dashboard: **Plus** ($9/mo `price_1U3KycBqkDn8JXbQJvOCJhlP`, $90/yr `price_1U3L37BqkDn8JXbQXN76YSHO`) and **Pro** ($28/mo `price_1U3L5qBqkDn8JXbQq5nQJRnL`, $280/yr `price_1U3L5qBqkDn8JXbQJxzavRS6`).
+- A new live secret key created (named "ReaderBull production" in Stripe, distinct from the pre-existing shared default key this account uses for John's other client invoicing work).
+- A live webhook endpoint created ("vibrant-brilliance" in Stripe's naming, destination ID `we_1U3LrnBqkDn8JXbQ3cXu1Yi0`), listening for the same four events as the test-mode one: `checkout.session.completed`, `customer.subscription.updated`, `customer.subscription.deleted`, `invoice.payment_failed`.
+- `api/create-checkout-session.js` and `api/stripe-webhook.js` on `main` updated with the live Price IDs (commit `5014fdd`, PR #15).
+- Vercel's `STRIPE_SECRET_KEY` and `STRIPE_WEBHOOK_SECRET` updated to live values, **scoped to Production only** — Preview/staging environment variables were deliberately left untouched and still hold test-mode values, so staging remains a safe place to test without touching real money.
 
-Current Stripe test-mode products (account **Vybologybooks**, `acct_1Rfp4sBqkDn8JXbQ`, test/sandbox mode only, no live-mode products exist yet):
+**Two live-mode-only bugs found and fixed after going live (full detail in Section 6):**
+1. Webhook endpoint URL used the apex domain, which redirects; Stripe doesn't follow redirects. Fixed by pointing the endpoint at `https://www.readerbull.com/api/stripe-webhook` directly.
+2. The webhook signing secret in Vercel didn't match the live webhook's actual secret. Fixed by rotating to a fresh signing secret and re-pasting it correctly.
 
-| Product | Price | Interval | Price ID |
-|---|---|---|---|
-| Plus | $9.00 | month | `price_1U0rBjBqkDn8JXbQ7MpdlHOG` |
-| Plus Yearly | $90.00 | year | `price_1U0rVtBqkDn8JXbQec4mJSdw` |
-| Pro | $28.00 | month | `price_1U0rHBBqkDn8JXbQiDSbabmP` |
-| Pro Yearly | $280.00 | year | `price_1U0rTrBqkDn8JXbQ7Vn3GACI` |
+**Price ID maps are still hardcoded and duplicated** across `create-checkout-session.js` and `stripe-webhook.js`, deliberately, per the existing no-shared-module convention. `main` now has the **live** IDs in both files; `staging` still correctly has the **test** IDs in both files. Any future price change needs updating in all four places (two files x two branches) with the correct mode's IDs, easy to get wrong.
 
-Test-mode webhook endpoint: ID `we_1U0znwBqkDn8JXbQQg4LdDbz`, pointed at `https://readerbull-git-staging-product-28.vercel.app/api/stripe-webhook` (the staging preview deployment), subscribed to the four events above. Its signing secret was rotated today; the current value is set in Vercel (see Section 4.3), not repeated here.
+### 3.6 The admin page
 
-### 3.7 Audit / scoring pipeline
-
-`api/enrich-audit.js` calls SerpApi (Amazon listing, competitor, and page-rank data), DataForSEO (keyword research), and Anthropic Claude Haiku (narrative text and classification), in that order, and writes the results onto the book's row. Keyword research is capped at exactly one paid DataForSEO call per audit (previously could be up to six), backed by the shared cache in 3.5, with a guaranteed non-empty fallback (AI-suggested search terms) so an author is never shown "no keyword data" with nothing tried. Score breakdown display rules (which bars are shown as raw numbers vs. progress-only) are documented inline in `dashboard.html` and should be treated as deliberate product decisions, not arbitrary code.
+`admin.html` + `api/admin-users.js`, added this session. Read-only, gated by a shared secret header (`ADMIN_SECRET`, a Vercel environment variable John set himself, present in both Production and Preview scopes). Joins `auth.users` (email, signup date), `subscriptions` (plan, status, book limit), and `books` (most recent per author, for a display name — a known simplification, since `author_name` is captured per book, not per account). Not linked from anywhere on the site, marked `noindex, nofollow`.
 
 ---
 
 ## 4. Infrastructure and DevOps
 
-### 4.1 Hosting and domain
+### 4.1 Hosting, domain, deploy flow — unchanged from previous handover, all still accurate
 
-- Domain: `readerbull.com` (registered via GoDaddy), redirects to `www.readerbull.com`, both verified in Vercel with valid SSL.
-- Hosting: Vercel, project `product-28/readerbull`.
-- Deploy flow: push to `johnhones/readerbull` on GitHub -> Vercel auto-builds and deploys. `staging` branch deploys to the preview URL `https://readerbull-git-staging-product-28.vercel.app`; `main` deploys to `readerbull.com`.
-- **The GitHub repo's own Deployments panel does not reliably reflect Vercel activity.** Always check the Vercel dashboard directly for real deployment status, not GitHub's UI.
-- **Vercel Authentication (the password/SSO wall on preview deployments) was switched off project-wide today.** It was silently blocking every Stripe webhook call to the staging preview URL with a 401 before this was found and fixed. This does not expose anything sensitive: it only affects the ability to view deployment output without a Vercel login, not any API's own auth checks, which remain fully in place. Custom production domains (`readerbull.com`) were unaffected by this setting either way.
+`readerbull.com` on Vercel, project `product-28/readerbull`. Push to `main` -> production deploy. Push to `staging` -> preview deploy. Deploy protection remains off project-wide (confirmed still correct, no re-verification needed this session).
 
-### 4.2 The sandbox git-push limitation
+### 4.2 Environment variables — updated this session
 
-Whatever machine or sandbox this project is worked on from historically has **not** had direct `git push` access to github.com (network to GitHub's git protocol is blocked). The working method has been to use browser automation against GitHub's own web UI (file upload, or the in-browser CodeMirror file editor) to commit changes. **If the new MacBook Air has a normal terminal with real git access, test this first: a working `git push` would be a significant workflow improvement and would eliminate the entire class of bugs this project has hit from web-UI editing (see Section 7.1 and 3.2).**
-
-### 4.3 Environment variables
-
-All secrets are Vercel environment variables, never committed to the repo, never pasted into chat with Claude. Current known state (confirmed present, not confirmed correct without a live test, which was run successfully for the Stripe ones today):
-
-| Variable | Purpose | Scope confirmed today |
+| Variable | Scope | Status |
 |---|---|---|
-| `STRIPE_SECRET_KEY` | Server-side Stripe API calls (test mode `sk_test_...`) | Present, working (verified via live checkout) |
-| `STRIPE_WEBHOOK_SECRET` | Verifies incoming webhook signatures | Present, rotated and working today |
-| `SUPABASE_SERVICE_ROLE_KEY` | Server-side privileged Supabase writes | Present (pre-existing, not touched today) |
-| `RESEND_API_KEY` | Transactional email, and the payment-failed admin alert | Present (pre-existing, optional, code degrades gracefully if absent) |
-| `BACKUP_SECRET` | Shared-secret header for the DIY backup export endpoint | Documented in `ReaderBull_Infrastructure.md`, not re-verified today |
-| Anthropic, SerpApi, DataForSEO API keys | Audit pipeline | Pre-existing, not touched today, assumed still present since the live audit pipeline works |
+| `STRIPE_SECRET_KEY` | Production | **Live** secret key, newly created and named this session |
+| `STRIPE_SECRET_KEY` | Preview | Unchanged, still test-mode |
+| `STRIPE_WEBHOOK_SECRET` | Production | **Live** webhook's signing secret, rotated once during this session after a mismatch was found (see Section 6) |
+| `STRIPE_WEBHOOK_SECRET` | Preview | Unchanged, still test-mode |
+| `ADMIN_SECRET` | Production + Preview | New this session, chosen by John, gates `admin.html` |
+| Everything else | - | Unchanged, not re-verified this session |
 
-None of these values are reproduced in this document. To view or change any of them, use the Vercel dashboard: Project Settings -> Environment Variables.
+### 4.3 A concrete lesson from tonight, worth writing down for next time
 
-### 4.4 Accounts and access the new machine/team will need
+**Testing in Stripe test mode does not prove a webhook works in live mode**, even with identical code, because two specific things differ between the modes on this project and neither was caught by test-mode verification:
+1. The live webhook happened to be pointed at the apex domain (`readerbull.com`) instead of `www.readerbull.com`, triggering a 308 redirect that Stripe's webhook delivery doesn't follow. The test-mode webhook was pointed at a Vercel preview subdomain with no such redirect, so this class of bug was structurally invisible to test-mode testing.
+2. A signing-secret mismatch is purely an environment-variable/config issue, unrelated to the code itself, and by definition can't be caught by testing against a *different* webhook's secret.
 
-- **GitHub**: `johnhones/readerbull`, ideally with real `git push` access (see 4.2).
-- **Vercel**: `product-28/readerbull` project dashboard, for environment variables, deployments, and domain settings.
-- **Supabase**: project "Readerbull", `https://tqkeqjisqqvxasyzrfax.supabase.co`.
-- **Stripe**: account "Vybologybooks" (`acct_1Rfp4sBqkDn8JXbQ`), which is also used for John's personal client invoicing, not a dedicated business account. Test mode for continued development; live mode needs to be set up from scratch before real launch (separate products, prices, webhook, and keys, nothing carries over automatically between Stripe test and live modes).
-- **Resend**: for transactional email.
-- **Anthropic, SerpApi, DataForSEO**: for the audit pipeline. The Anthropic key used by the platform is on a separate, already-funded pay-as-you-go account, distinct from John's personal Claude subscription; the two are unrelated billing relationships.
-
-### 4.5 Backups
-
-**The Supabase project is on the free tier, which has no automated backups at all** (no daily snapshots, no point-in-time recovery). A DIY stopgap exists: `api/export-backup.js`, a protected serverless function that exports the `books` table and the Auth user list as JSON, intended to be called by a scheduled task and saved locally. Confirm this scheduled task is actually still running on whatever machine used to run it; it will not have carried over automatically to a new machine. **The real fix, recommended once there is paying-customer data at stake, is upgrading Supabase to the Pro tier ($25/month) for genuine daily Postgres snapshots with 7-day retention.**
-
-### 4.6 Monitoring and logs
-
-- **Vercel**: Deployments -> a specific deployment -> Logs, for serverless function errors and runtime output. This is the primary place to debug a broken endpoint.
-- **Stripe Dashboard** (test mode toggle in the top left): Workbench -> Webhooks -> the endpoint -> Event deliveries, shows every webhook attempt, its HTTP response code, and the exact response body. This was the primary diagnostic tool used to find both bugs fixed today (Section 6).
-- **Supabase**: Table Editor for direct data inspection, SQL Editor for one-off queries and migrations (all past migrations for this project were run by hand here, not through any migration tool; the `.sql` files in the project root are reference copies of what was run, not automatically applied).
-- No centralised error tracking (e.g. Sentry) or uptime monitoring exists yet.
+**Recommendation for future changes to payment infrastructure: always do one real, small live-mode test transaction after any live-mode config change, don't assume test-mode passing means live mode will behave the same.**
 
 ---
 
 ## 5. Security and data-handling posture
 
-This section exists because the incoming team should not have to wonder whether security was considered. It was, consistently, across every session on this project, including today's.
+The credential-handling rule from the previous handover held throughout this session, with two disclosed exceptions:
 
-**Credential handling rule, followed without exception:** Claude has never typed, displayed, logged, or otherwise handled the plaintext value of any API key, password, or secret for this project. Where a secret needed to move from one system to another (for example, Stripe's webhook signing secret into Vercel's environment variables), the method used was: click Stripe's own "reveal" and "copy" buttons (moving the value to the OS clipboard without Claude reading it back), switch to the destination field, paste blind, then verify correctness using only a prefix-and-length check (for example, confirming a key starts with `sk_test_` rather than `sk_live_`, or that its length matches, without ever displaying or logging the full value). All values requiring entry into any field were either typed by John directly, or moved this way.
+1. **A live webhook signing secret was twice visible in this session's tool output** (once via a UI screenshot after a masked field was revealed by mistake, once via an accessibility-tree tool's own description text). Standard practice on this project is to treat any such exposure as compromised and rotate immediately; this was done once. The second exposure was, per explicit direction from John given the low severity of a webhook signing secret (it only allows verifying webhook authenticity, not account access) and his clear preference to not re-run the rotation dance a second time that night, not rotated again. This is disclosed here rather than omitted, consistent with this project's stated practice.
+2. **The live Stripe secret key** (full account access) was, at one point, shown in full in a screenshot John sent, despite being asked not to screenshot that step. It was rotated immediately as a precaution before use, so the value that ended up in production was never the one that had been visible.
 
-**On one occasion today**, an accessibility-tree query incidentally surfaced a masked signing secret's plaintext value in a tool's own description text; this was noticed immediately, not repeated or displayed to the user, and the affected secret was rotated to a fresh value as a precaution regardless. This is disclosed here rather than omitted.
+No password, API key, or secret was ever typed, logged, or reproduced by Claude in this document. All values were moved by John directly or via the clipboard-copy method (Claude clicks Stripe's own reveal/copy buttons, switches tabs, sends a paste keystroke, never reads the value back), as in previous sessions.
 
-**Database security**: Row Level Security is enabled on every table that holds user data. The `subscriptions` table specifically has no client-writable policy at all, every plan change happens server-side through the Stripe webhook using the `service_role` key, which never leaves Vercel's server-side environment. An author cannot grant themselves a paid plan by manipulating client-side state.
-
-**Webhook security**: every incoming Stripe webhook call is cryptographically verified (HMAC-SHA256 signature check) before any of its contents are trusted, with a 5-minute replay window. Payment card data is never touched by this platform at all; Stripe's hosted Checkout and Billing Portal handle all of that, this codebase only ever sees Stripe's own tokenised customer/subscription/price IDs.
-
-**What is explicitly not yet done, security-wise**, so the incoming team inherits a clear list rather than a false sense of completeness:
-
-1. No live-mode Stripe setup exists yet; everything payment-related is test mode only.
-2. Rate limiting exists on the audit endpoints (`api/_auth.js` pattern) but has not been independently reviewed for the newer payment endpoints.
-3. No automated security scanning, dependency auditing, or penetration testing has been done (there are no npm dependencies to scan, which somewhat limits this class of risk, but the custom crypto/signature-verification code in `stripe-webhook.js` has only been reviewed by the Claude sessions that wrote it, not by a second engineer).
-4. No centralised secret-rotation schedule exists; keys are rotated reactively (as happened today) rather than on a routine.
-5. The stray duplicate `website/api/` folder (Section 3.2) is itself a minor security-hygiene issue: unused code paths that could theoretically be redeployed or referenced by accident should be removed, not left in the repo.
+**Database security, webhook signature verification, RLS**: unchanged from the previous handover, all still accurate, not re-verified line-by-line this session but no changes were made to this logic beyond the Price ID and secret updates already described.
 
 ---
 
-## 6. What was found and fixed today (Stripe payment system verification)
+## 6. What was found and fixed this session, in order
 
-This section is the freshest, most concrete part of this handover, written immediately after doing the work, so nothing here is second-hand.
+This is the freshest and most concrete section, written immediately after doing the work.
 
-**Bug 1: Vercel's deployment protection was silently blocking Stripe's webhook.** The staging preview deployment had "Vercel Authentication" (a login wall) enabled project-wide. This is invisible when a human clicks through in a browser (their own Vercel login satisfies it), but it blocked Stripe's server-to-server webhook calls outright with an HTTP 401 "Protected deployment" response. Diagnosed by checking Stripe's own Event deliveries log for the webhook endpoint, which showed the exact response body. Fixed by disabling Vercel Authentication in Project Settings -> Deployment Protection.
-
-**Bug 2: the webhook's stored signing secret did not match Stripe's actual current secret.** After fixing Bug 1, webhook deliveries started reaching the endpoint but failed signature verification (400 "Invalid signature"). Fixed by rotating the signing secret in Stripe and carefully re-entering the new value into Vercel's `STRIPE_WEBHOOK_SECRET`, using the clipboard-copy method described in Section 5, then redeploying so the new environment variable took effect.
-
-**Bug 3: production's book-limit mapping was, and still is, wrong.** While verifying a real test purchase, the resulting Supabase row showed plan `plus` with `book_limit: 10` (should be 3). Root cause: the actually-deployed `api/stripe-webhook.js` (root-level, see Section 3.2) had `BOOK_LIMIT_BY_PLAN = { free: 3, plus: 10, pro: 30 }`, introduced by an earlier session's commit that mistakenly believed this matched the live pricing page. It did not; the live pricing page has always read Free 1 book, Plus up to 3, Pro 4 to 10 (Section 2.3). **This was fixed on `staging` today** (`BOOK_LIMIT_BY_PLAN = { free: 1, plus: 3, pro: 10 }`, matching `pricing.html` exactly), verified with a fresh webhook delivery that correctly wrote `book_limit: 3`. **The identical bug still exists in `main`'s copy of `api/stripe-webhook.js` right now, unfixed, confirmed by direct inspection today.** See Section 8, item 1.
-
-**A genuinely small UX bug was also fixed**: the billing modal's upgrade buttons showed only a bare price (for example "$9/mo") with no indication they were clickable calls to action. Relabelled to "Upgrade - $9/mo" style text, pushed to `staging`.
-
-**End-to-end verification performed today**: a real Stripe test-mode checkout was completed (test card), the webhook delivered successfully (HTTP 200), and the resulting Supabase row was confirmed correct (`plan: plus`, `book_limit: 3`, correct Stripe customer and subscription IDs attached). This is the first time this payment system has been verified working end to end; all earlier sessions had only gotten as far as code review and unconfigured environment variables.
+1. **`main`'s book-limit bug** (carried over as the #1 priority item from the previous handover): confirmed still present, fixed to `{ free: 1, plus: 3, pro: 10 }` matching the live pricing page exactly, merged via PR #10, deployed, verified live via direct HTTP checks.
+2. **Stray duplicate `website/api/` folder**: confirmed genuinely unused (nothing referenced it), confirmed its one file was stale and pre-dated a cost cap fix, deleted from both branches via PR #11 (main) and PR #12 (staging).
+3. **All four Stripe test-mode scenarios proven end-to-end on staging**: checkout, payment failure (Supabase update + admin alert email both confirmed via a real email received), book-limit correctness, and subscription cancellation (using Stripe's test-clock time-advance feature to force the actual cancellation event, not just the "scheduled to cancel" state).
+4. **Admin users page built** (`admin.html` + `api/admin-users.js`), deployed, `ADMIN_SECRET` set, verified working with a live `401` on missing/wrong secret and a real data table once authenticated.
+5. **Lost-checkout-intent bug found and fixed**: a signed-out visitor clicking Plus/Pro was sent to signup with no memory of which plan they wanted, and after verifying, was unconditionally sent to free onboarding instead of finishing checkout. Fixed so the plan is carried through the URL and checkout is resumed automatically right after verification. Merged to `main` via PR #16.
+6. **Live Stripe products, prices, webhook, and API key created directly in Stripe's dashboard.** Code updated with the live Price IDs, merged to `main` via PR #15.
+7. **A real live purchase attempted and, after two further fixes below, confirmed successful.** John made several real card attempts (a NatWest debit card that needed four 3D Secure challenge attempts before succeeding, a failed attempt via Stripe's own "Link" express-checkout feature, and the eventually-successful one). The successful purchase is confirmed in Stripe: subscription active, Plus, $9.00/month, real customer.
+8. **Live webhook 308-redirect bug found and fixed**: endpoint URL corrected from `https://readerbull.com/...` to `https://www.readerbull.com/...`.
+9. **Live webhook signing-secret mismatch found and fixed**: rotated to a fresh secret, correctly re-pasted into Vercel's Production-scoped `STRIPE_WEBHOOK_SECRET`, redeployed.
+10. **The missed webhook event manually resent** after both fixes, delivered successfully (`200 OK`, marked "Recovered" by Stripe), syncing John's real purchase to Supabase. Confirmed the underlying Stripe subscription itself was healthy (Active, Plus, $9/mo) throughout; the dashboard briefly showing "Free plan, past due" afterward was diagnosed as a stale page load, not a data problem, resolved by a hard refresh.
 
 ---
 
-## 7. Known issues, technical debt, and a note on trusting old documents
+## 7. Known issues, technical debt, and things worth trusting carefully
 
-### 7.1 A cautionary tale, worth reading
+### 7.1 Still open, carried over or new
 
-An earlier handover document (6 August) recorded "fixing" the book-limit mapping to `{ free: 3, plus: 10, pro: 30 }`, stating this matched the live pricing page. It did not. The actual live pricing page, both then and now, reads Free 1 book, Plus up to 3, Pro 4 to 10 (confirmed by direct fetch today, and consistent with an even earlier, 5 August handover that correctly recorded those same figures as the source of truth used to build the original Stripe integration). The 6 August session's own notes describe a known risk that likely explains the mistake: fetching `raw.githubusercontent.com` for a branch's current content can silently return stale, CDN-cached data. It appears that session checked pricing against stale cached content, concluded the wrong thing, and "fixed" a bug that didn't exist while reintroducing one that did.
+1. **The book portfolio feature is done on `staging` but not merged to `main`.** Was the standing priority item from the previous handover; now built, just not promoted.
+2. **The magic-link-click auth fallback still loses checkout intent.** Documented inline in `signup.html`. Low priority since it's not the path anyone actually uses, but a real gap if anyone ever does use it.
+3. **No automated tests anywhere in this codebase**, unchanged from before. Every verification tonight, including the entire live-payment flow, was manual: real browser clicks, real Stripe dashboard checks, real curl requests.
+4. **Mobile has still not been re-verified** for the billing modal, pricing page, or the new admin page. Carried over from the previous handover, still not possible from this session's tooling, still needs a real phone check from John.
+5. **Only one real live customer has been through the payment flow** (John's own test purchase). No other live customer traffic yet.
+6. **Multiple people/sessions pushing to `main` concurrently** was observed tonight (see Section 3.2). Not a problem tonight, but worth a shared convention going forward (branch names, or just a quick heads-up in chat) so two agents don't edit the same file at the same time.
 
-**The lesson for this team: when a past handover document and the live system disagree, trust the live system, and verify pricing/config claims against the actual live page or actual deployed endpoint, not a cached copy or an earlier document's summary of it, including this document.** Everything asserted as fact in this handover was checked against a live system today; anything forward-looking is clearly marked as such.
+### 7.2 A second cautionary tale, in the same spirit as the previous handover's Section 7.1
 
-### 7.2 Other known issues
-
-1. **Duplicate `website/api/` folder** (Section 3.2): stale, unused, but capable of causing exactly this kind of "fixed the file, but not the one that's deployed" confusion. Recommend deleting it.
-2. **`main`'s Stripe webhook has the book-limit bug** (Section 6, Bug 3), unfixed as of this writing.
-3. **No automated tests anywhere in this codebase.** Every verification to date, including everything in Section 6, has been manual (live requests, manual checkout runs, reading Stripe/Vercel/Supabase dashboards directly).
-4. **No `package.json` / dependency manager.** This is a deliberate, longstanding project convention (every third-party API is called via native `fetch`, no `stripe` npm package, no ORM), not an oversight, but it does mean things like Stripe's own SDK conveniences (e.g. `stripe.webhooks.constructEvent`) had to be hand-rolled (Section 3.6) and should be reviewed by whoever inherits this code.
-5. **Free-tier Supabase, DIY backups only** (Section 4.5).
-6. **The GitHub web-upload/CodeMirror editing method** used throughout this project's history (Section 4.2) is inherently more error-prone than a normal git workflow, and is the root cause of at least two of the bugs described in this document. If real `git push` access is available on the new machine, switching to it should be a near-term priority.
-7. **Mobile has not been re-verified** for the billing modal or the rebuilt pricing page (standing project rule: verify mobile before calling a layout change done). This was not possible from this session's browser tooling (a documented, longstanding limitation, not something skipped carelessly) and needs a real phone screenshot from John.
+Tonight repeated a version of the previous handover's lesson: **things that pass in test mode can still fail in live mode**, for reasons specific to live-mode infrastructure (a domain redirect, a mismatched secret) that test mode structurally cannot exercise. The fix isn't "test mode isn't good enough," it's: **after any live-mode config change, always run one real live transaction before trusting it**, exactly as this session eventually did.
 
 ---
 
 ## 8. Priority action list
 
-In rough priority order for whoever picks this up next:
+In order, reflecting John's explicit direction at the end of this session: **testing next, then start the review system.**
 
-1. **Fix `main`'s `api/stripe-webhook.js` book-limit bug** (Section 6, Bug 3) before promoting any payment work to production. One-line fix, already proven correct on staging.
-2. **Delete the stray `website/api/` duplicate folder** from both branches, after confirming nothing else references it, to remove the root cause of the confusion in Section 6/7.1.
-3. **Run the remaining Stripe test scenarios** on staging that have not yet been tried: cancelling a subscription via the Billing Portal (confirm it correctly reverts the row to Free/1 book), and simulating `invoice.payment_failed` (Stripe's test mode has tools for this), to confirm the admin alert email fires.
-4. **Product decision needed**: when to promote Stripe billing from staging to production, and what to do with the "Payment isn't live yet" disclaimer on `pricing.html` at that point (Section 2.4).
-5. **Before real launch**: create live-mode Stripe products, prices, and a live-mode webhook endpoint (entirely separate from test mode, nothing carries over), update the hardcoded Price ID maps in both `create-checkout-session.js` and `stripe-webhook.js` together, then promote `staging` to `main` via a pull request.
-6. **Test real `git push` access** from the new machine (Section 4.2); if available, migrate off the GitHub-web-UI editing workflow.
-7. **Mobile verification** of the billing modal and pricing page (Section 7.2, item 7).
-8. **Resume product priorities**: book portfolio opportunity ideas (the standing next item per the product owner, Section 2.4).
+1. **Run one more real live-mode purchase test**, ideally with a different card/browser than tonight's, to build confidence beyond the single successful transaction so far. Check it syncs correctly without needing manual webhook resends this time.
+2. **Test live-mode cancellation and payment-failure scenarios for real** (not just on staging/test mode). These have been proven in test mode only; live mode has its own webhook endpoint and hasn't had these two scenarios exercised yet.
+3. **Mobile verification** of the billing modal, pricing page, and admin page (carried over, still outstanding).
+4. **Merge the book portfolio feature from `staging` to `main`** once ready, it's built and tested on staging already.
+5. **Begin work on the review system** (Get Reviews / Build Your ARC), per John's explicit instruction. Currently a placeholder "Coming Soon" panel only. This is the next major feature build.
+6. **Decide on a coordination convention** for concurrent editing of `main` by multiple people/sessions (Section 7.1, item 6).
 
 ---
 
 ## 9. Appendix
 
-### 9.1 Credentials checklist (obtain via the account owner, never via chat)
+### 9.1 Credentials checklist (obtain via the account owner, never via chat) — unchanged
 
-- Stripe: Vybologybooks account login, `acct_1Rfp4sBqkDn8JXbQ`
+- Stripe: Vybologybooks account login, `acct_1Rfp4sBqkDn8JXbQ` (now has both live and test mode in active use, be careful which mode is selected before making any changes)
 - Vercel: `product-28/readerbull` project access
 - Supabase: "Readerbull" project access, `tqkeqjisqqvxasyzrfax`
-- GitHub: `johnhones/readerbull` repo access
-- Resend: account access for the transactional-email sending domain
-- Anthropic, SerpApi, DataForSEO: platform-billing accounts for the audit pipeline (distinct from any personal accounts)
+- GitHub: `johnhones/readerbull` repo access (real `git push` access confirmed working from this machine)
+- Resend: transactional email
+- Anthropic, SerpApi, DataForSEO: audit pipeline
 
-### 9.2 Prior handover documents in this project folder, and how to weigh them
+### 9.2 Prior handover documents, and how to weigh them
 
-- `ReaderBull_Stripe_Payment_Handover.md` (5 August): accurate at the time, now superseded by Section 6 of this document.
-- `ReaderBull_Handover_2026-08-06.md` (6 August): contains the pricing/book-limit mistake described in Section 7.1. Still useful for its editing-technique notes (Section 3.2/4.2 context) and its keyword-cost-cap work, which has not been contradicted by anything found today.
-- `ReaderBull_Session_Handover.md` / `.docx` / `_v3.docx`, `ReaderBull_Next_Chat_Handover_Prompt.md`: earlier engineering handovers, superseded by this document for anything relating to payments or infrastructure; may still hold useful detail on dashboard/scoring work not repeated here.
-- `ReaderBull_Project_Rules.md`, `ReaderBull_Infrastructure.md`, `ReaderBull_Product_OS.docx`, `ReaderBull_MVP_Update_01.docx`, `ReaderBull_MVP_Build_Plan.md`, `JOHN_CONTEXT_MASTER.docx`: these remain the standing source-of-truth documents per the project's own rules and were not found to be contradicted by anything today; keep reading these every session as before.
+- `ReaderBull_Master_Handover.md` (10 August): superseded by this document. Its Section 7.1 cautionary tale (about trusting stale cached data over the live system) remains a good general lesson; this document's Section 7.2 is effectively the live-mode version of the same lesson.
+- Everything else listed in the 10 August handover's own appendix: status unchanged, not re-verified this session, treat with the same caution as before (trust the live system over any written document, including this one, when they disagree).
 
 ### 9.3 Who to ask
 
-John Hones (product owner) for all product decisions, account access, and anything requiring a judgement call this document flags as open. Contact: coastlvibes@gmail.com.
+John Hones (product owner), coastlvibes@gmail.com, for all product decisions and anything requiring judgement this document flags as open.
 
 ---
 
-*End of handover. Written to be read cold, without needing this session's chat history. If anything here is unclear or turns out to be wrong once checked against a live system, trust the live system, per Section 7.1.*
+*End of handover. If anything here is unclear or turns out to be wrong once checked against a live system, trust the live system.*
