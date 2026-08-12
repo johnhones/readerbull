@@ -379,6 +379,7 @@ failures (e.g. a failed import), which is what made this feel loud. */
 .icon-orange { background: var(--orange-l); color: var(--orange-d); }
 .item-t { font-size: 16px; font-weight: 700; color: var(--teal-d); margin-bottom: 3px; }
 .item-b { font-size: 15px; color: var(--mid); line-height: 1.65; }
+.item-b > p:not(:last-child) { margin-bottom: 10px; }
 
 .callout { border-left: 3px solid var(--teal); background: var(--teal-l); padding: 14px 18px; border-radius: 0 4px 4px 0; font-size: 13px; color: var(--navy); line-height: 1.65; margin-bottom: 16px; }
 .callout-orange { border-left-color: var(--orange); background: var(--orange-l); }
