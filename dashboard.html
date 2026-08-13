@@ -85,7 +85,6 @@
       </div>
       <div class="g2" style="max-width:760px;margin:24px auto 0;">
         <div class="pricing-card">
-          <div class="soon-badge">Coming Soon</div>
           <h3><i class="ti ti-users" style="color:var(--teal-d);margin-right:6px;"></i> Reciprocal Reviews</h3>
           <p style="font-size:13px;color:var(--mid);line-height:1.6;margin-bottom:16px;">Free to start. Review another author's book, unlock a review request for one of yours. No cash changes hands between authors, ever, matching stays anonymous, and reviews stay genuinely voluntary.</p>
           <ul>
@@ -93,6 +92,7 @@
             <li><i class="ti ti-check"></i> Anonymous, anti-swap protected</li>
             <li><i class="ti ti-check"></i> Uses your uploaded manuscript</li>
           </ul>
+          <button type="button" class="btn btn-primary" id="reciprocal-open-btn" style="width:100%;justify-content:center;">Open Reciprocal Reviews</button>
         </div>
         <div class="pricing-card">
           <div class="soon-badge">Coming Soon</div>
@@ -103,6 +103,39 @@
             <li><i class="ti ti-check"></i> Readers opt in by genre interest</li>
             <li><i class="ti ti-check"></i> Reviews stay optional and honest</li>
           </ul>
+        </div>
+      </div>
+
+      <div id="reciprocal-detail" style="display:none;max-width:900px;margin:32px auto 0;">
+        <button type="button" id="reciprocal-close-btn" style="background:none;border:none;color:var(--mid);font-size:13px;cursor:pointer;margin-bottom:16px;"><i class="ti ti-arrow-left"></i> Back</button>
+
+        <div id="reciprocal-loading" style="text-align:center;padding:40px;color:var(--mid);">Loading&hellip;</div>
+        <div id="reciprocal-content" style="display:none;">
+
+          <div style="margin-bottom:32px;">
+            <h4 style="font-size:15px;font-weight:800;color:var(--navy);margin-bottom:4px;">Your books</h4>
+            <p style="font-size:13px;color:var(--mid);margin-bottom:12px;">Add a book to the pool once it has a manuscript uploaded. Every book gets one free starter slot so the pool isn't a chicken-and-egg problem on day one — after that, slots come from reviews you complete for other authors.</p>
+            <div id="reciprocal-my-books"></div>
+          </div>
+
+          <div style="margin-bottom:32px;">
+            <h4 style="font-size:15px;font-weight:800;color:var(--navy);margin-bottom:4px;">Books you're reviewing</h4>
+            <p style="font-size:13px;color:var(--mid);margin-bottom:12px;">Read the manuscript, leave an honest review on Amazon with the required disclosure line, then mark it done here to unlock a slot on your own book.</p>
+            <div id="reciprocal-to-review"></div>
+          </div>
+
+          <div style="margin-bottom:32px;">
+            <h4 style="font-size:15px;font-weight:800;color:var(--navy);margin-bottom:4px;">Being reviewed</h4>
+            <p style="font-size:13px;color:var(--mid);margin-bottom:12px;">Who's assigned isn't shown to you, matching stays anonymous, this is just a count.</p>
+            <div id="reciprocal-being-reviewed"></div>
+          </div>
+
+          <div>
+            <h4 style="font-size:15px;font-weight:800;color:var(--navy);margin-bottom:4px;">Browse &amp; request</h4>
+            <p style="font-size:13px;color:var(--mid);margin-bottom:12px;">Other authors' books with an open slot right now.</p>
+            <div id="reciprocal-browse"></div>
+          </div>
+
         </div>
       </div>
     </div>
@@ -1791,6 +1824,198 @@ async function saveKeywordChange(b, newList) {
         itemsHtml +
       '</div>'
     );
+  }
+
+  // Reciprocal Reviews (Get Reviews > Track A). Lazy-loaded: only calls
+  // api/reviews-my-status and api/reviews-browse the first time the author
+  // opens it, not on every dashboard load. See
+  // ReaderBull_Review_System_Scoping.md Sections 8-9 for the design this
+  // implements.
+  var reciprocalOpenBtn = document.getElementById('reciprocal-open-btn');
+  var reciprocalCloseBtn = document.getElementById('reciprocal-close-btn');
+  var reciprocalDetail = document.getElementById('reciprocal-detail');
+  var reciprocalLoading = document.getElementById('reciprocal-loading');
+  var reciprocalContent = document.getElementById('reciprocal-content');
+  var reciprocalLoaded = false;
+
+  function escapeHtmlLocal(s) {
+    return String(s == null ? '' : s).replace(/[&<>"']/g, function (c) {
+      return { '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c];
+    });
+  }
+
+  async function reciprocalApi(path, opts) {
+    opts = opts || {};
+    var resp = await fetch('/api/' + path, {
+      method: opts.method || 'GET',
+      headers: Object.assign(
+        { Authorization: 'Bearer ' + accessToken },
+        opts.body ? { 'Content-Type': 'application/json' } : {}
+      ),
+      body: opts.body ? JSON.stringify(opts.body) : undefined
+    });
+    var data = {};
+    try { data = await resp.json(); } catch (err) { /* empty body */ }
+    if (!resp.ok) throw new Error(data.error || 'Something went wrong, please try again.');
+    return data;
+  }
+
+  async function loadReciprocalReviews() {
+    reciprocalLoading.style.display = 'block';
+    reciprocalContent.style.display = 'none';
+    try {
+      var status = await reciprocalApi('reviews-my-status');
+      var browse = await reciprocalApi('reviews-browse');
+      renderReciprocalMyBooks(status.myBooks || []);
+      renderReciprocalToReview(status.toReview || []);
+      renderReciprocalBeingReviewed(status.beingReviewed || []);
+      renderReciprocalBrowse(browse.books || []);
+      reciprocalLoading.style.display = 'none';
+      reciprocalContent.style.display = 'block';
+    } catch (err) {
+      reciprocalLoading.innerHTML = '<p style="color:var(--red-d,#c0392b);">' + escapeHtmlLocal(err.message) + '</p>';
+    }
+  }
+
+  function renderReciprocalMyBooks(myBooks) {
+    var el = document.getElementById('reciprocal-my-books');
+    if (!myBooks.length) {
+      el.innerHTML = '<p style="font-size:13px;color:var(--mid);">No books yet — add one from your dashboard first.</p>';
+      return;
+    }
+    el.innerHTML = myBooks.map(function (b) {
+      var slotsText = b.inPool ? (b.availableSlots > 0 ? b.availableSlots + ' open slot' + (b.availableSlots === 1 ? '' : 's') : 'No open slots right now') : '';
+      var actionHtml;
+      if (!b.manuscriptUploaded) {
+        actionHtml = '<span style="font-size:12px;color:var(--mid);">Upload a manuscript to enable</span>';
+      } else if (b.inPool) {
+        actionHtml = '<button type="button" class="btn btn-outline reciprocal-toggle-btn" data-book-id="' + b.bookId + '" data-active="false" style="padding:7px 14px;font-size:12px;">Remove from pool</button>';
+      } else {
+        actionHtml = '<button type="button" class="btn btn-primary reciprocal-toggle-btn" data-book-id="' + b.bookId + '" data-active="true" style="padding:7px 14px;font-size:12px;">Add to pool</button>';
+      }
+      return '<div style="display:flex;align-items:center;justify-content:space-between;padding:12px 16px;border:1px solid var(--border);border-radius:8px;margin-bottom:8px;">' +
+        '<div><div style="font-size:14px;font-weight:700;color:var(--navy);">' + escapeHtmlLocal(b.title) + '</div>' +
+        (slotsText ? '<div style="font-size:12px;color:var(--mid);margin-top:2px;">' + slotsText + '</div>' : '') +
+        '</div>' + actionHtml + '</div>';
+    }).join('');
+
+    el.querySelectorAll('.reciprocal-toggle-btn').forEach(function (btn) {
+      btn.addEventListener('click', async function () {
+        btn.disabled = true;
+        try {
+          await reciprocalApi('reviews-pool-optin', {
+            method: 'POST',
+            body: { bookId: btn.getAttribute('data-book-id'), active: btn.getAttribute('data-active') === 'true' }
+          });
+          await loadReciprocalReviews();
+        } catch (err) {
+          alert(err.message);
+          btn.disabled = false;
+        }
+      });
+    });
+  }
+
+  function renderReciprocalToReview(toReview) {
+    var el = document.getElementById('reciprocal-to-review');
+    if (!toReview.length) {
+      el.innerHTML = '<p style="font-size:13px;color:var(--mid);">Nothing assigned yet — request a book below to get started.</p>';
+      return;
+    }
+    el.innerHTML = toReview.map(function (r) {
+      var doneHtml = r.status === 'completed'
+        ? '<span style="font-size:12px;color:var(--teal-d);font-weight:700;"><i class="ti ti-check"></i> Done</span>'
+        : '<button type="button" class="btn btn-outline reciprocal-read-btn" data-path="' + escapeHtmlLocal(r.manuscriptPath) + '" style="padding:7px 14px;font-size:12px;margin-right:8px;">Read manuscript</button>' +
+          '<button type="button" class="btn btn-primary reciprocal-done-btn" data-assignment-id="' + r.assignmentId + '" style="padding:7px 14px;font-size:12px;">Mark as done</button>';
+      return '<div style="display:flex;align-items:center;justify-content:space-between;padding:12px 16px;border:1px solid var(--border);border-radius:8px;margin-bottom:8px;">' +
+        '<div style="font-size:14px;font-weight:700;color:var(--navy);">' + escapeHtmlLocal(r.title) + '</div>' +
+        '<div>' + doneHtml + '</div></div>';
+    }).join('');
+
+    el.querySelectorAll('.reciprocal-read-btn').forEach(function (btn) {
+      btn.addEventListener('click', async function () {
+        try {
+          var signed = await readerbull.client.storage.from('manuscripts').createSignedUrl(btn.getAttribute('data-path'), 3600);
+          if (signed.error || !signed.data) throw new Error(signed.error ? signed.error.message : 'Could not open that manuscript.');
+          window.open(signed.data.signedUrl, '_blank');
+        } catch (err) {
+          alert(err.message);
+        }
+      });
+    });
+    el.querySelectorAll('.reciprocal-done-btn').forEach(function (btn) {
+      btn.addEventListener('click', async function () {
+        if (!confirm("Confirm you've left an honest review on Amazon (with the required disclosure line) for this book?")) return;
+        btn.disabled = true;
+        try {
+          await reciprocalApi('reviews-mark-done', { method: 'POST', body: { assignmentId: btn.getAttribute('data-assignment-id') } });
+          await loadReciprocalReviews();
+        } catch (err) {
+          alert(err.message);
+          btn.disabled = false;
+        }
+      });
+    });
+  }
+
+  function renderReciprocalBeingReviewed(beingReviewed) {
+    var el = document.getElementById('reciprocal-being-reviewed');
+    if (!beingReviewed.length) {
+      el.innerHTML = '<p style="font-size:13px;color:var(--mid);">None of your books are being reviewed yet.</p>';
+      return;
+    }
+    el.innerHTML = beingReviewed.map(function (b) {
+      return '<div style="display:flex;align-items:center;justify-content:space-between;padding:12px 16px;border:1px solid var(--border);border-radius:8px;margin-bottom:8px;">' +
+        '<div style="font-size:14px;font-weight:700;color:var(--navy);">' + escapeHtmlLocal(b.title) + '</div>' +
+        '<div style="font-size:12px;color:var(--mid);">' + b.activeCount + ' in progress &middot; ' + b.completedCount + ' completed</div></div>';
+    }).join('');
+  }
+
+  function renderReciprocalBrowse(books) {
+    var el = document.getElementById('reciprocal-browse');
+    var withSlots = books.filter(function (b) { return b.availableSlots > 0; });
+    if (!withSlots.length) {
+      el.innerHTML = '<p style="font-size:13px;color:var(--mid);">No open books to review right now — check back soon.</p>';
+      return;
+    }
+    el.innerHTML = withSlots.map(function (b) {
+      return '<div style="display:flex;align-items:center;justify-content:space-between;padding:12px 16px;border:1px solid var(--border);border-radius:8px;margin-bottom:8px;">' +
+        '<div><div style="font-size:14px;font-weight:700;color:var(--navy);">' + escapeHtmlLocal(b.title) + '</div>' +
+        '<div style="font-size:12px;color:var(--mid);margin-top:2px;">' + (b.category ? escapeHtmlLocal(b.category) + ' &middot; ' : '') + b.availableSlots + ' open slot' + (b.availableSlots === 1 ? '' : 's') + (b.cleanContentOnly ? ' &middot; clean content only' : '') + '</div></div>' +
+        '<button type="button" class="btn btn-primary reciprocal-request-btn" data-book-id="' + b.bookId + '" style="padding:7px 14px;font-size:12px;">Request to review</button></div>';
+    }).join('');
+
+    el.querySelectorAll('.reciprocal-request-btn').forEach(function (btn) {
+      btn.addEventListener('click', async function () {
+        btn.disabled = true;
+        try {
+          await reciprocalApi('reviews-request', { method: 'POST', body: { bookId: btn.getAttribute('data-book-id') } });
+          await loadReciprocalReviews();
+        } catch (err) {
+          alert(err.message);
+          btn.disabled = false;
+        }
+      });
+    });
+  }
+
+  if (reciprocalOpenBtn) {
+    reciprocalOpenBtn.addEventListener('click', function () {
+      reciprocalDetail.style.display = 'block';
+      reciprocalOpenBtn.closest('.g2').style.display = 'none';
+      document.querySelector('#panel-get-reviews > div:first-child').style.display = 'none';
+      if (!reciprocalLoaded) {
+        reciprocalLoaded = true;
+        loadReciprocalReviews();
+      }
+    });
+  }
+  if (reciprocalCloseBtn) {
+    reciprocalCloseBtn.addEventListener('click', function () {
+      reciprocalDetail.style.display = 'none';
+      document.querySelector('#panel-get-reviews .g2').style.display = 'grid';
+      document.querySelector('#panel-get-reviews > div:first-child').style.display = 'block';
+    });
   }
 
   // Tab switching between Navigate items.
