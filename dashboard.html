@@ -109,7 +109,11 @@
       <div id="reciprocal-detail" style="display:none;max-width:900px;margin:32px auto 0;">
         <button type="button" id="reciprocal-close-btn" style="background:none;border:none;color:var(--mid);font-size:13px;cursor:pointer;margin-bottom:16px;"><i class="ti ti-arrow-left"></i> Back</button>
 
-        <div id="reciprocal-loading" style="text-align:center;padding:40px;color:var(--mid);">Loading&hellip;</div>
+        <div id="reciprocal-loading" style="text-align:center;padding:40px;color:var(--mid);">
+          <p id="reciprocal-loading-text" style="margin-bottom:14px;font-size:13px;">Loading your reviews&hellip;</p>
+          <div class="submit-loading-bar-track"><div class="submit-loading-bar-fill" id="reciprocal-loading-bar"></div></div>
+          <p id="reciprocal-loading-error" style="display:none;color:var(--red-d,#c0392b);margin-top:14px;"></p>
+        </div>
         <div id="reciprocal-content" style="display:none;">
 
           <div style="margin-bottom:32px;">
@@ -1835,6 +1839,9 @@ async function saveKeywordChange(b, newList) {
   var reciprocalCloseBtn = document.getElementById('reciprocal-close-btn');
   var reciprocalDetail = document.getElementById('reciprocal-detail');
   var reciprocalLoading = document.getElementById('reciprocal-loading');
+  var reciprocalLoadingText = document.getElementById('reciprocal-loading-text');
+  var reciprocalLoadingBar = document.getElementById('reciprocal-loading-bar');
+  var reciprocalLoadingError = document.getElementById('reciprocal-loading-error');
   var reciprocalContent = document.getElementById('reciprocal-content');
   var reciprocalLoaded = false;
 
@@ -1863,17 +1870,48 @@ async function saveKeywordChange(b, newList) {
   async function loadReciprocalReviews() {
     reciprocalLoading.style.display = 'block';
     reciprocalContent.style.display = 'none';
+    reciprocalLoadingError.style.display = 'none';
+    reciprocalLoadingText.style.display = 'block';
+    reciprocalLoadingBar.parentElement.style.display = 'block';
+
+    // Paced progress bar, not tied to real elapsed time: eases toward 90%
+    // over ~6s then holds until the responses actually land, so it never
+    // shows a raw ticking second count. Same pattern as the audit-refresh
+    // loading bar above, just paced faster since this call is usually a
+    // couple of seconds, not tens of seconds.
+    reciprocalLoadingBar.style.width = '0%';
+    var loadingStart = Date.now();
+    var loadingBarInterval = setInterval(function () {
+      var elapsedSec = (Date.now() - loadingStart) / 1000;
+      var fraction = Math.min(1, elapsedSec / 6);
+      var percent = 90 * (1 - Math.pow(1 - fraction, 2));
+      reciprocalLoadingBar.style.width = percent + '%';
+    }, 150);
+
     try {
-      var status = await reciprocalApi('reviews-my-status');
-      var browse = await reciprocalApi('reviews-browse');
+      var results = await Promise.all([
+        reciprocalApi('reviews-my-status'),
+        reciprocalApi('reviews-browse')
+      ]);
+      var status = results[0];
+      var browse = results[1];
       renderReciprocalMyBooks(status.myBooks || []);
       renderReciprocalToReview(status.toReview || []);
       renderReciprocalBeingReviewed(status.beingReviewed || []);
       renderReciprocalBrowse(browse.books || []);
-      reciprocalLoading.style.display = 'none';
-      reciprocalContent.style.display = 'block';
+      clearInterval(loadingBarInterval);
+      reciprocalLoadingBar.style.width = '100%';
+      setTimeout(function () {
+        reciprocalLoading.style.display = 'none';
+        reciprocalContent.style.display = 'block';
+      }, 200);
     } catch (err) {
-      reciprocalLoading.innerHTML = '<p style="color:var(--red-d,#c0392b);">' + escapeHtmlLocal(err.message) + '</p>';
+      clearInterval(loadingBarInterval);
+      reciprocalLoadingText.style.display = 'none';
+      reciprocalLoadingBar.parentElement.style.display = 'none';
+      reciprocalLoadingError.textContent = err.message;
+      reciprocalLoadingError.style.display = 'block';
+      reciprocalLoaded = false; // allow a retry next time this panel is opened
     }
   }
 
