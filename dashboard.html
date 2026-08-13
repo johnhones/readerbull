@@ -46,7 +46,6 @@
       <hr class="shell-divider">
       <div class="shell-section-label">Tools</div>
       <button class="shell-nav-item act" data-panel="get-reviews"><i class="ti ti-star"></i> Get Reviews</button>
-      <button class="shell-nav-item act" data-panel="build-arc"><i class="ti ti-book-2"></i> Build Your ARC</button>
       <button class="shell-nav-item act" data-panel="ad-campaigns"><i class="ti ti-ad-2"></i> Ad Campaigns</button>
 
       <hr class="shell-divider">
@@ -80,19 +79,31 @@
     <div id="panel-quick-wins" class="shell-panel" style="display:none;"></div>
 
     <div id="panel-get-reviews" class="shell-panel" style="display:none;">
-      <div class="shell-empty">
-        <div class="soon-badge">Coming Soon</div>
-        <i class="ti ti-star"></i>
-        <h3>Get Reviews</h3>
-        <p>We'll show your book here next to how many reviews you need to be competitive in your category, plus safe ways to get there.</p>
+      <div style="max-width:760px;margin:0 auto;padding:40px 0 8px;text-align:center;">
+        <h3 style="font-size:20px;font-weight:800;color:var(--navy);margin-bottom:8px;">Get Reviews</h3>
+        <p style="font-size:14px;color:var(--mid);line-height:1.6;">Two ways to build genuine, Amazon-compliant reviews for your book. Pick the one that fits, or use both.</p>
       </div>
-    </div>
-    <div id="panel-build-arc" class="shell-panel" style="display:none;">
-      <div class="shell-empty">
-        <div class="soon-badge">Coming Soon</div>
-        <i class="ti ti-book-2"></i>
-        <h3>Build Your ARC</h3>
-        <p>A guided way to launch an Advance Reader Copy campaign and recruit real, opted-in readers for honest reviews.</p>
+      <div class="g2" style="max-width:760px;margin:24px auto 0;">
+        <div class="pricing-card">
+          <div class="soon-badge">Coming Soon</div>
+          <h3><i class="ti ti-users" style="color:var(--teal-d);margin-right:6px;"></i> Reciprocal Reviews</h3>
+          <p style="font-size:13px;color:var(--mid);line-height:1.6;margin-bottom:16px;">Free to start. Review another author's book, unlock a review request for one of yours. No cash changes hands between authors, ever, matching stays anonymous, and reviews stay genuinely voluntary.</p>
+          <ul>
+            <li><i class="ti ti-check"></i> Free, one-for-one matching</li>
+            <li><i class="ti ti-check"></i> Anonymous, anti-swap protected</li>
+            <li><i class="ti ti-check"></i> Uses your uploaded manuscript</li>
+          </ul>
+        </div>
+        <div class="pricing-card">
+          <div class="soon-badge">Coming Soon</div>
+          <h3><i class="ti ti-speakerphone" style="color:var(--teal-d);margin-right:6px;"></i> Sponsored Reviews</h3>
+          <p style="font-size:13px;color:var(--mid);line-height:1.6;margin-bottom:16px;">Set a budget and put your book in front of real readers who choose it because they want to. Faster than the reciprocal queue, no review swap required on your end.</p>
+          <ul>
+            <li><i class="ti ti-check"></i> You set the budget</li>
+            <li><i class="ti ti-check"></i> Readers opt in by genre interest</li>
+            <li><i class="ti ti-check"></i> Reviews stay optional and honest</li>
+          </ul>
+        </div>
       </div>
     </div>
     <div id="panel-ad-campaigns" class="shell-panel" style="display:none;">
@@ -1416,7 +1427,7 @@ function competitorTableHtml(b) { var competitors = b.competitors_json; if (!com
     if ((reviews.points || 0) < (reviews.max || 20)) {
       steps.push({
         title: 'Build your reviews and ratings',
-        body: 'This is approximated from your total ratings count. Launch or grow your Build Your ARC campaign (under Tools) to reach opted-in readers, it\'s free to start and reciprocal, and add a warm, compliant review request inside the book itself.'
+        body: 'This is approximated from your total ratings count. Use Get Reviews (under Tools) to reach opted-in readers, reciprocal and sponsored options both available, and add a warm, compliant review request inside the book itself.'
       });
     }
     var starRating = breakdown.starRating || {};
@@ -1756,7 +1767,7 @@ async function saveKeywordChange(b, newList) {
 
       var actionText = {
         listing: 'Fill in all 7 backend keyword fields (scores are capped at 12/20 until they are), confirm your primary keyword is in the title, and check your categories and description.',
-        reviews: 'Launch or grow your Build Your ARC campaign (under Tools) to build reviews and ratings, it\'s free to start and reciprocal, and this is worth the most points and usually moves fastest.',
+        reviews: 'Use Get Reviews (under Tools) to build reviews and ratings, reciprocal and sponsored options both available, and this is worth the most points and usually moves fastest.',
         starRating: 'Address anything recurring in critical reviews, star rating is scored separately from review volume.'
       };
 
@@ -1794,7 +1805,7 @@ async function saveKeywordChange(b, newList) {
       document.getElementById('panel-overview').style.display = (target === 'overview') ? 'block' : 'none';
       [
         'market-analysis', 'marketing-strategy', 'keywords', 'quick-wins',
-        'get-reviews', 'build-arc', 'ad-campaigns',
+        'get-reviews', 'ad-campaigns',
         'amazon-kdp', 'tiktok-shop', 'barnes-noble', 'apple-books', 'audible-acx'
       ].forEach(function (name) {
         var el = document.getElementById('panel-' + name);
