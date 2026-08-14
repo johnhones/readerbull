@@ -118,7 +118,7 @@
 
           <div style="margin-bottom:32px;">
             <h4 style="font-size:15px;font-weight:800;color:var(--navy);margin-bottom:4px;">Your books</h4>
-            <p style="font-size:13px;color:var(--mid);margin-bottom:12px;">Add a book to the pool once it has a manuscript uploaded. Every book gets one free starter slot so the pool isn't a chicken-and-egg problem on day one — after that, slots come from reviews you complete for other authors.</p>
+            <p style="font-size:13px;color:var(--mid);margin-bottom:12px;">Add a book to the pool once it has a manuscript uploaded. Every book gets one free starter slot so the pool isn't a chicken-and-egg problem on day one. After that, slots come from reviews you complete for other authors.</p>
             <div id="reciprocal-my-books"></div>
           </div>
 
@@ -1918,7 +1918,7 @@ async function saveKeywordChange(b, newList) {
   function renderReciprocalMyBooks(myBooks) {
     var el = document.getElementById('reciprocal-my-books');
     if (!myBooks.length) {
-      el.innerHTML = '<p style="font-size:13px;color:var(--mid);">No books yet — add one from your dashboard first.</p>';
+      el.innerHTML = '<p style="font-size:13px;color:var(--mid);">No books yet. Add one from your dashboard first.</p>';
       return;
     }
     el.innerHTML = myBooks.map(function (b) {
@@ -1957,7 +1957,7 @@ async function saveKeywordChange(b, newList) {
   function renderReciprocalToReview(toReview) {
     var el = document.getElementById('reciprocal-to-review');
     if (!toReview.length) {
-      el.innerHTML = '<p style="font-size:13px;color:var(--mid);">Nothing assigned yet — request a book below to get started.</p>';
+      el.innerHTML = '<p style="font-size:13px;color:var(--mid);">Nothing assigned yet. Request a book below to get started.</p>';
       return;
     }
     el.innerHTML = toReview.map(function (r) {
@@ -2013,7 +2013,7 @@ async function saveKeywordChange(b, newList) {
     var el = document.getElementById('reciprocal-browse');
     var withSlots = books.filter(function (b) { return b.availableSlots > 0; });
     if (!withSlots.length) {
-      el.innerHTML = '<p style="font-size:13px;color:var(--mid);">No open books to review right now — check back soon.</p>';
+      el.innerHTML = '<p style="font-size:13px;color:var(--mid);">No open books to review right now. Check back soon.</p>';
       return;
     }
     el.innerHTML = withSlots.map(function (b) {
