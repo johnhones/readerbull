@@ -42,7 +42,7 @@ module.exports = async function handler(req, res) {
   // makes the embed work even for books the caller doesn't own).
   var poolResp = await fetch(
     SUPABASE_URL + '/rest/v1/review_pool_entries?select=id,book_id,user_id,bonus_slots,clean_content_only,' +
-      'books(book_title,cover_image_url,amazon_category)&active=eq.true',
+      'books(book_title,cover_image_url,amazon_category,score)&active=eq.true',
     { headers: headers }
   );
   if (!poolResp.ok) {
@@ -106,9 +106,24 @@ module.exports = async function handler(req, res) {
       coverImageUrl: b.cover_image_url || null,
       category: b.amazon_category || null,
       cleanContentOnly: !!entry.clean_content_only,
-      availableSlots: availableSlots
+      availableSlots: availableSlots,
+      discoverabilityScore: (typeof b.score === 'number') ? b.score : null
     });
   }
+
+  // "Smart Match" v1 (17 August 2026, direct user instruction): surface
+  // books that most need review momentum first, using the Discoverability
+  // Score already computed for every imported book. Lower score = needs
+  // more help = shown first. Books with no score yet (never audited) sort
+  // last, since we have no evidence they need priority. This is a book-need
+  // ranking only — it is NOT personalized to the reviewer's own genre
+  // interests, because ReaderBull doesn't have a reviewer-preferences field
+  // to do that with yet; that'd be a natural follow-up, not built here.
+  results.sort(function (a, b) {
+    var sa = a.discoverabilityScore === null ? Infinity : a.discoverabilityScore;
+    var sb = b.discoverabilityScore === null ? Infinity : b.discoverabilityScore;
+    return sa - sb;
+  });
 
   res.status(200).json({ books: results });
 };
