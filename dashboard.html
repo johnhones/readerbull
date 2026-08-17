@@ -116,28 +116,43 @@
         </div>
         <div id="reciprocal-content" style="display:none;">
 
-          <div style="margin-bottom:32px;">
-            <h4 style="font-size:15px;font-weight:800;color:var(--navy);margin-bottom:4px;">Your books</h4>
-            <p style="font-size:13px;color:var(--mid);margin-bottom:12px;">Add a book to the pool once it has a manuscript uploaded. Every book gets one free starter slot so the pool isn't a chicken-and-egg problem on day one. After that, slots come from reviews you complete for other authors.</p>
-            <div id="reciprocal-my-books"></div>
+          <!-- ARC Readers dashboard rebuild (15 August 2026) — three-tab
+               structure + Recent Activity feed, per
+               ReaderBull_ARC_Readers_Rebuild_Engineering_Spec_2026-08-14_v3.md
+               Section 2, built against arc-readers-mockup_v2_1.html. Every
+               section below is fully populated by renderArc* functions. -->
+          <div id="arc-stat-row" class="stat-row"></div>
+
+          <div class="arc-section">
+            <div class="hb-card">
+              <div class="hb-eyebrow"><i class="ti ti-books"></i> Books in Review</div>
+              <p class="sub">Add a book once it has a manuscript uploaded. Every book gets one free starter slot, so you're never stuck waiting for someone else to go first. After that, slots come from reviews you complete for other authors. Your plan sets how many books can be in review at once &mdash; 1 on Free, 3 on Plus, 10 on Pro.</p>
+              <div id="arc-books-in-review"></div>
+            </div>
           </div>
 
-          <div style="margin-bottom:32px;">
-            <h4 style="font-size:15px;font-weight:800;color:var(--navy);margin-bottom:4px;">Books you're reviewing</h4>
-            <p style="font-size:13px;color:var(--mid);margin-bottom:12px;">Read the manuscript, leave an honest review on Amazon with the required disclosure line, then mark it done here to unlock a slot on your own book.</p>
-            <div id="reciprocal-to-review"></div>
+          <div class="arc-section">
+            <div class="hb-card">
+              <div class="hb-eyebrow"><i class="ti ti-book"></i> Books You're Reviewing</div>
+              <p class="sub">Read the manuscript, leave an honest review on Amazon with the required disclosure line, then mark it done here to unlock a slot on your own book.</p>
+              <div id="arc-books-reviewing"></div>
+            </div>
           </div>
 
-          <div style="margin-bottom:32px;">
-            <h4 style="font-size:15px;font-weight:800;color:var(--navy);margin-bottom:4px;">Being reviewed</h4>
-            <p style="font-size:13px;color:var(--mid);margin-bottom:12px;">Who's assigned isn't shown to you, matching stays anonymous, this is just a count.</p>
-            <div id="reciprocal-being-reviewed"></div>
+          <div class="arc-section">
+            <div class="hb-card">
+              <div class="hb-eyebrow"><i class="ti ti-compass"></i> Library</div>
+              <p class="sub">Other authors' books currently open for review.</p>
+              <div id="arc-library"></div>
+            </div>
           </div>
 
-          <div>
-            <h4 style="font-size:15px;font-weight:800;color:var(--navy);margin-bottom:4px;">Browse &amp; request</h4>
-            <p style="font-size:13px;color:var(--mid);margin-bottom:12px;">Other authors' books with an open slot right now.</p>
-            <div id="reciprocal-browse"></div>
+          <div class="arc-section">
+            <div class="hb-card">
+              <div class="hb-eyebrow"><i class="ti ti-history"></i> Recent Activity</div>
+              <p class="sub">Your reading history and the books you've reviewed, most recent first.</p>
+              <div id="arc-activity"></div>
+            </div>
           </div>
 
         </div>
@@ -289,6 +304,37 @@
     <div class="modal-actions">
       <button class="btn btn-outline" id="billing-modal-close">Close</button>
       <button class="btn btn-primary" id="billing-modal-manage" style="display:none;">Manage billing</button>
+    </div>
+  </div>
+</div>
+
+<!-- ARC Readers manuscript upload modal (ARC Readers rebuild, 15 August 2026).
+     Uploads straight to the existing `manuscripts` storage bucket at
+     user_id/book_id.pdf, same path convention onboarding.html already uses,
+     then updates books.manuscript_url via the existing "Users can update
+     own book" RLS policy (same direct-client pattern the book-switcher's
+     delete button already uses). If the book is under the plan's book_limit
+     for active pool entries, this also auto-activates it into the pool
+     (calls reviews-pool-optin with active:true) per the approved Section 2.1
+     copy; otherwise it's left inactive as a "Manuscript ready" gated row. -->
+<div class="modal-overlay" id="arc-upload-modal">
+  <div class="modal-card">
+    <h3>Upload manuscript</h3>
+    <p id="arc-upload-modal-book-title" style="font-weight:700;color:var(--navy);margin-top:-10px;margin-bottom:16px;"></p>
+    <div class="upload-drop" id="arc-upload-drop">
+      <i class="ti ti-file-upload"></i>
+      <p>Drop a PDF here or click to choose a file</p>
+      <p class="fine">PDF only, up to 50MB</p>
+      <input type="file" id="arc-upload-input" accept="application/pdf">
+    </div>
+    <div class="upload-file-row" id="arc-upload-file-row">
+      <span id="arc-upload-file-name"></span>
+      <i class="ti ti-circle-check" style="color:var(--teal-d);"></i>
+    </div>
+    <div class="detail-error" id="arc-upload-modal-error" style="display:none;text-align:left;"></div>
+    <div class="modal-actions">
+      <button class="btn btn-outline" id="arc-upload-modal-cancel">Cancel</button>
+      <button class="btn btn-primary" id="arc-upload-modal-save" disabled>Upload</button>
     </div>
   </div>
 </div>
@@ -1867,6 +1913,139 @@ async function saveKeywordChange(b, newList) {
     return data;
   }
 
+  // Same shape as renderOverview's local formatRelativeTime, plus weeks/
+  // months/years since ARC Readers' Recent Activity feed can reasonably
+  // show older items than a freshly-audited book ever would.
+  function arcFormatRelativeTime(iso) {
+    if (!iso) return '';
+    var then = new Date(iso).getTime();
+    if (isNaN(then)) return '';
+    var diffMs = Date.now() - then;
+    if (diffMs < 0) diffMs = 0;
+    var mins = Math.floor(diffMs / 60000);
+    if (mins < 1) return 'just now';
+    if (mins < 60) return mins + (mins === 1 ? ' minute ago' : ' minutes ago');
+    var hours = Math.floor(mins / 60);
+    if (hours < 24) return hours + (hours === 1 ? ' hour ago' : ' hours ago');
+    var days = Math.floor(hours / 24);
+    if (days < 7) return days + (days === 1 ? ' day ago' : ' days ago');
+    var weeks = Math.floor(days / 7);
+    if (weeks < 5) return weeks + (weeks === 1 ? ' week ago' : ' weeks ago');
+    var months = Math.floor(days / 30);
+    if (months < 12) return months + (months === 1 ? ' month ago' : ' months ago');
+    var years = Math.floor(days / 365);
+    return years + (years === 1 ? ' year ago' : ' years ago');
+  }
+
+  // ARC Readers manuscript upload modal (ARC Readers rebuild, 15 August
+  // 2026). Static markup, wired once here rather than re-wired per render
+  // like the row buttons below, since the modal itself never gets its
+  // innerHTML rebuilt.
+  var arcUploadModal = document.getElementById('arc-upload-modal');
+  var arcUploadInput = document.getElementById('arc-upload-input');
+  var arcUploadFileRow = document.getElementById('arc-upload-file-row');
+  var arcUploadFileName = document.getElementById('arc-upload-file-name');
+  var arcUploadModalError = document.getElementById('arc-upload-modal-error');
+  var arcUploadModalSave = document.getElementById('arc-upload-modal-save');
+  var arcUploadModalCancel = document.getElementById('arc-upload-modal-cancel');
+  var arcUploadModalBookTitle = document.getElementById('arc-upload-modal-book-title');
+  var arcUploadTargetBookId = null;
+  var arcUploadSelectedFile = null;
+  // Count of this author's books currently active in the pool, recomputed
+  // on every loadReciprocalReviews() call. Drives both the row-gating
+  // logic below and the auto-activate decision in the upload modal's save
+  // handler, per the plan-limit decision: reuse subscription.book_limit
+  // (1/3/10) as the cap rather than a separate ARC-specific limit.
+  var arcActiveInReviewCount = 0;
+
+  function arcResetUploadModal() {
+    arcUploadTargetBookId = null;
+    arcUploadSelectedFile = null;
+    arcUploadInput.value = '';
+    arcUploadFileRow.style.display = 'none';
+    arcUploadModalError.style.display = 'none';
+    arcUploadModalSave.disabled = true;
+    arcUploadModalSave.textContent = 'Upload';
+  }
+
+  function arcOpenUploadModal(bookId, bookTitle) {
+    arcResetUploadModal();
+    arcUploadTargetBookId = bookId;
+    arcUploadModalBookTitle.textContent = bookTitle || '';
+    arcUploadModal.classList.add('active');
+  }
+
+  arcUploadInput.addEventListener('change', function () {
+    var file = arcUploadInput.files && arcUploadInput.files[0];
+    arcUploadModalError.style.display = 'none';
+    if (!file) return;
+    if (file.type !== 'application/pdf') {
+      arcUploadModalError.textContent = 'Please choose a PDF file.';
+      arcUploadModalError.style.display = 'block';
+      arcUploadInput.value = '';
+      return;
+    }
+    if (file.size > 50 * 1024 * 1024) {
+      arcUploadModalError.textContent = 'That file is over the 50MB limit.';
+      arcUploadModalError.style.display = 'block';
+      arcUploadInput.value = '';
+      return;
+    }
+    arcUploadSelectedFile = file;
+    arcUploadFileName.textContent = file.name;
+    arcUploadFileRow.style.display = 'flex';
+    arcUploadModalSave.disabled = false;
+  });
+
+  arcUploadModalCancel.addEventListener('click', function () {
+    arcUploadModal.classList.remove('active');
+    arcResetUploadModal();
+  });
+
+  arcUploadModalSave.addEventListener('click', async function () {
+    if (!arcUploadSelectedFile || !arcUploadTargetBookId) return;
+    arcUploadModalSave.disabled = true;
+    arcUploadModalSave.textContent = 'Uploading…';
+    arcUploadModalError.style.display = 'none';
+    try {
+      // Same storage path convention onboarding.html already uses
+      // (user_id/book_id.pdf), so the existing "matched reviewer can read
+      // assigned manuscript" storage policy keeps working unchanged.
+      var path = user.id + '/' + arcUploadTargetBookId + '.pdf';
+      var uploadResult = await readerbull.client.storage
+        .from('manuscripts')
+        .upload(path, arcUploadSelectedFile, { upsert: true, contentType: 'application/pdf' });
+      if (uploadResult.error) throw new Error(uploadResult.error.message || 'Upload failed, please try again.');
+
+      // Direct client write, RLS-scoped by the existing "Users can update
+      // own book" policy, same pattern the book-switcher's delete button
+      // already uses (readerbull.client.from('books').delete()...).
+      var updateResult = await readerbull.client
+        .from('books')
+        .update({ manuscript_url: path })
+        .eq('id', arcUploadTargetBookId);
+      if (updateResult.error) throw new Error(updateResult.error.message || 'Could not save the manuscript to this book.');
+
+      // Auto-activate if still under the plan's book_limit for active pool
+      // entries (Section 2.1: "manuscript present, under the plan limit ->
+      // auto-activates"). Reuses the existing reviews-pool-optin endpoint,
+      // no new backend logic needed. If already at the limit, the row will
+      // show the "upgrade to activate" state on the next render instead.
+      if (arcActiveInReviewCount < (subscription.book_limit || 1)) {
+        await reciprocalApi('reviews-pool-optin', { method: 'POST', body: { bookId: arcUploadTargetBookId, active: true } });
+      }
+
+      arcUploadModal.classList.remove('active');
+      arcResetUploadModal();
+      await loadReciprocalReviews();
+    } catch (err) {
+      arcUploadModalError.textContent = err.message;
+      arcUploadModalError.style.display = 'block';
+      arcUploadModalSave.disabled = false;
+      arcUploadModalSave.textContent = 'Upload';
+    }
+  });
+
   async function loadReciprocalReviews() {
     reciprocalLoading.style.display = 'block';
     reciprocalContent.style.display = 'none';
@@ -1895,10 +2074,20 @@ async function saveKeywordChange(b, newList) {
       ]);
       var status = results[0];
       var browse = results[1];
-      renderReciprocalMyBooks(status.myBooks || []);
-      renderReciprocalToReview(status.toReview || []);
-      renderReciprocalBeingReviewed(status.beingReviewed || []);
-      renderReciprocalBrowse(browse.books || []);
+      var myBooks = status.myBooks || [];
+      var toReview = status.toReview || [];
+      var libraryBooks = (browse.books || []).filter(function (b) { return b.availableSlots > 0; });
+      var beingReviewedByBook = {};
+      (status.beingReviewed || []).forEach(function (b) { beingReviewedByBook[b.bookId] = b; });
+
+      arcActiveInReviewCount = myBooks.filter(function (b) { return b.inPool; }).length;
+
+      renderArcStats(myBooks, toReview, libraryBooks);
+      renderArcBooksInReview(myBooks, beingReviewedByBook);
+      renderArcBooksReviewing(toReview);
+      renderArcLibrary(libraryBooks);
+      renderArcActivity(myBooks, toReview, status.beingReviewedEvents || []);
+
       clearInterval(loadingBarInterval);
       reciprocalLoadingBar.style.width = '100%';
       setTimeout(function () {
@@ -1915,36 +2104,83 @@ async function saveKeywordChange(b, newList) {
     }
   }
 
-  function renderReciprocalMyBooks(myBooks) {
-    var el = document.getElementById('reciprocal-my-books');
+  function arcEmptyHtml(message) {
+    return '<div class="arc-empty"><p>' + escapeHtmlLocal(message) + '</p></div>';
+  }
+
+  function renderArcStats(myBooks, toReview, libraryBooks) {
+    var el = document.getElementById('arc-stat-row');
+    var inReviewCount = myBooks.filter(function (b) { return b.inPool; }).length;
+    var reviewingCount = toReview.filter(function (r) { return r.status !== 'completed'; }).length;
+    el.innerHTML =
+      '<div class="stat-tile"><div class="stat-icon icon-teal"><i class="ti ti-books"></i></div>' +
+      '<div class="stat-label">Books in Review</div>' +
+      '<div class="stat-num">' + inReviewCount + ' <span style="font-size:13px;font-weight:600;color:var(--muted);">of ' + (subscription.book_limit || 1) + '</span></div></div>' +
+      '<div class="stat-tile"><div class="stat-icon icon-orange"><i class="ti ti-book"></i></div>' +
+      '<div class="stat-label">Books You’re Reviewing</div>' +
+      '<div class="stat-num">' + reviewingCount + '</div></div>' +
+      '<div class="stat-tile"><div class="stat-icon icon-teal"><i class="ti ti-compass"></i></div>' +
+      '<div class="stat-label">Library</div>' +
+      '<div class="stat-num">' + libraryBooks.length + '</div></div>';
+  }
+
+  // Three-state row logic, per the engineering spec Section 2.1, revised
+  // after CTO/Product/UX review specifically to give a Free-tier author
+  // with multiple books a distinct "plan limit reached" message instead of
+  // making it look like a broken upload (that was the sharpest UX gap in
+  // v1). A 4th, rarely-seen fallback state (manuscript present, under the
+  // limit, but somehow not yet active) covers a failed/retried
+  // auto-activation rather than being something authors normally see.
+  function renderArcBooksInReview(myBooks, beingReviewedByBook) {
+    var el = document.getElementById('arc-books-in-review');
     if (!myBooks.length) {
-      el.innerHTML = '<p style="font-size:13px;color:var(--mid);">No books yet. Add one from your dashboard first.</p>';
+      el.innerHTML = arcEmptyHtml('No books yet. Add one from your dashboard first.');
       return;
     }
     el.innerHTML = myBooks.map(function (b) {
-      var slotsText = b.inPool ? (b.availableSlots > 0 ? b.availableSlots + ' open slot' + (b.availableSlots === 1 ? '' : 's') : 'No open slots right now') : '';
-      var actionHtml;
+      var metaHtml, actionHtml;
       if (!b.manuscriptUploaded) {
-        actionHtml = '<span style="font-size:12px;color:var(--mid);">Upload a manuscript to enable</span>';
+        metaHtml = '<span class="pill pill-muted">Add your manuscript to open this slot</span>';
+        actionHtml = '<button type="button" class="btn btn-outline arc-upload-btn" data-book-id="' + b.bookId + '" data-book-title="' + escapeHtmlLocal(b.title) + '"><i class="ti ti-upload"></i> Upload manuscript</button>';
       } else if (b.inPool) {
-        actionHtml = '<button type="button" class="btn btn-outline reciprocal-toggle-btn" data-book-id="' + b.bookId + '" data-active="false" style="padding:7px 14px;font-size:12px;">Remove from pool</button>';
+        var counts = beingReviewedByBook[b.bookId];
+        var activeCount = counts ? counts.activeCount : 0;
+        var completedCount = counts ? counts.completedCount : 0;
+        if (activeCount > 0) {
+          metaHtml = '<span class="pill pill-teal">' + activeCount + ' reviewer' + (activeCount === 1 ? '' : 's') + ' currently reviewing</span>';
+        } else if (completedCount > 0) {
+          metaHtml = '<span class="pill pill-teal">' + completedCount + ' review' + (completedCount === 1 ? '' : 's') + ' completed</span>';
+        } else {
+          metaHtml = '<span class="pill pill-muted">Looking for your first reviewer</span>';
+        }
+        actionHtml = '';
+      } else if (arcActiveInReviewCount >= (subscription.book_limit || 1)) {
+        metaHtml = '<span class="pill pill-orange">Manuscript ready &mdash; upgrade to activate</span>';
+        actionHtml = '<button type="button" class="btn btn-outline arc-upgrade-btn" data-book-title="' + escapeHtmlLocal(b.title) + '">Upgrade</button>';
       } else {
-        actionHtml = '<button type="button" class="btn btn-primary reciprocal-toggle-btn" data-book-id="' + b.bookId + '" data-active="true" style="padding:7px 14px;font-size:12px;">Add to pool</button>';
+        metaHtml = '<span class="pill pill-muted">Manuscript ready</span>';
+        actionHtml = '<button type="button" class="btn btn-primary arc-activate-btn" data-book-id="' + b.bookId + '">Activate</button>';
       }
-      return '<div style="display:flex;align-items:center;justify-content:space-between;padding:12px 16px;border:1px solid var(--border);border-radius:8px;margin-bottom:8px;">' +
-        '<div><div style="font-size:14px;font-weight:700;color:var(--navy);">' + escapeHtmlLocal(b.title) + '</div>' +
-        (slotsText ? '<div style="font-size:12px;color:var(--mid);margin-top:2px;">' + slotsText + '</div>' : '') +
-        '</div>' + actionHtml + '</div>';
+      return '<div class="arc-row"><div><div class="arc-row-title">' + escapeHtmlLocal(b.title) + '</div>' +
+        '<div class="arc-row-meta">' + metaHtml + '</div></div>' +
+        (actionHtml ? '<div class="arc-row-actions">' + actionHtml + '</div>' : '') + '</div>';
     }).join('');
 
-    el.querySelectorAll('.reciprocal-toggle-btn').forEach(function (btn) {
+    el.querySelectorAll('.arc-upload-btn').forEach(function (btn) {
+      btn.addEventListener('click', function () {
+        arcOpenUploadModal(btn.getAttribute('data-book-id'), btn.getAttribute('data-book-title'));
+      });
+    });
+    el.querySelectorAll('.arc-upgrade-btn').forEach(function (btn) {
+      btn.addEventListener('click', function () {
+        openBillingModal('"' + btn.getAttribute('data-book-title') + '" has a manuscript ready. Upgrade your plan to activate it in Books in Review.');
+      });
+    });
+    el.querySelectorAll('.arc-activate-btn').forEach(function (btn) {
       btn.addEventListener('click', async function () {
         btn.disabled = true;
         try {
-          await reciprocalApi('reviews-pool-optin', {
-            method: 'POST',
-            body: { bookId: btn.getAttribute('data-book-id'), active: btn.getAttribute('data-active') === 'true' }
-          });
+          await reciprocalApi('reviews-pool-optin', { method: 'POST', body: { bookId: btn.getAttribute('data-book-id'), active: true } });
           await loadReciprocalReviews();
         } catch (err) {
           alert(err.message);
@@ -1954,23 +2190,26 @@ async function saveKeywordChange(b, newList) {
     });
   }
 
-  function renderReciprocalToReview(toReview) {
-    var el = document.getElementById('reciprocal-to-review');
+  function renderArcBooksReviewing(toReview) {
+    var el = document.getElementById('arc-books-reviewing');
     if (!toReview.length) {
-      el.innerHTML = '<p style="font-size:13px;color:var(--mid);">Nothing assigned yet. Request a book below to get started.</p>';
+      el.innerHTML = arcEmptyHtml('Nothing assigned yet. Request a book from the Library below to get started.');
       return;
     }
     el.innerHTML = toReview.map(function (r) {
-      var doneHtml = r.status === 'completed'
-        ? '<span style="font-size:12px;color:var(--teal-d);font-weight:700;"><i class="ti ti-check"></i> Done</span>'
-        : '<button type="button" class="btn btn-outline reciprocal-read-btn" data-path="' + escapeHtmlLocal(r.manuscriptPath) + '" style="padding:7px 14px;font-size:12px;margin-right:8px;">Read manuscript</button>' +
-          '<button type="button" class="btn btn-primary reciprocal-done-btn" data-assignment-id="' + r.assignmentId + '" style="padding:7px 14px;font-size:12px;">Mark as done</button>';
-      return '<div style="display:flex;align-items:center;justify-content:space-between;padding:12px 16px;border:1px solid var(--border);border-radius:8px;margin-bottom:8px;">' +
-        '<div style="font-size:14px;font-weight:700;color:var(--navy);">' + escapeHtmlLocal(r.title) + '</div>' +
-        '<div>' + doneHtml + '</div></div>';
+      var assignedRel = arcFormatRelativeTime(r.assignedAt);
+      var metaHtml = (assignedRel ? 'Assigned ' + assignedRel + ' &middot; ' : '') +
+        (r.status === 'completed' ? '<span class="pill pill-teal">Review posted</span>' : '<span class="pill pill-orange">Not yet reviewed</span>');
+      var actionHtml = r.status === 'completed'
+        ? ''
+        : '<button type="button" class="btn btn-outline arc-read-btn" data-path="' + escapeHtmlLocal(r.manuscriptPath) + '">Read manuscript</button>' +
+          '<button type="button" class="btn btn-primary arc-done-btn" data-assignment-id="' + r.assignmentId + '">Mark as done</button>';
+      return '<div class="arc-row"><div><div class="arc-row-title">' + escapeHtmlLocal(r.title) + '</div>' +
+        '<div class="arc-row-meta">' + metaHtml + '</div></div>' +
+        (actionHtml ? '<div class="arc-row-actions">' + actionHtml + '</div>' : '') + '</div>';
     }).join('');
 
-    el.querySelectorAll('.reciprocal-read-btn').forEach(function (btn) {
+    el.querySelectorAll('.arc-read-btn').forEach(function (btn) {
       btn.addEventListener('click', async function () {
         try {
           var signed = await readerbull.client.storage.from('manuscripts').createSignedUrl(btn.getAttribute('data-path'), 3600);
@@ -1981,7 +2220,7 @@ async function saveKeywordChange(b, newList) {
         }
       });
     });
-    el.querySelectorAll('.reciprocal-done-btn').forEach(function (btn) {
+    el.querySelectorAll('.arc-done-btn').forEach(function (btn) {
       btn.addEventListener('click', async function () {
         if (!confirm("Confirm you've left an honest review on Amazon (with the required disclosure line) for this book?")) return;
         btn.disabled = true;
@@ -1996,34 +2235,20 @@ async function saveKeywordChange(b, newList) {
     });
   }
 
-  function renderReciprocalBeingReviewed(beingReviewed) {
-    var el = document.getElementById('reciprocal-being-reviewed');
-    if (!beingReviewed.length) {
-      el.innerHTML = '<p style="font-size:13px;color:var(--mid);">None of your books are being reviewed yet.</p>';
+  function renderArcLibrary(libraryBooks) {
+    var el = document.getElementById('arc-library');
+    if (!libraryBooks.length) {
+      el.innerHTML = arcEmptyHtml('No open books to review right now. Check back soon.');
       return;
     }
-    el.innerHTML = beingReviewed.map(function (b) {
-      return '<div style="display:flex;align-items:center;justify-content:space-between;padding:12px 16px;border:1px solid var(--border);border-radius:8px;margin-bottom:8px;">' +
-        '<div style="font-size:14px;font-weight:700;color:var(--navy);">' + escapeHtmlLocal(b.title) + '</div>' +
-        '<div style="font-size:12px;color:var(--mid);">' + b.activeCount + ' in progress &middot; ' + b.completedCount + ' completed</div></div>';
-    }).join('');
-  }
+    el.innerHTML = '<div class="browse-grid">' + libraryBooks.map(function (b) {
+      return '<div class="browse-card"><div class="arc-row-title">' + escapeHtmlLocal(b.title) + '</div>' +
+        '<div class="arc-row-meta">' + (b.category ? escapeHtmlLocal(b.category) + ' &middot; ' : '') + b.availableSlots + ' open slot' + (b.availableSlots === 1 ? '' : 's') + '</div>' +
+        (b.cleanContentOnly ? '<div class="arc-row-meta">Clean content only</div>' : '') +
+        '<button type="button" class="btn btn-primary arc-request-btn" data-book-id="' + b.bookId + '">Request to review</button></div>';
+    }).join('') + '</div>';
 
-  function renderReciprocalBrowse(books) {
-    var el = document.getElementById('reciprocal-browse');
-    var withSlots = books.filter(function (b) { return b.availableSlots > 0; });
-    if (!withSlots.length) {
-      el.innerHTML = '<p style="font-size:13px;color:var(--mid);">No open books to review right now. Check back soon.</p>';
-      return;
-    }
-    el.innerHTML = withSlots.map(function (b) {
-      return '<div style="display:flex;align-items:center;justify-content:space-between;padding:12px 16px;border:1px solid var(--border);border-radius:8px;margin-bottom:8px;">' +
-        '<div><div style="font-size:14px;font-weight:700;color:var(--navy);">' + escapeHtmlLocal(b.title) + '</div>' +
-        '<div style="font-size:12px;color:var(--mid);margin-top:2px;">' + (b.category ? escapeHtmlLocal(b.category) + ' &middot; ' : '') + b.availableSlots + ' open slot' + (b.availableSlots === 1 ? '' : 's') + (b.cleanContentOnly ? ' &middot; clean content only' : '') + '</div></div>' +
-        '<button type="button" class="btn btn-primary reciprocal-request-btn" data-book-id="' + b.bookId + '" style="padding:7px 14px;font-size:12px;">Request to review</button></div>';
-    }).join('');
-
-    el.querySelectorAll('.reciprocal-request-btn').forEach(function (btn) {
+    el.querySelectorAll('.arc-request-btn').forEach(function (btn) {
       btn.addEventListener('click', async function () {
         btn.disabled = true;
         try {
@@ -2035,6 +2260,43 @@ async function saveKeywordChange(b, newList) {
         }
       });
     });
+  }
+
+  // Merges three event types into one chronological feed, per Section
+  // 2.1's Recent Activity design: a book gaining a manuscript-review slot,
+  // a review this author completed for someone else, and someone being
+  // assigned to review this author's own book (never who, per the
+  // anonymity rule in ReaderBull_Review_System_Scoping.md). Capped at 15
+  // items, most recent first.
+  function renderArcActivity(myBooks, toReview, beingReviewedEvents) {
+    var el = document.getElementById('arc-activity');
+    var events = [];
+    myBooks.forEach(function (b) {
+      if (b.poolCreatedAt) {
+        events.push({ time: b.poolCreatedAt, icon: 'ti-plus', iconClass: 'icon-teal', text: 'Added <strong>' + escapeHtmlLocal(b.title) + '</strong> to review' });
+      }
+    });
+    toReview.forEach(function (r) {
+      if (r.status === 'completed' && r.completedAt) {
+        events.push({ time: r.completedAt, icon: 'ti-check', iconClass: 'icon-orange', text: 'Completed a review for <strong>' + escapeHtmlLocal(r.title) + '</strong>' });
+      }
+    });
+    beingReviewedEvents.forEach(function (e) {
+      if (e.assignedAt) {
+        events.push({ time: e.assignedAt, icon: 'ti-user-plus', iconClass: 'icon-teal', text: 'A reviewer was assigned to <strong>' + escapeHtmlLocal(e.title) + '</strong>' });
+      }
+    });
+    events.sort(function (a, b) { return new Date(b.time).getTime() - new Date(a.time).getTime(); });
+    events = events.slice(0, 15);
+
+    if (!events.length) {
+      el.innerHTML = arcEmptyHtml('No activity yet. It’ll show up here once you add a book or start reviewing.');
+      return;
+    }
+    el.innerHTML = '<div class="activity-list">' + events.map(function (e) {
+      return '<div class="activity-item"><div class="activity-icon ' + e.iconClass + '"><i class="ti ' + e.icon + '"></i></div>' +
+        '<div><div class="activity-text">' + e.text + '</div><div class="activity-time">' + arcFormatRelativeTime(e.time) + '</div></div></div>';
+    }).join('') + '</div>';
   }
 
   if (reciprocalOpenBtn) {

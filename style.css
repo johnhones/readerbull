@@ -623,3 +623,62 @@ finishes before the audit does or shows a raw ticking second count. */
   .c3-split > div:first-child > p { margin-left: auto; margin-right: auto; }
   .c3-outcomes { justify-content: center; }
 }
+
+/* ---------- ARC READERS DASHBOARD REBUILD (added 15 August 2026) ----------
+   Ported from arc-readers-mockup_v2_1.html, built against
+   ReaderBull_ARC_Readers_Rebuild_Engineering_Spec_2026-08-14_v3.md Section 2.
+   .icon-teal/.icon-orange are already defined above (used by .item-icon)
+   and apply here unchanged, no redefinition needed. */
+.arc-head { max-width: 900px; margin: 0 auto 28px; }
+.arc-head h2 { font-size: 22px; font-weight: 800; color: var(--navy); margin-bottom: 6px; }
+.arc-head p { font-size: 14px; color: var(--mid); line-height: 1.6; max-width: 640px; }
+
+.stat-row { max-width: 900px; margin: 0 auto 32px; display: grid; grid-template-columns: repeat(3, 1fr); gap: 16px; }
+.stat-tile { background: #fff; border: 1px solid var(--border); border-radius: 10px; padding: 18px 18px 16px; display: flex; flex-direction: column; gap: 2px; position: relative; }
+.stat-tile .stat-icon { position: absolute; top: 16px; right: 16px; width: 32px; height: 32px; border-radius: 8px; display: flex; align-items: center; justify-content: center; font-size: 15px; }
+.stat-tile .stat-label { font-size: 12px; color: var(--mid); font-weight: 600; }
+.stat-tile .stat-num { font-size: 28px; font-weight: 900; color: var(--navy); margin-top: 6px; }
+
+.arc-section { max-width: 900px; margin: 0 auto 24px; }
+.arc-section .hb-eyebrow { display: flex; align-items: center; gap: 8px; }
+.arc-section .hb-eyebrow i { font-size: 16px; }
+.arc-section > .hb-card > p.sub { font-size: 13px; color: var(--mid); margin-bottom: 16px; }
+
+.arc-row { display: flex; align-items: center; justify-content: space-between; gap: 16px; padding: 14px 0; border-top: 1px solid var(--border); }
+.arc-row:first-child { border-top: none; }
+.arc-row .arc-row-title { font-size: 14px; font-weight: 700; color: var(--navy); margin-bottom: 4px; }
+.arc-row .arc-row-meta { font-size: 12px; color: var(--muted); }
+.arc-row .btn { padding: 7px 14px; font-size: 12px; white-space: nowrap; }
+.arc-row-actions { display: flex; gap: 8px; flex-shrink: 0; }
+
+.pill { display: inline-flex; align-items: center; gap: 5px; font-size: 11px; font-weight: 700; padding: 3px 10px; border-radius: 20px; text-transform: uppercase; letter-spacing: .3px; }
+.pill-teal { background: var(--teal-l); color: var(--teal-d); }
+.pill-orange { background: var(--orange-l); color: var(--orange-d); }
+.pill-muted { background: var(--light); color: var(--muted); }
+
+.browse-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 14px; }
+.browse-card { border: 1px solid var(--border); border-radius: 8px; padding: 14px 16px; }
+.browse-card .arc-row-title { margin-bottom: 6px; }
+.browse-card .arc-row-meta { display: block; margin-bottom: 2px; }
+.browse-card .btn { width: 100%; justify-content: center; margin-top: 10px; }
+
+.activity-list { display: flex; flex-direction: column; }
+.activity-item { display: flex; align-items: flex-start; gap: 12px; padding: 12px 0; border-top: 1px solid var(--border); }
+.activity-item:first-child { border-top: none; }
+.activity-icon { width: 28px; height: 28px; border-radius: 50%; flex-shrink: 0; display: flex; align-items: center; justify-content: center; font-size: 13px; margin-top: 1px; }
+.activity-text { font-size: 13px; color: var(--navy); line-height: 1.5; }
+.activity-time { font-size: 11.5px; color: var(--muted); margin-top: 2px; }
+
+.arc-empty { border: 1.5px dashed var(--border); border-radius: 8px; padding: 28px 20px; text-align: center; background: var(--light); }
+.arc-empty p { font-size: 13px; color: var(--mid); margin: 0; }
+
+@media (max-width: 720px) {
+  .stat-row { grid-template-columns: 1fr 1fr; }
+  .browse-grid { grid-template-columns: 1fr; }
+}
+@media (max-width: 560px) {
+  .stat-row { grid-template-columns: 1fr; }
+  .arc-row { flex-wrap: wrap; align-items: flex-start; }
+  .arc-row-actions { width: 100%; }
+  .arc-row-actions .btn { flex: 1; }
+}
