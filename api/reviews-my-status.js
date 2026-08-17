@@ -1,17 +1,25 @@
-// Vercel serverless function: everything the Reciprocal Reviews dashboard
-// card needs to render for the signed-in author — their own books' pool
-// status and slot counts, what they've been assigned to review, and how
-// many of their own books are currently being reviewed by someone else.
+// Vercel serverless function: everything the ARC Readers dashboard needs to
+// render for the signed-in author — their own books' pool status and slot
+// counts, what they've been assigned to review, and how many of their own
+// books are currently being reviewed by someone else.
 //
 // GET -> {
-//   myBooks: [ { bookId, title, manuscriptUploaded, inPool, availableSlots } ],
-//   toReview: [ { assignmentId, bookId, title, coverImageUrl, status } ],
-//   beingReviewed: [ { bookId, title, activeCount, completedCount } ]
+//   myBooks: [ { bookId, title, manuscriptUploaded, inPool, availableSlots, poolCreatedAt } ],
+//   toReview: [ { assignmentId, bookId, title, coverImageUrl, status, assignedAt, completedAt } ],
+//   beingReviewed: [ { bookId, title, activeCount, completedCount } ],
+//   beingReviewedEvents: [ { bookId, title, status, assignedAt, completedAt } ]
 // }
+//
+// poolCreatedAt / assignedAt / completedAt / beingReviewedEvents added for
+// the ARC Readers dashboard rebuild's Recent Activity feed (15 August
+// 2026, ReaderBull_ARC_Readers_Rebuild_Engineering_Spec_2026-08-14_v3.md
+// Section 2.1) — purely additive, existing fields unchanged.
 //
 // Reviewer/owner identity is deliberately not surfaced to the other party
 // anywhere in this response — see the anonymity note in
-// ReaderBull_Review_System_Scoping.md Section 8/9.
+// ReaderBull_Review_System_Scoping.md Section 8/9. beingReviewedEvents
+// carries status/timestamps only, same as the existing beingReviewed
+// counts, never who.
 
 var SUPABASE_URL = 'https://tqkeqjisqqvxasyzrfax.supabase.co';
 var SUPABASE_ANON_KEY = 'sb_publishable_0L4W_eHRcnYNm5MR1gDDDg_Bn1d3nPm';
@@ -55,7 +63,7 @@ module.exports = async function handler(req, res) {
   var books = booksResp.ok ? await booksResp.json() : [];
 
   var poolResp = await fetch(
-    SUPABASE_URL + '/rest/v1/review_pool_entries?select=id,book_id,active,bonus_slots&user_id=eq.' + encodeURIComponent(authUser.id),
+    SUPABASE_URL + '/rest/v1/review_pool_entries?select=id,book_id,active,bonus_slots,created_at&user_id=eq.' + encodeURIComponent(authUser.id),
     { headers: headers }
   );
   var poolRows = poolResp.ok ? await poolResp.json() : [];
@@ -80,13 +88,14 @@ module.exports = async function handler(req, res) {
       title: b.book_title || 'Untitled book',
       manuscriptUploaded: !!b.manuscript_url,
       inPool: !!(pool && pool.active),
-      availableSlots: availableSlots
+      availableSlots: availableSlots,
+      poolCreatedAt: pool ? pool.created_at : null
     });
   }
 
   // Books this author has been assigned to review.
   var toReviewResp = await fetch(
-    SUPABASE_URL + '/rest/v1/review_assignments?select=id,book_id,owner_id,status,books(book_title,cover_image_url)&reviewer_id=eq.' +
+    SUPABASE_URL + '/rest/v1/review_assignments?select=id,book_id,owner_id,status,assigned_at,completed_at,books(book_title,cover_image_url)&reviewer_id=eq.' +
       encodeURIComponent(authUser.id) + '&order=assigned_at.desc',
     { headers: headers }
   );
@@ -100,17 +109,23 @@ module.exports = async function handler(req, res) {
       manuscriptPath: r.owner_id + '/' + r.book_id + '.pdf',
       title: bk.book_title || 'Untitled book',
       coverImageUrl: bk.cover_image_url || null,
-      status: r.status
+      status: r.status,
+      assignedAt: r.assigned_at,
+      completedAt: r.completed_at
     };
   });
 
   // How many people are currently reviewing (or have completed reviewing)
   // each of this author's own books — counts only, no reviewer identity.
+  // beingReviewedEvents carries the same no-identity guarantee, just at
+  // per-assignment granularity (status + timestamps) so the dashboard's
+  // Recent Activity feed can show "a reviewer was assigned" events.
   var beingReviewed = [];
+  var beingReviewedEvents = [];
   for (var j = 0; j < myBooks.length; j++) {
     var bookId = myBooks[j].bookId;
     var assignResp = await fetch(
-      SUPABASE_URL + '/rest/v1/review_assignments?select=status&book_id=eq.' + encodeURIComponent(bookId),
+      SUPABASE_URL + '/rest/v1/review_assignments?select=status,assigned_at,completed_at&book_id=eq.' + encodeURIComponent(bookId),
       { headers: headers }
     );
     var assignRows = assignResp.ok ? await assignResp.json() : [];
@@ -118,8 +133,17 @@ module.exports = async function handler(req, res) {
       var activeCount = assignRows.filter(function (r) { return r.status === 'assigned'; }).length;
       var doneCount = assignRows.filter(function (r) { return r.status === 'completed'; }).length;
       beingReviewed.push({ bookId: bookId, title: myBooks[j].title, activeCount: activeCount, completedCount: doneCount });
+      assignRows.forEach(function (row) {
+        beingReviewedEvents.push({
+          bookId: bookId,
+          title: myBooks[j].title,
+          status: row.status,
+          assignedAt: row.assigned_at,
+          completedAt: row.completed_at
+        });
+      });
     }
   }
 
-  res.status(200).json({ myBooks: myBooks, toReview: toReview, beingReviewed: beingReviewed });
+  res.status(200).json({ myBooks: myBooks, toReview: toReview, beingReviewed: beingReviewed, beingReviewedEvents: beingReviewedEvents });
 };
