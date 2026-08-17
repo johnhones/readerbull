@@ -1958,6 +1958,11 @@ async function saveKeywordChange(b, newList) {
   // (1/3/10) as the cap rather than a separate ARC-specific limit.
   var arcActiveInReviewCount = 0;
 
+  // Fixed safety turnaround: how many days after being claimed an
+  // assignment must wait before it can be marked done. Mirrored server-side
+  // in api/reviews-mark-done.js — keep both in sync if this ever changes.
+  var ARC_MIN_WAIT_DAYS = 5;
+
   function arcResetUploadModal() {
     arcUploadTargetBookId = null;
     arcUploadSelectedFile = null;
@@ -2200,10 +2205,19 @@ async function saveKeywordChange(b, newList) {
       var assignedRel = arcFormatRelativeTime(r.assignedAt);
       var metaHtml = (assignedRel ? 'Assigned ' + assignedRel + ' &middot; ' : '') +
         (r.status === 'completed' ? '<span class="pill pill-teal">Review posted</span>' : '<span class="pill pill-orange">Not yet reviewed</span>');
+      // Fixed safety turnaround (ARC_MIN_WAIT_DAYS days from assignment)
+      // before a review can be marked done — mirrors the server-side gate
+      // in api/reviews-mark-done.js, shown proactively here so the button
+      // doesn't just fail with an alert. See that file's comment for why.
+      var eligibleAt = r.assignedAt ? new Date(r.assignedAt).getTime() + ARC_MIN_WAIT_DAYS * 86400000 : 0;
+      var daysLeft = Math.max(1, Math.ceil((eligibleAt - Date.now()) / 86400000));
+      var notYetEligible = r.status !== 'completed' && eligibleAt && Date.now() < eligibleAt;
       var actionHtml = r.status === 'completed'
         ? ''
         : '<button type="button" class="btn btn-outline arc-read-btn" data-path="' + escapeHtmlLocal(r.manuscriptPath) + '">Read manuscript</button>' +
-          '<button type="button" class="btn btn-primary arc-done-btn" data-assignment-id="' + r.assignmentId + '">Mark as done</button>';
+          (notYetEligible
+            ? '<span class="arc-row-meta" style="align-self:center;">Mark as done in ' + daysLeft + ' day' + (daysLeft === 1 ? '' : 's') + '</span>'
+            : '<button type="button" class="btn btn-primary arc-done-btn" data-assignment-id="' + r.assignmentId + '">Mark as done</button>');
       return '<div class="arc-row"><div><div class="arc-row-title">' + escapeHtmlLocal(r.title) + '</div>' +
         '<div class="arc-row-meta">' + metaHtml + '</div></div>' +
         (actionHtml ? '<div class="arc-row-actions">' + actionHtml + '</div>' : '') + '</div>';
@@ -2235,6 +2249,23 @@ async function saveKeywordChange(b, newList) {
     });
   }
 
+  // Initials shown on the cover when a book has no cover_image_url yet
+  // (e.g. it wasn't imported through the Amazon lookup flow). Same "two
+  // letters" treatment as the design mockup reviewed 17 August 2026.
+  function arcInitials(title) {
+    var words = (title || '').trim().split(/\s+/).filter(Boolean);
+    if (!words.length) return '?';
+    if (words.length === 1) return words[0].slice(0, 2).toUpperCase();
+    return (words[0][0] + words[1][0]).toUpperCase();
+  }
+
+  // Tier badge label. offerType isn't in the live API response yet (the
+  // Kindle Unlimited / Verified Purchase pool-entry types need a schema
+  // migration that's pending separate sign-off — see the 17 August 2026
+  // handover note) so this defaults every book to "Manuscript" today, but
+  // is written to display whatever the API sends once that lands.
+  var ARC_TIER_LABEL = { manuscript: 'Manuscript', kindle_unlimited: 'Kindle Unlimited', verified_purchase: 'Verified Purchase' };
+
   function renderArcLibrary(libraryBooks) {
     var el = document.getElementById('arc-library');
     if (!libraryBooks.length) {
@@ -2242,7 +2273,19 @@ async function saveKeywordChange(b, newList) {
       return;
     }
     el.innerHTML = '<div class="browse-grid">' + libraryBooks.map(function (b) {
-      return '<div class="browse-card"><div class="arc-row-title">' + escapeHtmlLocal(b.title) + '</div>' +
+      var tier = b.offerType && ARC_TIER_LABEL[b.offerType] ? b.offerType : 'manuscript';
+      var coverInner = b.coverImageUrl
+        ? '<img src="' + escapeHtmlLocal(b.coverImageUrl) + '" alt="" loading="lazy">'
+        : '<div class="browse-cover-fallback">' + escapeHtmlLocal(arcInitials(b.title)) + '</div>';
+      return '<div class="browse-card">' +
+        '<div class="browse-cover">' +
+          '<div class="browse-cover-3d">' +
+            '<div class="browse-cover-face">' + coverInner + '</div>' +
+            '<div class="browse-page-edge"></div>' +
+          '</div>' +
+          '<div class="browse-tier-badge tier-' + tier + '">' + ARC_TIER_LABEL[tier] + '</div>' +
+        '</div>' +
+        '<div class="arc-row-title">' + escapeHtmlLocal(b.title) + '</div>' +
         '<div class="arc-row-meta">' + (b.category ? escapeHtmlLocal(b.category) + ' &middot; ' : '') + b.availableSlots + ' open slot' + (b.availableSlots === 1 ? '' : 's') + '</div>' +
         (b.cleanContentOnly ? '<div class="arc-row-meta">Clean content only</div>' : '') +
         '<button type="button" class="btn btn-primary arc-request-btn" data-book-id="' + b.bookId + '">Request to review</button></div>';
@@ -2258,6 +2301,23 @@ async function saveKeywordChange(b, newList) {
           alert(err.message);
           btn.disabled = false;
         }
+      });
+    });
+
+    // Mouse-driven tilt — lets a reader "pick up and turn" a cover, same
+    // interaction as the reviewed mockup.
+    el.querySelectorAll('.browse-cover').forEach(function (coverEl) {
+      var inner = coverEl.querySelector('.browse-cover-3d');
+      coverEl.addEventListener('mousemove', function (e) {
+        var r = coverEl.getBoundingClientRect();
+        var px = (e.clientX - r.left) / r.width;
+        var py = (e.clientY - r.top) / r.height;
+        var rotY = (px - 0.5) * 70;
+        var rotX = (0.5 - py) * 40;
+        inner.style.transform = 'rotateY(' + rotY.toFixed(2) + 'deg) rotateX(' + rotX.toFixed(2) + 'deg) scale(1.06)';
+      });
+      coverEl.addEventListener('mouseleave', function () {
+        inner.style.transform = 'rotateY(-20deg) rotateX(6deg) scale(.92)';
       });
     });
   }

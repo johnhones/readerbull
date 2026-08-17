@@ -656,11 +656,26 @@ finishes before the audit does or shows a raw ticking second count. */
 .pill-orange { background: var(--orange-l); color: var(--orange-d); }
 .pill-muted { background: var(--light); color: var(--muted); }
 
-.browse-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 14px; }
-.browse-card { border: 1px solid var(--border); border-radius: 8px; padding: 14px 16px; }
-.browse-card .arc-row-title { margin-bottom: 6px; }
-.browse-card .arc-row-meta { display: block; margin-bottom: 2px; }
-.browse-card .btn { width: 100%; justify-content: center; margin-top: 10px; }
+.browse-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(180px, 1fr)); gap: 16px; }
+.browse-card { border: 1px solid var(--border); border-radius: 8px; padding: 0 0 14px; overflow: hidden; }
+.browse-card .arc-row-title { margin: 10px 14px 4px; }
+.browse-card .arc-row-meta { display: block; margin: 0 14px 2px; }
+.browse-card .btn { width: calc(100% - 28px); justify-content: center; margin: 10px 14px 0; }
+
+/* ARC Readers Library cover art — real cover_image_url per book, with a
+   mouse-driven 3D tilt (17 August 2026, direct user instruction, matching
+   the interaction on BookVillage's own library). Falls back to a plain
+   navy panel with the book's initials if no cover_image_url is set. */
+.browse-cover { position: relative; width: 100%; aspect-ratio: 2 / 3; background: var(--navy); perspective: 420px; cursor: grab; }
+.browse-cover-3d { position: absolute; inset: 0; transform-style: preserve-3d; transition: transform .2s cubic-bezier(.2,.8,.2,1); transform: rotateY(-20deg) rotateX(6deg) scale(.92); }
+.browse-cover-face { position: absolute; inset: 0; border-radius: 3px; overflow: hidden; box-shadow: -9px 12px 24px rgba(10,20,26,.4), 0 2px 4px rgba(0,0,0,.15); background: var(--navy); }
+.browse-cover-face img { width: 100%; height: 100%; object-fit: cover; display: block; }
+.browse-cover-face .browse-cover-fallback { width: 100%; height: 100%; display: flex; align-items: center; justify-content: center; color: rgba(255,255,255,.85); font-size: 22px; font-weight: 700; font-family: Georgia, serif; }
+.browse-page-edge { position: absolute; top: 2%; bottom: 2%; right: -1px; width: 6px; background: linear-gradient(180deg,#f4efe0,#d9d1bc 45%,#f4efe0); transform: translateZ(3px) rotateY(58deg); transform-origin: right center; border-radius: 0 2px 2px 0; box-shadow: inset -1px 0 2px rgba(0,0,0,.25); }
+.browse-cover .browse-tier-badge { position: absolute; top: 8px; left: 8px; z-index: 4; font-size: 10px; font-weight: 700; padding: 3px 8px; border-radius: 6px; color: #fff; letter-spacing: .02em; box-shadow: 0 2px 6px rgba(0,0,0,.2); text-transform: none; }
+.browse-tier-badge.tier-manuscript { background: var(--mid); }
+.browse-tier-badge.tier-kindle_unlimited { background: var(--teal-d); }
+.browse-tier-badge.tier-verified_purchase { background: var(--orange-d); }
 
 .activity-list { display: flex; flex-direction: column; }
 .activity-item { display: flex; align-items: flex-start; gap: 12px; padding: 12px 0; border-top: 1px solid var(--border); }
