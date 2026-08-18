@@ -382,6 +382,7 @@ failures (e.g. a failed import), which is what made this feel loud. */
 .item-b > p:not(:last-child) { margin-bottom: 10px; }
 
 .callout { border-left: 3px solid var(--teal); background: var(--teal-l); padding: 14px 18px; border-radius: 0 4px 4px 0; font-size: 13px; color: var(--navy); line-height: 1.65; margin-bottom: 16px; }
+.callout p:last-child { margin-bottom: 0; }
 .callout-orange { border-left-color: var(--orange); background: var(--orange-l); }
 .callout strong { color: var(--black); }
 
