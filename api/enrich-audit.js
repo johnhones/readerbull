@@ -1000,6 +1000,14 @@ async function generateNarrative(input, competitors, pageRank, nicheStats) {
   // marketAnalysis to use this field verbatim instead of computing it.
   var reviewCountNum = (typeof input.reviewCount === 'number') ? input.reviewCount : (Number(input.reviewCount) || 0);
   var reviewsToNextThreshold = reviewCountNum < 15 ? (15 - reviewCountNum) : null;
+  // Added [fix, 18 August 2026, per John]: precomputed for the same reason
+  // as reviewsToNextThreshold above, don't make the model count the
+  // competitors array itself. sponsored is only ever reliably known for
+  // competitors found via a live SerpApi search, not the "bought
+  // together" source (see findCompetitors/attachCompetitorBsr comments),
+  // so this is always a floor on real ad activity in the niche, never an
+  // exact census, hence the "at least N" phrasing required below.
+  var sponsoredCompetitorCount = (competitors || []).filter(function (c) { return c && c.sponsored === true; }).length;
   var payload = {
     book: {
       title: input.title || null,
@@ -1034,7 +1042,8 @@ async function generateNarrative(input, competitors, pageRank, nicheStats) {
     },
     scoreBreakdown: breakdown,
     competitors: competitors,
-    nicheStats: nicheStats || null
+    nicheStats: nicheStats || null,
+    sponsoredCompetitorCount: sponsoredCompetitorCount
   };
 
   // Content-quality rewrite, 29 July 2026 (ReaderBull_Next_Chat_Handover_Prompt.md
@@ -1095,18 +1104,37 @@ async function generateNarrative(input, competitors, pageRank, nicheStats) {
     'step suggesting the author think about a second, related title, since a second book compounds ' +
     'discoverability (cross-sell, a new keyword footprint, a new category placement). Do not suggest ' +
     'this if authorBookCount is missing, null, or greater than 1. ' +
-    'Book Insight (rewritten 18 August 2026, per John: the old version read as confusing jargon, not ' +
-    'encouraging): bookInsight is the very first thing an author sees about their book, it must feel ' +
-    'encouraging and rewarding, never confusing or technical. Never state a rank comparison as a ratio ' +
-    'or multiple, phrases like "150 times deeper in rank" or "3x behind" mean nothing to an author and ' +
-    'must never appear here or anywhere else in the narrative. Lead with genuine good news the data ' +
-    'actually supports (star rating, review quality, evergreen or real demand) before naming any gap. ' +
-    'When nicheStats.estimatedNicheRevenue is given, reference it concretely to make the opportunity ' +
-    'feel real and enticing, for example noting that comparable books in this niche are earning roughly ' +
-    'that much a month, never invent a figure if it is missing. If you mention building reviews toward ' +
-    'the Amazon Ads threshold here, phrase it as an encouraging range ("build to 10-15 reviews"), never ' +
-    'a single bald number like "you need exactly 15". Write 2-3 short, warm sentences, not one dense ' +
-    'sentence, and end on the single clearest next action. ' +
+    'Book Insight (rewritten a third time, 18 August 2026, per John, after several rounds of live ' +
+    'review): bookInsight is the very first thing an author sees about their book and must feel like a ' +
+    'real opportunity, not a data report. It is an array of exactly 2 short paragraph strings (see the ' +
+    'JSON shape below), never one block of text. ' +
+    'Paragraph 1 leads with money: when nicheStats.benchmarkCompetitor or nicheStats.targetRevenue/ ' +
+    'revenueRange is given, open by naming a concrete real figure ("top books in this niche are earning ' +
+    'around $X a month") sourced only from that data, never invented. Then name the actual gap between ' +
+    'this book and that benchmark as review count/social proof specifically, comparing book.reviewCount ' +
+    'against nicheStats.benchmarkCompetitor.reviews when both exist ("the difference is social proof, ' +
+    'they have dozens of reviews, you have one"), never the star rating and never a bare rank number. ' +
+    'Only credit book.rating as a positive signal anywhere in bookInsight once book.reviewCount is 3 or ' +
+    'higher, a perfect average built on 1-2 reviews is not credible evidence of anything and must not ' +
+    'be praised as if it were. If revenue data is genuinely missing, write around it honestly (name the ' +
+    'niche\'s real demand instead) rather than inventing a number or falling back to jargon. ' +
+    'Paragraph 2 gives the practical next step, in plain language an author actually understands: never ' +
+    'use the words "unlock" or "build", and never use the term ACoS, no author knows what that means. ' +
+    'State the review target as "aim for 10-15 reviews before you start paid ads", never a single bald ' +
+    'exact number like "you need exactly 15". When sponsoredCompetitorCount is 1 or more, use that exact ' +
+    'precomputed number (never count the competitors array yourself) to name a real, book-specific fact ' +
+    'about how many comparable books are already running ads, phrased as "at least N of the comparable ' +
+    'books here are running ads" since it is always a floor, not an exact census (see the field\'s own ' +
+    'note above). When sponsoredCompetitorCount is 0, skip that detail entirely rather than implying no ' +
+    'one in the niche advertises. End on a plain-English target for once ads are running: aim for around ' +
+    '$3 in sales for every $1 spent. This ratio is a fixed general benchmark, not computed from this ' +
+    'book\'s own data (no data source available to this pipeline exposes competitors\' real ad spend or ' +
+    'returns, that is private, advertiser-only data), present it as a target to aim for and monitor ' +
+    'against, never as a guarantee or a number this specific book will get. ' +
+    'Vary your phrasing, structure and word choice meaningfully from book to book, this must never read ' +
+    'like the same template sentence with numbers swapped in. Never state a rank comparison as a ratio ' +
+    'or multiple ("150 times deeper", "3x behind"), that phrasing is banned everywhere in the narrative, ' +
+    'not just here. Each paragraph is 1-2 short, warm sentences. ' +
     'Professional Assessment: write a short, direct verdict (2 short paragraphs) for the Overview tab, in ' +
     'the voice of an experienced KDP consultant giving a straight read of where this book stands right now. ' +
     'Ground it in nicheStats.bestSellerRank (how this book\'s best category placement compares to the niche ' +
@@ -1137,7 +1165,7 @@ async function generateNarrative(input, competitors, pageRank, nicheStats) {
     'rough order when the data supports it: how the book\'s rank compares to the niche, its review ' +
     'and rating position, and the competitive landscape (competitor count/revenue if given). ' +
     'Respond with ONLY a JSON object, no markdown fences, no commentary, matching exactly this shape: ' +
-    '{"bookInsight": "2-3 short, encouraging sentences, see Book Insight guidance above", ' +
+    '{"bookInsight": ["paragraph 1: real earning potential + the review-count gap", "paragraph 2: plain next step, sponsored-competitor fact if available, sales-per-spend target"], ' +
     '"marketAnalysis": [{"heading": "short heading", "body": "1-2 short sentences"}], ' +
     '"strategySteps": [{"title": "short step title", "body": "1-2 sentences, specific to this book\'s data"}], ' +
     '"quickWins": [{"title": "short action title", "body": "1-2 sentences on why this is the next best move"}], ' +
