@@ -3,9 +3,18 @@
 // ReaderBull_Review_System_Scoping.md Section 8 for the anti-abuse rules
 // this enforces).
 //
-// POST { bookId }
+// POST { bookId, asAmazonName }
 // -> { assignment: {...} } or -> { error: "..." } with a 4xx status
 //    explaining which rule blocked it.
+//
+// asAmazonName (17 August 2026, handover Section 4 items 6-7): Verified
+// Purchase books need the reviewer's Amazon display name on file before
+// they can claim one, captured here at claim time rather than later at
+// mark-done — decided this is the right moment since it's naturally when
+// a reader commits to reviewing this specific book. Stored once in the
+// reviewer's own auth profile (user_metadata.amazon_reviewer_name); once
+// it exists, later claims don't need to resend it. reviews-mark-done.js
+// checks the submitted proof link against whatever's on file here.
 //
 // This is the one place all three MVP anti-abuse rules are enforced:
 //   1. No two authors matched to review each other directly (one-directional
@@ -53,7 +62,7 @@ module.exports = async function handler(req, res) {
 
   // Look up the pool entry + owner.
   var poolResp = await fetch(
-    SUPABASE_URL + '/rest/v1/review_pool_entries?select=id,book_id,user_id,bonus_slots,active&book_id=eq.' +
+    SUPABASE_URL + '/rest/v1/review_pool_entries?select=id,book_id,user_id,bonus_slots,active,offer_type&book_id=eq.' +
       encodeURIComponent(bookId),
     { headers: headers }
   );
@@ -66,6 +75,24 @@ module.exports = async function handler(req, res) {
   if (pool.user_id === authUser.id) {
     res.status(400).json({ error: "You can't request to review your own book." });
     return;
+  }
+
+  // Verified Purchase needs the reviewer's Amazon name on file before they
+  // can claim it — first time only, later claims reuse what's on file.
+  if (pool.offer_type === 'verified_purchase') {
+    var storedName = (authUser.user_metadata && authUser.user_metadata.amazon_reviewer_name) || '';
+    if (!storedName) {
+      var asAmazonName = (req.body && req.body.asAmazonName ? String(req.body.asAmazonName).trim() : '');
+      if (!asAmazonName) {
+        res.status(400).json({ error: 'This is a Verified Purchase book. Enter the name your Amazon reviews are posted under before claiming it.' });
+        return;
+      }
+      await fetch(SUPABASE_URL + '/auth/v1/user', {
+        method: 'PUT',
+        headers: headers,
+        body: JSON.stringify({ data: { amazon_reviewer_name: asAmazonName } })
+      });
+    }
   }
 
   // Rule 1: anti-swap. Block if the target owner already has an assignment
