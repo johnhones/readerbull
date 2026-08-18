@@ -187,7 +187,7 @@
       btn.addEventListener('click', function () {
         var action = btn.classList.contains('admin-proof-approve') ? 'approve' : 'flag';
         btn.disabled = true;
-        fetch('/api/admin-arc-proofs', {
+        fetch('/api/admin-users', {
           method: 'POST',
           headers: { 'x-admin-secret': currentSecret, 'Content-Type': 'application/json' },
           body: JSON.stringify({ assignmentId: btn.getAttribute('data-id'), action: action })
@@ -206,7 +206,7 @@
   }
 
   function loadProofs() {
-    fetch('/api/admin-arc-proofs', { headers: { 'x-admin-secret': currentSecret } })
+    fetch('/api/admin-users?resource=proofs', { headers: { 'x-admin-secret': currentSecret } })
       .then(function (r) { return r.json().then(function (body) { return { ok: r.ok, body: body }; }); })
       .then(function (result) {
         if (!result.ok) throw new Error((result.body && result.body.error) || 'Could not load the proof queue.');
