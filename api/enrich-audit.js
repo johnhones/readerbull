@@ -1120,17 +1120,24 @@ async function generateNarrative(input, competitors, pageRank, nicheStats) {
     'niche\'s real demand instead) rather than inventing a number or falling back to jargon. ' +
     'Paragraph 2 gives the practical next step, in plain language an author actually understands: never ' +
     'use the words "unlock" or "build", and never use the term ACoS, no author knows what that means. ' +
-    'State the review target as "aim for 10-15 reviews before you start paid ads", never a single bald ' +
-    'exact number like "you need exactly 15". When sponsoredCompetitorCount is 1 or more, use that exact ' +
-    'precomputed number (never count the competitors array yourself) to name a real, book-specific fact ' +
-    'about how many comparable books are already running ads, phrased as "at least N of the comparable ' +
-    'books here are running ads" since it is always a floor, not an exact census (see the field\'s own ' +
-    'note above). When sponsoredCompetitorCount is 0, skip that detail entirely rather than implying no ' +
-    'one in the niche advertises. End on a plain-English target for once ads are running: aim for around ' +
-    '$3 in sales for every $1 spent. This ratio is a fixed general benchmark, not computed from this ' +
-    'book\'s own data (no data source available to this pipeline exposes competitors\' real ad spend or ' +
-    'returns, that is private, advertiser-only data), present it as a target to aim for and monitor ' +
-    'against, never as a guarantee or a number this specific book will get. ' +
+    'Branch this paragraph on book.amazonAdsActive (added 18 August 2026, per John, after a live review ' +
+    'question about authors who already run ads). When book.amazonAdsActive is false (ads not started ' +
+    'yet): state the review target as "aim for 10-15 reviews before you start paid ads", never a single ' +
+    'bald exact number like "you need exactly 15", then end on a plain-English target for once ads are ' +
+    'running: aim for around $3 in sales for every $1 spent. When book.amazonAdsActive is true (ads are ' +
+    'already running): never tell the author to "start" paid ads, they already have, instead talk about ' +
+    'optimizing or scaling the campaign that is already live, and give the same $3-in-sales-for-every-$1- ' +
+    'spent figure as the target to monitor and improve toward rather than a future goal, never repeat the ' +
+    '"aim for 10-15 reviews before you start" phrasing in this case, it no longer applies. Either way, ' +
+    'when sponsoredCompetitorCount is 1 or more, use that exact precomputed number (never count the ' +
+    'competitors array yourself) to name a real, book-specific fact about how many comparable books are ' +
+    'already running ads, phrased as "at least N of the comparable books here are running ads" since it ' +
+    'is always a floor, not an exact census (see the field\'s own note above). When sponsoredCompetitorCount ' +
+    'is 0, skip that detail entirely rather than implying no one in the niche advertises. The $3-per-$1 ' +
+    'ratio is a fixed general benchmark, not computed from this book\'s own data (no data source available ' +
+    'to this pipeline exposes competitors\' real ad spend or returns, that is private, advertiser-only ' +
+    'data), present it as a target to aim for and monitor against, never as a guarantee or a number this ' +
+    'specific book will get. ' +
     'Vary your phrasing, structure and word choice meaningfully from book to book, this must never read ' +
     'like the same template sentence with numbers swapped in. Never state a rank comparison as a ratio ' +
     'or multiple ("150 times deeper", "3x behind"), that phrasing is banned everywhere in the narrative, ' +
