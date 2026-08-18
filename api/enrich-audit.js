@@ -974,6 +974,15 @@ async function generateNarrative(input, competitors, pageRank, nicheStats) {
   if (!apiKey) { await sendErrorAlert('enrich-audit', 'ANTHROPIC_API_KEY is missing, narrative generation cannot run.'); return null; }
 
   var breakdown = input.breakdown || {};
+  // Added [fix, Aug 2026, per John]: precomputed here in code rather than
+  // left for the model to work out in prose, this is exactly the bug that
+  // produced "you're 15 reviews away" on a book that already had 14
+  // reviews, the model was restating the raw ads threshold (15) instead
+  // of doing 15 minus the actual reviewCount. See the review-gap
+  // instruction in systemPrompt below, which forces bookInsight/
+  // marketAnalysis to use this field verbatim instead of computing it.
+  var reviewCountNum = (typeof input.reviewCount === 'number') ? input.reviewCount : (Number(input.reviewCount) || 0);
+  var reviewsToNextThreshold = reviewCountNum < 15 ? (15 - reviewCountNum) : null;
   var payload = {
     book: {
       title: input.title || null,
@@ -987,6 +996,7 @@ async function generateNarrative(input, competitors, pageRank, nicheStats) {
       price: input.price || null,
       rating: input.rating || null,
       reviewCount: input.reviewCount || null,
+      reviewsToNextThreshold: reviewsToNextThreshold,
       bestsellerRank: input.bestsellerRank || null,
       keywords: input.keywords || null,
       discoverabilityScore: input.score || null,
@@ -1054,6 +1064,13 @@ async function generateNarrative(input, competitors, pageRank, nicheStats) {
     'reviews other authors\' books through it, the more they get back for their own book. Never suggest ' +
     'emailing or messaging existing readers/reviewers directly to ask for reviews, and never name any ' +
     'external ARC or review-swap service. ' +
+    'Review-gap phrasing: if you reference how many reviews the book still needs to reach a ' +
+    'threshold (for example the 15-review Amazon Ads threshold), you must use the exact value in ' +
+    'book.reviewsToNextThreshold, already correctly calculated as that threshold minus the book\'s ' +
+    'current reviewCount. Never restate the threshold number itself (15) as if it were the number ' +
+    'of reviews still needed, and never do that subtraction yourself in prose, always use the ' +
+    'precomputed field. If book.reviewsToNextThreshold is null, the book has already reached the ' +
+    'threshold, do not say it is any number of reviews away. ' +
     'Backend keywords: never assume the author has already filled in their 7 KDP backend keyword ' +
     'fields. Phrase any related advice as "if you haven\'t already" rather than assuming they\'re ' +
     'already populated, since we don\'t actually know their KDP backend state. ' +
@@ -1070,6 +1087,13 @@ async function generateNarrative(input, competitors, pageRank, nicheStats) {
     'around the gap honestly instead of guessing a figure. Name the single biggest lever available (usually ' +
     'reviews, ads, or both) and roughly what closes the gap, without inventing a specific target number ' +
     'or dollar figure unless one is present in the data given. ' +
+    'Rank-strength consistency: whenever you describe how strong, competitive or well-positioned ' +
+    'this book\'s category rank is anywhere in bookInsight, marketAnalysis or professionalAssessment, ' +
+    'that description must agree with nicheStats.bestSellerRank when it is given (yours versus ' +
+    'nicheAverage versus topCompetitor). A rank that is meaningfully worse (a higher number) than ' +
+    'nicheAverage is not "strong" or "ranking well" even if it looks like a small absolute number, ' +
+    'say plainly that there is a real gap to close instead. Only call the rank strong if it is at or ' +
+    'close to nicheAverage or topCompetitor. ' +
     'Content type (added 4 August 2026, for the Overview "Book Summary" panel): classify this book\'s ' +
     'subject matter as exactly one of "Evergreen", "Trending", or "Seasonal", based on book.title, ' +
     'book.category and book.description. Evergreen means the topic stays relevant indefinitely (most ' +
@@ -1078,9 +1102,14 @@ async function generateNarrative(input, competitors, pageRank, nicheStats) {
     'recent news event). Seasonal means demand for the topic spikes at a specific time of year (holiday ' +
     'guides, tax-season, back-to-school, diet-after-New-Year). Default to "Evergreen" unless the subject ' +
     'clearly fits one of the other two, most self-published non-fiction and fiction is evergreen. ' +
+    'Market Analysis structure: marketAnalysis must be an array of 2-4 short sections, never one long ' +
+    'paragraph. Each section is a {"heading": "...", "body": "..."} object: heading is 2-4 words, no ' +
+    'punctuation; body is 1-2 short sentences, no more than roughly 3 lines of text. Cover, in this ' +
+    'rough order when the data supports it: how the book\'s rank compares to the niche, its review ' +
+    'and rating position, and the competitive landscape (competitor count/revenue if given). ' +
     'Respond with ONLY a JSON object, no markdown fences, no commentary, matching exactly this shape: ' +
     '{"bookInsight": "one bolded-worthy sentence summarising the single biggest takeaway", ' +
-    '"marketAnalysis": "2-3 short paragraphs on where this book stands versus the competitors given", ' +
+    '"marketAnalysis": [{"heading": "short heading", "body": "1-2 short sentences"}], ' +
     '"strategySteps": [{"title": "short step title", "body": "1-2 sentences, specific to this book\'s data"}], ' +
     '"quickWins": [{"title": "short action title", "body": "1-2 sentences on why this is the next best move"}], ' +
     '"professionalAssessment": "2 short paragraphs, as described above", ' +
