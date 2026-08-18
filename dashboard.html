@@ -88,7 +88,7 @@
           <h3><i class="ti ti-users" style="color:var(--teal-d);margin-right:6px;"></i> ARC Readers</h3>
           <p style="font-size:13px;color:var(--mid);line-height:1.6;margin-bottom:16px;">Submit your book to our growing herd of ARC readers who love books in your niche. Get real feedback and genuine reviews along the way.</p>
           <ul>
-            <li><i class="ti ti-check"></i> Nothing to buy, ever</li>
+            <li><i class="ti ti-check"></i> No ReaderBull fees, ever</li>
             <li><i class="ti ti-check"></i> Get feedback on your book</li>
             <li><i class="ti ti-check"></i> Real reviews from real readers</li>
           </ul>
@@ -126,7 +126,8 @@
           <div class="arc-section">
             <div class="hb-card">
               <div class="hb-eyebrow"><i class="ti ti-books"></i> Books in Review</div>
-              <p class="sub">Add a book once it has a manuscript uploaded. Every book gets one free starter slot, so you're never stuck waiting for someone else to go first. After that, slots come from reviews you complete for other authors. Your plan sets how many books can be in review at once &mdash; 1 on Free, 3 on Plus, 10 on Pro.</p>
+              <p class="sub">Every book gets one free starter slot, so you're never stuck waiting for someone else to go first. After that, slots come from reviews you complete for other authors. Your plan sets how many books can be in review at once: 1 on Free, 3 on Plus, 10 on Pro.</p>
+              <button type="button" class="btn btn-primary" id="arc-add-book-btn" style="margin-bottom:16px;"><i class="ti ti-plus"></i> Add a book</button>
               <div id="arc-books-in-review"></div>
             </div>
           </div>
@@ -319,8 +320,36 @@
      copy; otherwise it's left inactive as a "Manuscript ready" gated row. -->
 <div class="modal-overlay" id="arc-upload-modal">
   <div class="modal-card">
-    <h3>Upload manuscript</h3>
-    <p id="arc-upload-modal-book-title" style="font-weight:700;color:var(--navy);margin-top:-10px;margin-bottom:16px;"></p>
+    <h3>Add a book</h3>
+
+    <!-- Restructured 18 August 2026 per direct feedback: one central
+         entry point rather than a button on each book's row, book picked
+         from a dropdown of the author's own already-uploaded books, and a
+         plain three-option list with no long descriptions or jargon
+         ("Tier" was confusing, dropped entirely). -->
+    <label class="field-label" for="arc-book-select">Choose a book</label>
+    <select id="arc-book-select" class="text-input" style="width:100%;margin-bottom:16px;"></select>
+
+    <div id="arc-tier-options" style="display:flex;flex-direction:column;gap:8px;margin-bottom:16px;">
+      <label style="display:flex;gap:8px;align-items:center;font-size:13px;font-weight:400;">
+        <input type="radio" name="arc-tier" value="manuscript" checked>
+        <span>Unpublished manuscript</span>
+      </label>
+      <label style="display:flex;gap:8px;align-items:center;font-size:13px;font-weight:400;">
+        <input type="radio" name="arc-tier" value="kindle_unlimited">
+        <span>Kindle Unlimited</span>
+      </label>
+      <label style="display:flex;gap:8px;align-items:center;font-size:13px;font-weight:400;">
+        <input type="radio" name="arc-tier" value="verified_purchase">
+        <span>Verified Purchase</span>
+      </label>
+    </div>
+    <div id="arc-tier-price-row" style="display:none;margin-bottom:16px;">
+      <label class="field-label" for="arc-tier-price">Price the reader pays on Amazon (up to $2.99)</label>
+      <input type="number" id="arc-tier-price" min="0.01" max="2.99" step="0.01" value="2.99" class="text-input" style="width:120px;">
+    </div>
+    <p id="arc-tier-published-note" style="display:none;font-size:13px;color:var(--mid);margin:-4px 0 16px;">Uses this book's existing Amazon listing, no manuscript needed.</p>
+
     <div class="upload-drop" id="arc-upload-drop">
       <i class="ti ti-file-upload"></i>
       <p>Drop a PDF here or click to choose a file</p>
@@ -335,6 +364,42 @@
     <div class="modal-actions">
       <button class="btn btn-outline" id="arc-upload-modal-cancel">Cancel</button>
       <button class="btn btn-primary" id="arc-upload-modal-save" disabled>Upload</button>
+    </div>
+  </div>
+</div>
+
+<!-- Verified Purchase proof-of-purchase modal (17-18 August 2026, handover
+     Section 4 items 6-7). Only shown when marking a Verified Purchase
+     assignment done, or fixing a flagged one, Manuscript/Kindle Unlimited
+     keep the plain confirm() flow unchanged. The reviewer's Amazon name
+     is captured earlier, at claim time, so this only needs the link. -->
+<div class="modal-overlay" id="arc-proof-modal">
+  <div class="modal-card">
+    <h3 id="arc-proof-modal-title">Confirm your review</h3>
+    <p id="arc-proof-modal-intro" style="font-size:13px;color:var(--mid);line-height:1.6;margin-top:-10px;margin-bottom:16px;">This is a Verified Purchase book. Paste the link to your posted Amazon review.</p>
+    <label class="field-label" for="arc-proof-url">Link to your Amazon review</label>
+    <input type="text" id="arc-proof-url" class="text-input" placeholder="https://www.amazon.com/gp/customer-reviews/..." style="width:100%;">
+    <div class="detail-error" id="arc-proof-modal-error" style="display:none;text-align:left;margin-top:10px;"></div>
+    <div class="modal-actions">
+      <button class="btn btn-outline" id="arc-proof-modal-cancel">Cancel</button>
+      <button class="btn btn-primary" id="arc-proof-modal-save">Mark as done</button>
+    </div>
+  </div>
+</div>
+
+<!-- Amazon reviewer name prompt (18 August 2026, handover Section 4 items
+     6-7). Shown once, the first time a reader claims a Verified Purchase
+     book, before the claim itself goes through. -->
+<div class="modal-overlay" id="arc-name-modal">
+  <div class="modal-card">
+    <h3>Your name on Amazon</h3>
+    <p style="font-size:13px;color:var(--mid);line-height:1.6;margin-top:-10px;margin-bottom:16px;">This is a Verified Purchase book. Enter the name your Amazon reviews are posted under, this is asked once and reused for every Verified Purchase book you claim.</p>
+    <label class="field-label" for="arc-name-input">Amazon reviewer name</label>
+    <input type="text" id="arc-name-input" class="text-input" placeholder="As it appears on your reviews" style="width:100%;">
+    <div class="detail-error" id="arc-name-modal-error" style="display:none;text-align:left;margin-top:10px;"></div>
+    <div class="modal-actions">
+      <button class="btn btn-outline" id="arc-name-modal-cancel">Cancel</button>
+      <button class="btn btn-primary" id="arc-name-modal-save">Continue</button>
     </div>
   </div>
 </div>
@@ -951,19 +1016,9 @@
       // cleanly without a bigger refactor.
       var descHtml = '';
 
-      // bookInsight is now an array of 2 short paragraphs (18 August 2026,
-      // per John: needed to separate the earning-potential opener from the
-      // "what's next with ads" close, one dense paragraph couldn't hold
-      // both cleanly). Falls back to the old single-string rendering for
-      // any book audited before this change, same convention already used
-      // for narrative.marketAnalysis below.
-      var insightHtml = '';
-      if (insight) {
-        var insightParas = Array.isArray(insight) ? insight.filter(Boolean) : [insight];
-        insightHtml = insightParas.map(function (p) {
-          return '<p style="font-weight:400;color:var(--navy);margin-bottom:8px;">' + escapeHtml(p) + '</p>';
-        }).join('');
-      }
+      var insightHtml = insight
+        ? '<p style="font-weight:400;color:var(--navy);margin-bottom:4px;">' + escapeHtml(insight) + '</p>'
+        : '';
 
       var competitorCount = stats && stats.competitorCount > 0 ? stats.competitorCount : null;
       var revenue = stats ? stats.estimatedNicheRevenue : null;
@@ -1510,7 +1565,7 @@
   // (b.bestseller_rank_number, nicheStats.yourEstimatedRevenue).
 function competitorTableHtml(b) { var competitors = b.competitors_json; if (!competitors || !competitors.length) return ''; var nicheStats = (b.audit_narrative_json && b.audit_narrative_json.nicheStats) || {}; var rows = competitors.map(function (c) { return ('<tr>' + '<td>' + escapeHtml(c.title || '') + '</td>' + '<td class="tc">' + fmtBsrCell(c.bestsellerRank) + '</td>' + '<td class="tr">' + fmtRevCell(c.estimatedRevenue) + '</td>' + '<td class="tc">' + (c.reviews != null ? escapeHtml(String(c.reviews)) : 'Not available') + '</td>' + '<td class="tc"><span class="badge ' + (c.sponsored ? 'b-teal' : 'b-muted') + '">' + (c.sponsored ? 'Yes' : 'No') + '</span></td>' + '</tr>'); }).join(''); rows += ('<tr>' + '<td style="font-weight:700;color:var(--teal-d);">Your Book</td>' + '<td class="tc">' + fmtBsrCell(b.bestseller_rank_number) + '</td>' + '<td class="tr" style="color:var(--orange);">' + fmtRevCell(nicheStats.yourEstimatedRevenue) + '</td>' + '<td class="tc">' + (b.live_review_count != null ? escapeHtml(String(b.live_review_count)) : 'Not available') + '</td>' + '<td class="tc"><span class="badge b-muted">No</span></td>' + '</tr>'); return ('<div style="overflow-x:auto;">' + '<table class="dash-table">' + '<thead><tr><th>Book</th><th class="tc">Sales Rank</th><th class="tr">Est. Revenue / Mo</th><th class="tc">Reviews</th><th class="tc">Running Ads</th></tr></thead>' + '<tbody>' + rows + '</tbody>' + '</table>' + '</div>' + '<div style="font-size:11px;color:var(--muted);margin-top:10px;">Sales rank and revenue are estimated from each listing\'s live Amazon data, a lower rank means more sales. Running Ads flags whether this listing showed up as a sponsored result during this search.</div>'); }
 
-  function hasCompetitorInsight(b) { var competitors = b.competitors_json; return !!(competitors && competitors.length && competitors.some(function (c) { return typeof c.bestsellerRank === 'number' || typeof c.estimatedRevenue === 'number'; })); } function marketAnalysisHtml(b) { var narrative = b.audit_narrative_json; var nicheStats = (narrative && narrative.nicheStats) || {}; var rankNum = b.bestseller_rank_number; var rankBullet; var bsrStats = (nicheStats && nicheStats.bestSellerRank) || null; var nicheAvgForRank = (bsrStats && typeof bsrStats.nicheAverage === 'number' && bsrStats.nicheAverage > 0) ? bsrStats.nicheAverage : null; if (rankNum && nicheAvgForRank) { var rankRatio = rankNum / nicheAvgForRank; if (rankRatio <= 3) { rankBullet = 'This book ranks strongly for its category, right in line with the niche average (#' + nicheAvgForRank.toLocaleString() + '). The focus now is protecting that position: keep reviews coming in and keep the listing optimised.'; } else if (rankRatio <= 25) { rankBullet = 'This book has a foothold in its category, but sits behind the niche average (#' + nicheAvgForRank.toLocaleString() + '). Reviews and category fit are the two levers most likely to close that gap.'; } else { rankBullet = 'This book\'s category rank (#' + rankNum.toLocaleString() + ') is well behind the niche average (#' + nicheAvgForRank.toLocaleString() + '). Reviews, keyword coverage, and category placement are the places to focus first.'; } } else if (rankNum && rankNum <= 10000) { rankBullet = 'This book ranks strongly in its category already. The focus now is protecting that position: keep reviews coming in and keep the listing optimised.'; } else if (rankNum && rankNum <= 100000) { rankBullet = 'This book has a solid foothold in its category, with real room to climb. Reviews and category fit are the two levers most likely to move the rank.'; } else if (rankNum) { rankBullet = 'This book\'s bestseller rank shows it needs more visibility in its category. Reviews, keyword coverage, and category placement are the places to focus first.'; } else { rankBullet = 'We don\'t have a bestseller rank for this book yet. Once Amazon reports one, we\'ll use it here to gauge category standing.'; } var reviewCount = Number(b.live_review_count) || 0; var reviewBullet = reviewCount >= 15 ? 'With ' + reviewCount + ' reviews, this book has enough social proof to support running ads.' : 'With ' + reviewCount + ' review' + (reviewCount === 1 ? '' : 's') + ', this book is still building the review base most competitive listings in a category carry (a common benchmark is 15+) before ads pay off.'; var bullets = [rankBullet, reviewBullet]; var marketAnalysisSectionsHtml = ''; if (narrative && narrative.marketAnalysis) { if (Array.isArray(narrative.marketAnalysis)) { marketAnalysisSectionsHtml = narrative.marketAnalysis.map(function (sec) { if (!sec || !sec.body) return ''; return '<div class="ma-block">' + (sec.heading ? '<div class="ma-heading">' + escapeHtml(sec.heading) + '</div>' : '') + '<div class="ma-body">' + escapeHtml(sec.body) + '</div>' + '</div>'; }).join(''); } else { bullets.push(narrative.marketAnalysis); } } var competitorCount = (nicheStats.competitorCount > 0) ? nicheStats.competitorCount : null; var revenue = (typeof nicheStats.estimatedNicheRevenue === 'number') ? nicheStats.estimatedNicheRevenue : null; if (competitorCount != null || revenue != null) { var landscapeBits = []; if (competitorCount != null) landscapeBits.push(competitorCount + ' other book' + (competitorCount === 1 ? '' : 's') + ' selling well in this category'); if (revenue != null) landscapeBits.push('an estimated ' + fmtRevCell(revenue) + '/month in category-wide revenue'); bullets.push('This category shows ' + landscapeBits.join(' and ') + '.'); } var insightHtml = ''; if (narrative && narrative.bookInsight) { var biParas = Array.isArray(narrative.bookInsight) ? narrative.bookInsight.filter(Boolean) : [narrative.bookInsight]; insightHtml = '<div class="callout">' + biParas.map(function (p) { return '<p style="margin:0 0 8px;">' + escapeHtml(p) + '</p>'; }).join('') + '</div>'; } var bulletsHtml = bullets.map(function (t) { return '<div class="item"><div class="item-icon icon-orange">&#10003;</div><div class="item-b">' + escapeHtml(t) + '</div></div>'; }).join(''); var arrowHtml = '<div style="text-align:center;margin-top:-4px;margin-bottom:20px;"><span style="font-size:28px;color:var(--orange);line-height:1;">&#8595;</span></div>'; var compareHtml = hasCompetitorInsight(b) ? (arrowHtml + '<div class="hb-card">' + '<div class="hb-eyebrow">How You Compare' + (b.amazon_category ? (': ' + escapeHtml(b.amazon_category)) : '') + '</div>' + competitorTableHtml(b) + '</div>') : ''; return ('<div class="sec-label">Market Analysis</div>' + '<div class="hb-card">' + '<div class="hb-eyebrow">Your Category Standing</div>' + insightHtml + bulletsHtml + marketAnalysisSectionsHtml + '</div>' + compareHtml); }
+  function hasCompetitorInsight(b) { var competitors = b.competitors_json; return !!(competitors && competitors.length && competitors.some(function (c) { return typeof c.bestsellerRank === 'number' || typeof c.estimatedRevenue === 'number'; })); } function marketAnalysisHtml(b) { var narrative = b.audit_narrative_json; var nicheStats = (narrative && narrative.nicheStats) || {}; var rankNum = b.bestseller_rank_number; var rankBullet; var bsrStats = (nicheStats && nicheStats.bestSellerRank) || null; var nicheAvgForRank = (bsrStats && typeof bsrStats.nicheAverage === 'number' && bsrStats.nicheAverage > 0) ? bsrStats.nicheAverage : null; if (rankNum && nicheAvgForRank) { var rankRatio = rankNum / nicheAvgForRank; if (rankRatio <= 3) { rankBullet = 'This book ranks strongly for its category, right in line with the niche average (#' + nicheAvgForRank.toLocaleString() + '). The focus now is protecting that position: keep reviews coming in and keep the listing optimised.'; } else if (rankRatio <= 25) { rankBullet = 'This book has a foothold in its category, but sits behind the niche average (#' + nicheAvgForRank.toLocaleString() + '). Reviews and category fit are the two levers most likely to close that gap.'; } else { rankBullet = 'This book\'s category rank (#' + rankNum.toLocaleString() + ') is well behind the niche average (#' + nicheAvgForRank.toLocaleString() + '). Reviews, keyword coverage, and category placement are the places to focus first.'; } } else if (rankNum && rankNum <= 10000) { rankBullet = 'This book ranks strongly in its category already. The focus now is protecting that position: keep reviews coming in and keep the listing optimised.'; } else if (rankNum && rankNum <= 100000) { rankBullet = 'This book has a solid foothold in its category, with real room to climb. Reviews and category fit are the two levers most likely to move the rank.'; } else if (rankNum) { rankBullet = 'This book\'s bestseller rank shows it needs more visibility in its category. Reviews, keyword coverage, and category placement are the places to focus first.'; } else { rankBullet = 'We don\'t have a bestseller rank for this book yet. Once Amazon reports one, we\'ll use it here to gauge category standing.'; } var reviewCount = Number(b.live_review_count) || 0; var reviewBullet = reviewCount >= 15 ? 'With ' + reviewCount + ' reviews, this book has enough social proof to support running ads.' : 'With ' + reviewCount + ' review' + (reviewCount === 1 ? '' : 's') + ', this book is still building the review base most competitive listings in a category carry (a common benchmark is 15+) before ads pay off.'; var bullets = [rankBullet, reviewBullet]; var marketAnalysisSectionsHtml = ''; if (narrative && narrative.marketAnalysis) { if (Array.isArray(narrative.marketAnalysis)) { marketAnalysisSectionsHtml = narrative.marketAnalysis.map(function (sec) { if (!sec || !sec.body) return ''; return '<div class="ma-block">' + (sec.heading ? '<div class="ma-heading">' + escapeHtml(sec.heading) + '</div>' : '') + '<div class="ma-body">' + escapeHtml(sec.body) + '</div>' + '</div>'; }).join(''); } else { bullets.push(narrative.marketAnalysis); } } var competitorCount = (nicheStats.competitorCount > 0) ? nicheStats.competitorCount : null; var revenue = (typeof nicheStats.estimatedNicheRevenue === 'number') ? nicheStats.estimatedNicheRevenue : null; if (competitorCount != null || revenue != null) { var landscapeBits = []; if (competitorCount != null) landscapeBits.push(competitorCount + ' other book' + (competitorCount === 1 ? '' : 's') + ' selling well in this category'); if (revenue != null) landscapeBits.push('an estimated ' + fmtRevCell(revenue) + '/month in category-wide revenue'); bullets.push('This category shows ' + landscapeBits.join(' and ') + '.'); } var insightHtml = (narrative && narrative.bookInsight) ? '<div class="callout">' + escapeHtml(narrative.bookInsight) + '</div>' : ''; var bulletsHtml = bullets.map(function (t) { return '<div class="item"><div class="item-icon icon-orange">&#10003;</div><div class="item-b">' + escapeHtml(t) + '</div></div>'; }).join(''); var arrowHtml = '<div style="text-align:center;margin-top:-4px;margin-bottom:20px;"><span style="font-size:28px;color:var(--orange);line-height:1;">&#8595;</span></div>'; var compareHtml = hasCompetitorInsight(b) ? (arrowHtml + '<div class="hb-card">' + '<div class="hb-eyebrow">How You Compare' + (b.amazon_category ? (': ' + escapeHtml(b.amazon_category)) : '') + '</div>' + competitorTableHtml(b) + '</div>') : ''; return ('<div class="sec-label">Market Analysis</div>' + '<div class="hb-card">' + '<div class="hb-eyebrow">Your Category Standing</div>' + insightHtml + bulletsHtml + marketAnalysisSectionsHtml + '</div>' + compareHtml); }
 
   // Template-driven strategy steps, used whenever no LLM narrative is
   // stored for this book (older imports, or if enrichment failed/was
@@ -1961,15 +2016,60 @@ async function saveKeywordChange(b, newList) {
   var arcUploadModalError = document.getElementById('arc-upload-modal-error');
   var arcUploadModalSave = document.getElementById('arc-upload-modal-save');
   var arcUploadModalCancel = document.getElementById('arc-upload-modal-cancel');
-  var arcUploadModalBookTitle = document.getElementById('arc-upload-modal-book-title');
-  var arcUploadTargetBookId = null;
+  var arcBookSelect = document.getElementById('arc-book-select');
+  var arcAddBookBtn = document.getElementById('arc-add-book-btn');
+  var arcUploadDrop = document.getElementById('arc-upload-drop');
+  var arcTierPriceRow = document.getElementById('arc-tier-price-row');
+  var arcTierPrice = document.getElementById('arc-tier-price');
+  var arcTierPublishedNote = document.getElementById('arc-tier-published-note');
   var arcUploadSelectedFile = null;
+  // Every book this author has, refreshed each loadReciprocalReviews()
+  // call, so the "Add a book" dropdown always reflects current state
+  // without a separate fetch of its own.
+  var arcMyBooksCache = [];
+
+  function arcSelectedBookId() {
+    return arcBookSelect.value || null;
+  }
+
+  function arcSelectedTier() {
+    var checked = document.querySelector('input[name="arc-tier"]:checked');
+    return checked ? checked.value : 'manuscript';
+  }
+
+  // Toggle the PDF-upload UI vs. the "already published" note, and the
+  // price field, based on the chosen tier. Manuscript still requires a
+  // file to enable Save; Kindle Unlimited / Verified Purchase don't need
+  // one, so Save enables immediately (server still gates on the book
+  // having an Amazon listing — see api/reviews-pool-optin.js).
+  function arcUpdateTierUI() {
+    var tier = arcSelectedTier();
+    var isManuscript = tier === 'manuscript';
+    var hasBook = !!arcSelectedBookId();
+    arcUploadDrop.style.display = isManuscript ? '' : 'none';
+    arcUploadFileRow.style.display = (isManuscript && arcUploadSelectedFile) ? 'flex' : 'none';
+    arcTierPublishedNote.style.display = isManuscript ? 'none' : 'block';
+    arcTierPriceRow.style.display = tier === 'verified_purchase' ? 'block' : 'none';
+    arcUploadModalSave.disabled = !hasBook || (isManuscript && !arcUploadSelectedFile);
+  }
+
+  arcBookSelect.addEventListener('change', arcUpdateTierUI);
+
+  document.querySelectorAll('input[name="arc-tier"]').forEach(function (r) {
+    r.addEventListener('change', arcUpdateTierUI);
+  });
   // Count of this author's books currently active in the pool, recomputed
   // on every loadReciprocalReviews() call. Drives both the row-gating
   // logic below and the auto-activate decision in the upload modal's save
   // handler, per the plan-limit decision: reuse subscription.book_limit
   // (1/3/10) as the cap rather than a separate ARC-specific limit.
   var arcActiveInReviewCount = 0;
+  // Self-reported Amazon reviewer name on file, checked before letting a
+  // reader claim a Verified Purchase book (Section 4 items 6-7, decided
+  // 18 August 2026 to ask at claim time, not later at mark-done).
+  // Populated from reviews-my-status each load; null until the reader's
+  // first Verified Purchase claim sets it server-side.
+  var arcAmazonReviewerName = null;
 
   // Fixed safety turnaround: how many days after being claimed an
   // assignment must wait before it can be marked done. Mirrored server-side
@@ -1977,20 +2077,32 @@ async function saveKeywordChange(b, newList) {
   var ARC_MIN_WAIT_DAYS = 5;
 
   function arcResetUploadModal() {
-    arcUploadTargetBookId = null;
     arcUploadSelectedFile = null;
     arcUploadInput.value = '';
     arcUploadFileRow.style.display = 'none';
     arcUploadModalError.style.display = 'none';
-    arcUploadModalSave.disabled = true;
     arcUploadModalSave.textContent = 'Upload';
+    var manuscriptRadio = document.querySelector('input[name="arc-tier"][value="manuscript"]');
+    if (manuscriptRadio) manuscriptRadio.checked = true;
+    if (arcTierPrice) arcTierPrice.value = '2.99';
+    arcUpdateTierUI();
   }
 
-  function arcOpenUploadModal(bookId, bookTitle) {
+  // Single central entry point (18 August 2026), replacing the old
+  // per-book-row "Upload manuscript" button. Only books not already in
+  // the pool are offered, picked from a dropdown rather than needing to
+  // find the right row first.
+  function arcOpenUploadModal() {
     arcResetUploadModal();
-    arcUploadTargetBookId = bookId;
-    arcUploadModalBookTitle.textContent = bookTitle || '';
+    var addable = arcMyBooksCache.filter(function (b) { return !b.inPool; });
+    arcBookSelect.innerHTML = addable.length
+      ? addable.map(function (b) { return '<option value="' + b.bookId + '">' + escapeHtmlLocal(b.title) + '</option>'; }).join('')
+      : '<option value="">No books available to add</option>';
     arcUploadModal.classList.add('active');
+  }
+
+  if (arcAddBookBtn) {
+    arcAddBookBtn.addEventListener('click', arcOpenUploadModal);
   }
 
   arcUploadInput.addEventListener('change', function () {
@@ -2021,37 +2133,61 @@ async function saveKeywordChange(b, newList) {
   });
 
   arcUploadModalSave.addEventListener('click', async function () {
-    if (!arcUploadSelectedFile || !arcUploadTargetBookId) return;
+    var targetBookId = arcSelectedBookId();
+    if (!targetBookId) return;
+    var tier = arcSelectedTier();
+    if (tier === 'manuscript' && !arcUploadSelectedFile) return;
+
+    // Plan limit is checked here, up front, rather than silently skipping
+    // activation the way the old per-row flow did, so the author always
+    // knows whether adding this book actually took effect.
+    if (arcActiveInReviewCount >= (subscription.book_limit || 1)) {
+      arcUploadModal.classList.remove('active');
+      arcResetUploadModal();
+      openBillingModal('Your plan is at its limit for books in review. Upgrade to add another.');
+      return;
+    }
+
+    var priceCents = null;
+    if (tier === 'verified_purchase') {
+      var dollars = parseFloat(arcTierPrice.value);
+      if (!dollars || dollars <= 0 || dollars > 2.99) {
+        arcUploadModalError.textContent = 'Enter a price between $0.01 and $2.99.';
+        arcUploadModalError.style.display = 'block';
+        return;
+      }
+      priceCents = Math.round(dollars * 100);
+    }
+
     arcUploadModalSave.disabled = true;
-    arcUploadModalSave.textContent = 'Uploading…';
+    arcUploadModalSave.textContent = tier === 'manuscript' ? 'Uploading…' : 'Saving…';
     arcUploadModalError.style.display = 'none';
     try {
-      // Same storage path convention onboarding.html already uses
-      // (user_id/book_id.pdf), so the existing "matched reviewer can read
-      // assigned manuscript" storage policy keeps working unchanged.
-      var path = user.id + '/' + arcUploadTargetBookId + '.pdf';
-      var uploadResult = await readerbull.client.storage
-        .from('manuscripts')
-        .upload(path, arcUploadSelectedFile, { upsert: true, contentType: 'application/pdf' });
-      if (uploadResult.error) throw new Error(uploadResult.error.message || 'Upload failed, please try again.');
+      if (tier === 'manuscript') {
+        // Same storage path convention onboarding.html already uses
+        // (user_id/book_id.pdf), so the existing "matched reviewer can read
+        // assigned manuscript" storage policy keeps working unchanged.
+        var path = user.id + '/' + targetBookId + '.pdf';
+        var uploadResult = await readerbull.client.storage
+          .from('manuscripts')
+          .upload(path, arcUploadSelectedFile, { upsert: true, contentType: 'application/pdf' });
+        if (uploadResult.error) throw new Error(uploadResult.error.message || 'Upload failed, please try again.');
 
-      // Direct client write, RLS-scoped by the existing "Users can update
-      // own book" policy, same pattern the book-switcher's delete button
-      // already uses (readerbull.client.from('books').delete()...).
-      var updateResult = await readerbull.client
-        .from('books')
-        .update({ manuscript_url: path })
-        .eq('id', arcUploadTargetBookId);
-      if (updateResult.error) throw new Error(updateResult.error.message || 'Could not save the manuscript to this book.');
-
-      // Auto-activate if still under the plan's book_limit for active pool
-      // entries (Section 2.1: "manuscript present, under the plan limit ->
-      // auto-activates"). Reuses the existing reviews-pool-optin endpoint,
-      // no new backend logic needed. If already at the limit, the row will
-      // show the "upgrade to activate" state on the next render instead.
-      if (arcActiveInReviewCount < (subscription.book_limit || 1)) {
-        await reciprocalApi('reviews-pool-optin', { method: 'POST', body: { bookId: arcUploadTargetBookId, active: true } });
+        // Direct client write, RLS-scoped by the existing "Users can update
+        // own book" policy, same pattern the book-switcher's delete button
+        // already uses (readerbull.client.from('books').delete()...).
+        var updateResult = await readerbull.client
+          .from('books')
+          .update({ manuscript_url: path })
+          .eq('id', targetBookId);
+        if (updateResult.error) throw new Error(updateResult.error.message || 'Could not save the manuscript to this book.');
       }
+      // Kindle Unlimited / Verified Purchase skip straight here, no file,
+      // server checks the book already has an Amazon listing instead.
+
+      var optinBody = { bookId: targetBookId, active: true, offerType: tier };
+      if (tier === 'verified_purchase') optinBody.priceCents = priceCents;
+      await reciprocalApi('reviews-pool-optin', { method: 'POST', body: optinBody });
 
       arcUploadModal.classList.remove('active');
       arcResetUploadModal();
@@ -2060,7 +2196,7 @@ async function saveKeywordChange(b, newList) {
       arcUploadModalError.textContent = err.message;
       arcUploadModalError.style.display = 'block';
       arcUploadModalSave.disabled = false;
-      arcUploadModalSave.textContent = 'Upload';
+      arcUploadModalSave.textContent = tier === 'manuscript' ? 'Upload' : 'Save';
     }
   });
 
@@ -2094,6 +2230,7 @@ async function saveKeywordChange(b, newList) {
       var browse = results[1];
       var myBooks = status.myBooks || [];
       var toReview = status.toReview || [];
+      arcAmazonReviewerName = status.amazonReviewerName || null;
       var libraryBooks = (browse.books || []).filter(function (b) { return b.availableSlots > 0; });
       var beingReviewedByBook = {};
       (status.beingReviewed || []).forEach(function (b) { beingReviewedByBook[b.bookId] = b; });
@@ -2150,6 +2287,7 @@ async function saveKeywordChange(b, newList) {
   // limit, but somehow not yet active) covers a failed/retried
   // auto-activation rather than being something authors normally see.
   function renderArcBooksInReview(myBooks, beingReviewedByBook) {
+    arcMyBooksCache = myBooks;
     var el = document.getElementById('arc-books-in-review');
     if (!myBooks.length) {
       el.innerHTML = arcEmptyHtml('No books yet. Add one from your dashboard first.');
@@ -2157,10 +2295,7 @@ async function saveKeywordChange(b, newList) {
     }
     el.innerHTML = myBooks.map(function (b) {
       var metaHtml, actionHtml;
-      if (!b.manuscriptUploaded) {
-        metaHtml = '<span class="pill pill-muted">Add your manuscript to open this slot</span>';
-        actionHtml = '<button type="button" class="btn btn-outline arc-upload-btn" data-book-id="' + b.bookId + '" data-book-title="' + escapeHtmlLocal(b.title) + '"><i class="ti ti-upload"></i> Upload manuscript</button>';
-      } else if (b.inPool) {
+      if (b.inPool) {
         var counts = beingReviewedByBook[b.bookId];
         var activeCount = counts ? counts.activeCount : 0;
         var completedCount = counts ? counts.completedCount : 0;
@@ -2172,23 +2307,25 @@ async function saveKeywordChange(b, newList) {
           metaHtml = '<span class="pill pill-muted">Looking for your first reviewer</span>';
         }
         actionHtml = '';
-      } else if (arcActiveInReviewCount >= (subscription.book_limit || 1)) {
-        metaHtml = '<span class="pill pill-orange">Manuscript ready &mdash; upgrade to activate</span>';
+      } else if (b.manuscriptUploaded && arcActiveInReviewCount >= (subscription.book_limit || 1)) {
+        // Legacy state: a manuscript was uploaded before this book was
+        // added to the pool (e.g. hit the plan limit under the old flow).
+        // New additions can't reach this state, the limit is checked
+        // before anything uploads (see arcUploadModalSave above).
+        metaHtml = '<span class="pill pill-orange">Manuscript ready, upgrade to activate</span>';
         actionHtml = '<button type="button" class="btn btn-outline arc-upgrade-btn" data-book-title="' + escapeHtmlLocal(b.title) + '">Upgrade</button>';
-      } else {
+      } else if (b.manuscriptUploaded) {
         metaHtml = '<span class="pill pill-muted">Manuscript ready</span>';
         actionHtml = '<button type="button" class="btn btn-primary arc-activate-btn" data-book-id="' + b.bookId + '">Activate</button>';
+      } else {
+        metaHtml = '<span class="pill pill-muted">Not yet in ARC Readers</span>';
+        actionHtml = '';
       }
       return '<div class="arc-row"><div><div class="arc-row-title">' + escapeHtmlLocal(b.title) + '</div>' +
         '<div class="arc-row-meta">' + metaHtml + '</div></div>' +
         (actionHtml ? '<div class="arc-row-actions">' + actionHtml + '</div>' : '') + '</div>';
     }).join('');
 
-    el.querySelectorAll('.arc-upload-btn').forEach(function (btn) {
-      btn.addEventListener('click', function () {
-        arcOpenUploadModal(btn.getAttribute('data-book-id'), btn.getAttribute('data-book-title'));
-      });
-    });
     el.querySelectorAll('.arc-upgrade-btn').forEach(function (btn) {
       btn.addEventListener('click', function () {
         openBillingModal('"' + btn.getAttribute('data-book-title') + '" has a manuscript ready. Upgrade your plan to activate it in Books in Review.');
@@ -2225,12 +2362,22 @@ async function saveKeywordChange(b, newList) {
       var eligibleAt = r.assignedAt ? new Date(r.assignedAt).getTime() + ARC_MIN_WAIT_DAYS * 86400000 : 0;
       var daysLeft = Math.max(1, Math.ceil((eligibleAt - Date.now()) / 86400000));
       var notYetEligible = r.status !== 'completed' && eligibleAt && Date.now() < eligibleAt;
-      var actionHtml = r.status === 'completed'
+      // A flagged Verified Purchase submission can be fixed and
+      // resubmitted even though the assignment itself already shows
+      // completed (18 August 2026, direct instruction: "yes, they can fix
+      // it"). This doesn't touch the slot credit either way.
+      var flagged = r.status === 'completed' && r.offerType === 'verified_purchase' && r.proofStatus === 'flagged';
+      if (flagged) {
+        metaHtml += ' &middot; <span class="pill pill-orange">Link needs fixing</span>';
+      }
+      var actionHtml = flagged
+        ? '<button type="button" class="btn btn-outline arc-fix-proof-btn" data-assignment-id="' + r.assignmentId + '">Fix submission</button>'
+        : r.status === 'completed'
         ? ''
         : '<button type="button" class="btn btn-outline arc-read-btn" data-path="' + escapeHtmlLocal(r.manuscriptPath) + '">Read manuscript</button>' +
           (notYetEligible
             ? '<span class="arc-row-meta" style="align-self:center;">Mark as done in ' + daysLeft + ' day' + (daysLeft === 1 ? '' : 's') + '</span>'
-            : '<button type="button" class="btn btn-primary arc-done-btn" data-assignment-id="' + r.assignmentId + '">Mark as done</button>');
+            : '<button type="button" class="btn btn-primary arc-done-btn" data-assignment-id="' + r.assignmentId + '" data-offer-type="' + (r.offerType || 'manuscript') + '">Mark as done</button>');
       return '<div class="arc-row"><div><div class="arc-row-title">' + escapeHtmlLocal(r.title) + '</div>' +
         '<div class="arc-row-meta">' + metaHtml + '</div></div>' +
         (actionHtml ? '<div class="arc-row-actions">' + actionHtml + '</div>' : '') + '</div>';
@@ -2249,10 +2396,18 @@ async function saveKeywordChange(b, newList) {
     });
     el.querySelectorAll('.arc-done-btn').forEach(function (btn) {
       btn.addEventListener('click', async function () {
+        var assignmentId = btn.getAttribute('data-assignment-id');
+        // Verified Purchase needs a proof link before it can be marked
+        // done; other tiers keep the plain honesty-based confirm()
+        // (Section 4 item 7 decision).
+        if (btn.getAttribute('data-offer-type') === 'verified_purchase') {
+          arcOpenProofModal(assignmentId, false);
+          return;
+        }
         if (!confirm("Confirm you've left an honest review on Amazon (with the required disclosure line) for this book?")) return;
         btn.disabled = true;
         try {
-          await reciprocalApi('reviews-mark-done', { method: 'POST', body: { assignmentId: btn.getAttribute('data-assignment-id') } });
+          await reciprocalApi('reviews-mark-done', { method: 'POST', body: { assignmentId: assignmentId } });
           await loadReciprocalReviews();
         } catch (err) {
           alert(err.message);
@@ -2260,7 +2415,112 @@ async function saveKeywordChange(b, newList) {
         }
       });
     });
+    el.querySelectorAll('.arc-fix-proof-btn').forEach(function (btn) {
+      btn.addEventListener('click', function () {
+        arcOpenProofModal(btn.getAttribute('data-assignment-id'), true);
+      });
+    });
   }
+
+  // Verified Purchase proof-of-purchase modal (17-18 August 2026, handover
+  // Section 4 items 6-7). Static markup, wired once here like the upload
+  // modal above. Reused for both a first submission and fixing a flagged
+  // one, isResubmit only changes the copy shown.
+  var arcProofModal = document.getElementById('arc-proof-modal');
+  var arcProofModalTitle = document.getElementById('arc-proof-modal-title');
+  var arcProofModalIntro = document.getElementById('arc-proof-modal-intro');
+  var arcProofUrl = document.getElementById('arc-proof-url');
+  var arcProofModalError = document.getElementById('arc-proof-modal-error');
+  var arcProofModalSave = document.getElementById('arc-proof-modal-save');
+  var arcProofModalCancel = document.getElementById('arc-proof-modal-cancel');
+  var arcProofTargetAssignmentId = null;
+
+  function arcOpenProofModal(assignmentId, isResubmit) {
+    arcProofTargetAssignmentId = assignmentId;
+    arcProofUrl.value = '';
+    arcProofModalTitle.textContent = isResubmit ? 'Fix your submission' : 'Confirm your review';
+    arcProofModalIntro.textContent = isResubmit
+      ? 'Your last link needs fixing. Paste the corrected link to your posted Amazon review.'
+      : 'This is a Verified Purchase book. Paste the link to your posted Amazon review.';
+    arcProofModalError.style.display = 'none';
+    arcProofModalSave.disabled = false;
+    arcProofModalSave.textContent = 'Mark as done';
+    arcProofModal.classList.add('active');
+  }
+
+  arcProofModalCancel.addEventListener('click', function () {
+    arcProofModal.classList.remove('active');
+  });
+
+  // Amazon reviewer name prompt, shown once at claim time for the first
+  // Verified Purchase book a reader requests (Section 4 items 6-7).
+  var arcNameModal = document.getElementById('arc-name-modal');
+  var arcNameInput = document.getElementById('arc-name-input');
+  var arcNameModalError = document.getElementById('arc-name-modal-error');
+  var arcNameModalSave = document.getElementById('arc-name-modal-save');
+  var arcNameModalCancel = document.getElementById('arc-name-modal-cancel');
+  var arcNameTargetBookId = null;
+
+  function arcOpenNameModal(bookId) {
+    arcNameTargetBookId = bookId;
+    arcNameInput.value = '';
+    arcNameModalError.style.display = 'none';
+    arcNameModalSave.disabled = false;
+    arcNameModalSave.textContent = 'Continue';
+    arcNameModal.classList.add('active');
+  }
+
+  arcNameModalCancel.addEventListener('click', function () {
+    arcNameModal.classList.remove('active');
+  });
+
+  arcNameModalSave.addEventListener('click', async function () {
+    var name = arcNameInput.value.trim();
+    arcNameModalError.style.display = 'none';
+    if (!name) {
+      arcNameModalError.textContent = 'Enter the name your Amazon reviews are posted under.';
+      arcNameModalError.style.display = 'block';
+      return;
+    }
+    arcNameModalSave.disabled = true;
+    arcNameModalSave.textContent = 'Saving…';
+    try {
+      await reciprocalApi('reviews-request', { method: 'POST', body: { bookId: arcNameTargetBookId, asAmazonName: name } });
+      arcAmazonReviewerName = name;
+      arcNameModal.classList.remove('active');
+      await loadReciprocalReviews();
+    } catch (err) {
+      arcNameModalError.textContent = err.message;
+      arcNameModalError.style.display = 'block';
+      arcNameModalSave.disabled = false;
+      arcNameModalSave.textContent = 'Continue';
+    }
+  });
+
+  arcProofModalSave.addEventListener('click', async function () {
+    var url = arcProofUrl.value.trim();
+    arcProofModalError.style.display = 'none';
+    if (!url) {
+      arcProofModalError.textContent = 'Paste the link to your posted Amazon review.';
+      arcProofModalError.style.display = 'block';
+      return;
+    }
+    arcProofModalSave.disabled = true;
+    arcProofModalSave.textContent = 'Saving…';
+    try {
+      await reciprocalApi('reviews-mark-done', {
+        method: 'POST',
+        body: { assignmentId: arcProofTargetAssignmentId, proofUrl: url }
+      });
+      arcProofModal.classList.remove('active');
+      await loadReciprocalReviews();
+    } catch (err) {
+      arcProofModalError.textContent = err.message;
+      arcProofModalError.style.display = 'block';
+      arcProofModalSave.disabled = false;
+      arcProofModalSave.textContent = 'Mark as done';
+    }
+  });
 
   // Initials shown on the cover when a book has no cover_image_url yet
   // (e.g. it wasn't imported through the Amazon lookup flow). Same "two
@@ -2272,12 +2532,14 @@ async function saveKeywordChange(b, newList) {
     return (words[0][0] + words[1][0]).toUpperCase();
   }
 
-  // Tier badge label. offerType isn't in the live API response yet (the
-  // Kindle Unlimited / Verified Purchase pool-entry types need a schema
-  // migration that's pending separate sign-off — see the 17 August 2026
-  // handover note) so this defaults every book to "Manuscript" today, but
-  // is written to display whatever the API sends once that lands.
+  // Tier badge label. offerType/priceCents are live in the API response as
+  // of the 17 August 2026 schema migration (handover Section 4 items 4-5)
+  // — books saved before that migration default to 'manuscript' server-
+  // side, so this still renders correctly for older rows too.
   var ARC_TIER_LABEL = { manuscript: 'Manuscript', kindle_unlimited: 'Kindle Unlimited', verified_purchase: 'Verified Purchase' };
+  function arcFormatPrice(cents) {
+    return '$' + (cents / 100).toFixed(2);
+  }
 
   function renderArcLibrary(libraryBooks) {
     var el = document.getElementById('arc-library');
@@ -2300,12 +2562,20 @@ async function saveKeywordChange(b, newList) {
         '</div>' +
         '<div class="arc-row-title">' + escapeHtmlLocal(b.title) + '</div>' +
         '<div class="arc-row-meta">' + (b.category ? escapeHtmlLocal(b.category) + ' &middot; ' : '') + b.availableSlots + ' open slot' + (b.availableSlots === 1 ? '' : 's') + '</div>' +
+        (tier === 'verified_purchase' && b.priceCents ? '<div class="arc-row-meta">Buy on Amazon &middot; ' + arcFormatPrice(b.priceCents) + '</div>' : '') +
         (b.cleanContentOnly ? '<div class="arc-row-meta">Clean content only</div>' : '') +
-        '<button type="button" class="btn btn-primary arc-request-btn" data-book-id="' + b.bookId + '">Request to review</button></div>';
+        '<button type="button" class="btn btn-primary arc-request-btn" data-book-id="' + b.bookId + '" data-offer-type="' + tier + '">Request to review</button></div>';
     }).join('') + '</div>';
 
     el.querySelectorAll('.arc-request-btn').forEach(function (btn) {
       btn.addEventListener('click', async function () {
+        // Verified Purchase needs the reviewer's Amazon name on file
+        // before claiming, asked once here rather than later at mark-done
+        // (Section 4 items 6-7, decided 18 August 2026).
+        if (btn.getAttribute('data-offer-type') === 'verified_purchase' && !arcAmazonReviewerName) {
+          arcOpenNameModal(btn.getAttribute('data-book-id'));
+          return;
+        }
         btn.disabled = true;
         try {
           await reciprocalApi('reviews-request', { method: 'POST', body: { bookId: btn.getAttribute('data-book-id') } });
