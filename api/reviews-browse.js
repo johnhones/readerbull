@@ -41,7 +41,7 @@ module.exports = async function handler(req, res) {
   // can read books actively in the review pool" policy from the migration
   // makes the embed work even for books the caller doesn't own).
   var poolResp = await fetch(
-    SUPABASE_URL + '/rest/v1/review_pool_entries?select=id,book_id,user_id,bonus_slots,clean_content_only,' +
+    SUPABASE_URL + '/rest/v1/review_pool_entries?select=id,book_id,user_id,bonus_slots,clean_content_only,offer_type,price_cents,' +
       'books(book_title,cover_image_url,amazon_category,score)&active=eq.true',
     { headers: headers }
   );
@@ -107,7 +107,12 @@ module.exports = async function handler(req, res) {
       category: b.amazon_category || null,
       cleanContentOnly: !!entry.clean_content_only,
       availableSlots: availableSlots,
-      discoverabilityScore: (typeof b.score === 'number') ? b.score : null
+      discoverabilityScore: (typeof b.score === 'number') ? b.score : null,
+      // offerType/priceCents added 17 August 2026 for the tier system —
+      // defaults to 'manuscript'/null for any pre-migration row (the
+      // column's own DB default), so older entries render correctly too.
+      offerType: entry.offer_type || 'manuscript',
+      priceCents: (typeof entry.price_cents === 'number') ? entry.price_cents : null
     });
   }
 
