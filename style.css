@@ -483,8 +483,8 @@ failures (e.g. a failed import), which is what made this feel loud. */
 .modal-card { background: #fff; border-radius: 10px; padding: 28px; max-width: 420px; width: 90%; }
 .modal-card h3 { font-size: 18px; color: var(--navy); margin-bottom: 12px; }
 .modal-card p { font-size: 14px; color: var(--mid); margin-bottom: 20px; line-height: 1.6; }
-.modal-card input[type=email], .modal-card input[type=password] { width: 100%; border: 1px solid var(--border); border-radius: 6px; padding: 10px 12px; font-size: 14px; outline: none; font-family: inherit; margin-bottom: 4px; }
-.modal-card input[type=email]:focus, .modal-card input[type=password]:focus { border-color: var(--teal); }
+.modal-card input[type=email], .modal-card input[type=password], .modal-card input[type=text], .modal-card input[type=number], .modal-card .text-input { width: 100%; border: 1px solid var(--border); border-radius: 6px; padding: 10px 12px; font-size: 14px; outline: none; font-family: inherit; margin-bottom: 4px; }
+.modal-card input[type=email]:focus, .modal-card input[type=password]:focus, .modal-card input[type=text]:focus, .modal-card input[type=number]:focus, .modal-card .text-input:focus { border-color: var(--teal); }
 .modal-actions { display: flex; justify-content: flex-end; gap: 10px; }
 
 /* Loading view swapped into the submit-confirm modal in onboarding.html
