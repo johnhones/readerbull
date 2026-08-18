@@ -55,6 +55,32 @@
       <tbody id="admin-table-body"></tbody>
     </table>
   </div>
+
+  <!-- Verified Purchase proof queue (18 August 2026). Not a gate on
+       anything, the reviewer's slot credit already landed the moment they
+       submitted a link, this is only for spot-checking those links by
+       hand and flagging anything that needs fixing. -->
+  <h2 style="color:var(--navy);margin:40px 0 4px;">ARC Verified Purchase proofs</h2>
+  <p style="color:var(--mid);font-size:13px;margin-bottom:20px;">Every submitted review link, newest first. Approving or flagging one doesn't change the reviewer's already-credited slot, flagging just asks them to resubmit a corrected link.</p>
+
+  <div class="admin-summary" id="admin-proofs-summary"></div>
+
+  <div style="overflow-x:auto;">
+    <table class="dash-table" id="admin-proofs-table">
+      <thead>
+        <tr>
+          <th>Book</th>
+          <th>Reviewer</th>
+          <th>Amazon name</th>
+          <th>Proof link</th>
+          <th>Submitted</th>
+          <th>Status</th>
+          <th></th>
+        </tr>
+      </thead>
+      <tbody id="admin-proofs-table-body"></tbody>
+    </table>
+  </div>
 </div>
 
 <script>
@@ -66,6 +92,9 @@
   var errorEl = document.getElementById('admin-gate-error');
   var summaryEl = document.getElementById('admin-summary');
   var tbody = document.getElementById('admin-table-body');
+  var proofsSummaryEl = document.getElementById('admin-proofs-summary');
+  var proofsTbody = document.getElementById('admin-proofs-table-body');
+  var currentSecret = null;
 
   function planPillClass(plan) {
     if (plan === 'plus') return 'plan-plus';
@@ -114,6 +143,80 @@
     }).join('');
   }
 
+  function formatDateTime(iso) {
+    if (!iso) return '–';
+    var d = new Date(iso);
+    if (isNaN(d.getTime())) return '–';
+    return d.toLocaleDateString('en-GB', { day: 'numeric', month: 'short', year: 'numeric' }) + ', ' +
+      d.toLocaleTimeString('en-GB', { hour: '2-digit', minute: '2-digit' });
+  }
+
+  function renderProofs(proofs) {
+    var pendingCount = proofs.filter(function (p) { return p.proofStatus === 'pending_review'; }).length;
+    var flaggedCount = proofs.filter(function (p) { return p.proofStatus === 'flagged'; }).length;
+    proofsSummaryEl.innerHTML =
+      '<div class="admin-stat"><b>' + pendingCount + '</b>Awaiting review</div>' +
+      (flaggedCount ? '<div class="admin-stat"><b style="color:#b91c1c;">' + flaggedCount + '</b>Flagged, waiting on reviewer</div>' : '');
+
+    if (!proofs.length) {
+      proofsTbody.innerHTML = '<tr><td colspan="7" style="color:var(--mid);">Nothing waiting on review right now.</td></tr>';
+      return;
+    }
+
+    proofsTbody.innerHTML = proofs.map(function (p) {
+      var statusClass = p.proofStatus === 'flagged' ? 'status-past_due' : '';
+      var linkHtml = p.proofUrl
+        ? '<a href="' + escapeHtml(p.proofUrl) + '" target="_blank" rel="noopener">Open link</a>'
+        : '<span style="color:var(--border);">–</span>';
+      var actionsHtml = p.proofStatus === 'pending_review'
+        ? '<button type="button" class="btn btn-outline admin-proof-approve" data-id="' + p.assignmentId + '" style="padding:6px 12px;font-size:12px;">Approve</button> ' +
+          '<button type="button" class="btn btn-outline admin-proof-flag" data-id="' + p.assignmentId + '" style="padding:6px 12px;font-size:12px;">Flag</button>'
+        : '<span style="color:var(--mid);font-size:12px;">Resubmission needed</span>';
+      return '<tr>' +
+        '<td>' + escapeHtml(p.bookTitle) + '</td>' +
+        '<td>' + (escapeHtml(p.reviewerEmail) || '–') + '</td>' +
+        '<td>' + (escapeHtml(p.amazonReviewerName) || '–') + '</td>' +
+        '<td>' + linkHtml + '</td>' +
+        '<td>' + formatDateTime(p.completedAt) + '</td>' +
+        '<td class="' + statusClass + '">' + escapeHtml(p.proofStatus) + '</td>' +
+        '<td>' + actionsHtml + '</td>' +
+        '</tr>';
+    }).join('');
+
+    proofsTbody.querySelectorAll('.admin-proof-approve, .admin-proof-flag').forEach(function (btn) {
+      btn.addEventListener('click', function () {
+        var action = btn.classList.contains('admin-proof-approve') ? 'approve' : 'flag';
+        btn.disabled = true;
+        fetch('/api/admin-arc-proofs', {
+          method: 'POST',
+          headers: { 'x-admin-secret': currentSecret, 'Content-Type': 'application/json' },
+          body: JSON.stringify({ assignmentId: btn.getAttribute('data-id'), action: action })
+        })
+          .then(function (r) { return r.json().then(function (body) { return { ok: r.ok, body: body }; }); })
+          .then(function (result) {
+            if (!result.ok) throw new Error((result.body && result.body.error) || 'Could not update that submission.');
+            loadProofs();
+          })
+          .catch(function (err) {
+            alert(err.message);
+            btn.disabled = false;
+          });
+      });
+    });
+  }
+
+  function loadProofs() {
+    fetch('/api/admin-arc-proofs', { headers: { 'x-admin-secret': currentSecret } })
+      .then(function (r) { return r.json().then(function (body) { return { ok: r.ok, body: body }; }); })
+      .then(function (result) {
+        if (!result.ok) throw new Error((result.body && result.body.error) || 'Could not load the proof queue.');
+        renderProofs(result.body.proofs || []);
+      })
+      .catch(function (err) {
+        proofsTbody.innerHTML = '<tr><td colspan="7" style="color:#b91c1c;">' + escapeHtml(err.message) + '</td></tr>';
+      });
+  }
+
   function attempt() {
     var secret = input.value;
     if (!secret) return;
@@ -128,9 +231,11 @@
           throw new Error((result.body && result.body.error) || 'Could not load the user list.');
         }
         sessionStorage.setItem('rb_admin_secret', secret);
+        currentSecret = secret;
         gate.style.display = 'none';
         content.style.display = 'block';
         render(result.body.users || []);
+        loadProofs();
       })
       .catch(function (err) {
         errorEl.textContent = err.message === 'Failed to fetch' ? 'Network error, try again.' : (err.message.indexOf('Unauthorized') > -1 ? 'Incorrect secret.' : err.message);
