@@ -56,8 +56,11 @@ module.exports = async function handler(req, res) {
   var completedCount = (completedRows || []).length;
 
   // This author's own books, plus whatever pool entry exists for each.
+  // amazon_link added 18 August 2026 so the "Add a book" picker knows
+  // whether Kindle Unlimited / Verified Purchase are even valid choices
+  // for a given book (those need an existing Amazon listing).
   var booksResp = await fetch(
-    SUPABASE_URL + '/rest/v1/books?select=id,book_title,manuscript_url&user_id=eq.' + encodeURIComponent(authUser.id),
+    SUPABASE_URL + '/rest/v1/books?select=id,book_title,manuscript_url,amazon_link&user_id=eq.' + encodeURIComponent(authUser.id),
     { headers: headers }
   );
   var books = booksResp.ok ? await booksResp.json() : [];
@@ -87,6 +90,7 @@ module.exports = async function handler(req, res) {
       bookId: b.id,
       title: b.book_title || 'Untitled book',
       manuscriptUploaded: !!b.manuscript_url,
+      hasAmazonListing: !!b.amazon_link,
       inPool: !!(pool && pool.active),
       availableSlots: availableSlots,
       poolCreatedAt: pool ? pool.created_at : null
@@ -95,13 +99,30 @@ module.exports = async function handler(req, res) {
 
   // Books this author has been assigned to review.
   var toReviewResp = await fetch(
-    SUPABASE_URL + '/rest/v1/review_assignments?select=id,book_id,owner_id,status,assigned_at,completed_at,books(book_title,cover_image_url)&reviewer_id=eq.' +
+    SUPABASE_URL + '/rest/v1/review_assignments?select=id,book_id,owner_id,status,assigned_at,completed_at,review_proof_url,proof_status,books(book_title,cover_image_url)&reviewer_id=eq.' +
       encodeURIComponent(authUser.id) + '&order=assigned_at.desc',
     { headers: headers }
   );
   var toReviewRows = toReviewResp.ok ? await toReviewResp.json() : [];
+
+  // offerType per assignment — needed so the dashboard knows whether to ask
+  // for proof-of-purchase before letting "mark as done" go through (that's
+  // Verified Purchase only, see the 17 August 2026 handover Section 4 item
+  // 7). review_pool_entries is keyed by book_id, same as the assignment.
+  var offerTypeByBook = {};
+  var toReviewBookIds = (toReviewRows || []).map(function (r) { return r.book_id; }).filter(Boolean);
+  if (toReviewBookIds.length) {
+    var tierResp = await fetch(
+      SUPABASE_URL + '/rest/v1/review_pool_entries?select=book_id,offer_type,price_cents&book_id=in.(' + toReviewBookIds.join(',') + ')',
+      { headers: headers }
+    );
+    var tierRows = tierResp.ok ? await tierResp.json() : [];
+    (tierRows || []).forEach(function (t) { offerTypeByBook[t.book_id] = t; });
+  }
+
   var toReview = (toReviewRows || []).map(function (r) {
     var bk = r.books || {};
+    var tier = offerTypeByBook[r.book_id] || {};
     return {
       assignmentId: r.id,
       bookId: r.book_id,
@@ -111,7 +132,11 @@ module.exports = async function handler(req, res) {
       coverImageUrl: bk.cover_image_url || null,
       status: r.status,
       assignedAt: r.assigned_at,
-      completedAt: r.completed_at
+      completedAt: r.completed_at,
+      offerType: tier.offer_type || 'manuscript',
+      priceCents: (typeof tier.price_cents === 'number') ? tier.price_cents : null,
+      reviewProofUrl: r.review_proof_url || null,
+      proofStatus: r.proof_status || null
     };
   });
 
@@ -145,5 +170,19 @@ module.exports = async function handler(req, res) {
     }
   }
 
-  res.status(200).json({ myBooks: myBooks, toReview: toReview, beingReviewed: beingReviewed, beingReviewedEvents: beingReviewedEvents });
+  // Self-reported Amazon reviewer display name, stored in the user's own
+  // auth metadata (no schema migration needed for this bit — see the 17
+  // August 2026 handover Section 4 item 6 for why: it's a reusable,
+  // honesty-based value the reader sets once and every Verified Purchase
+  // proof submission is checked against, same "no Amazon API access to
+  // verify" limitation the rest of this system already documents).
+  var amazonReviewerName = (authUser.user_metadata && authUser.user_metadata.amazon_reviewer_name) || null;
+
+  res.status(200).json({
+    myBooks: myBooks,
+    toReview: toReview,
+    beingReviewed: beingReviewed,
+    beingReviewedEvents: beingReviewedEvents,
+    amazonReviewerName: amazonReviewerName
+  });
 };
