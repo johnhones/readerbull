@@ -1047,19 +1047,21 @@
       // if he doesn't understand them other authors won't either]. Those
       // two numbers still drive the niche-relative rank language in
       // marketAnalysisHtml below, just no longer shown as bare tiles here.
-      // Relabelled "Your BSR" to "Your Category Rank" and added a plain-
-      // language line distinguishing it from the overall store-wide rank
-      // Amazon shows on the listing page itself (the #616 vs #967,327
-      // confusion), the two are different numbers, this was previously
-      // unlabelled.
+      // Kept the "Best Seller Rank" label (John, 18 Aug 2026: authors know
+      // this term, don't replace it) but added a plain-language line
+      // distinguishing it from the overall store-wide rank Amazon shows on
+      // the listing page itself (the #616 vs #967,327 confusion), the two
+      // are different numbers, this was previously unlabelled. An earlier
+      // version of this fix relabelled the tile to "Your Category Rank",
+      // reverted same day per John's explicit correction.
       var categoryLabel = b.amazon_category ? (' in ' + escapeHtml(b.amazon_category)) : '';
 
       return (
         '<div style="margin-top:24px;padding-top:20px;border-top:1px solid rgba(255,255,255,.1);">' +
-          '<div class="eyebrow2" style="margin-bottom:10px;">Your Category Rank</div>' +
+          '<div class="eyebrow2" style="margin-bottom:10px;">Best Seller Rank</div>' +
           '<div style="background:rgba(255,255,255,.06);border:1px solid rgba(255,255,255,.1);border-radius:10px;padding:14px 16px;">' +
             '<div style="font-size:22px;font-weight:800;color:#fff;">' + fmtRank(r.yours) + '</div>' +
-            '<div style="font-size:11px;color:rgba(255,255,255,.55);margin-top:4px;">Your book\'s rank within its own Amazon category' + categoryLabel + ', not the overall store-wide rank Amazon shows on the listing page. A lower rank means more sales.</div>' +
+            '<div style="font-size:11px;color:rgba(255,255,255,.55);margin-top:4px;">Best Seller Rank within your book\'s own Amazon category' + categoryLabel + ', not the overall store-wide rank Amazon shows on the listing page. A lower rank means more sales.</div>' +
           '</div>' +
         '</div>'
       );
@@ -1254,7 +1256,7 @@
 // Paced progress bar, not tied to real elapsed time: eases toward
     // 90% over ~20s then holds until the response actually lands, so
     // it never shows a raw ticking second count.
-    var loadingMessages = ['Pulling your live Amazon listing…', 'Readerbull is sniffing out your competition…', 'Researching bullish keywords…', 'Finding profitable categories for your book…', 'Creating your Readerbull strategy…'];
+    var loadingMessages = ['Pulling your live Amazon listing…', 'Readerbull is analyzing your competition…', 'Researching bullish keywords…', 'Finding profitable categories for your book…', 'Creating your Readerbull strategy…'];
     var loadingMsgIndex = 0;
     refreshLoadingMessageEl.textContent = loadingMessages[0];
     refreshLoadingBarEl.style.width = '0%';
