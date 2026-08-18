@@ -385,6 +385,12 @@ failures (e.g. a failed import), which is what made this feel loud. */
 .callout-orange { border-left-color: var(--orange); background: var(--orange-l); }
 .callout strong { color: var(--black); }
 
+/* Market Analysis headed short sections (added Aug 2026, per John: replaces the old single dense paragraph with short headed blocks so it reads clearly, not as a wall of text). */
+.ma-block { margin-top: 16px; padding-top: 14px; border-top: 1px solid var(--border); }
+.ma-block:first-child { margin-top: 0; padding-top: 0; border-top: none; }
+.ma-heading { font-size: 13px; font-weight: 700; letter-spacing: .3px; color: var(--teal-d); margin-bottom: 4px; }
+.ma-body { font-size: 14px; color: var(--mid); line-height: 1.6; }
+
 .step { display: flex; gap: 16px; align-items: flex-start; padding: 18px 20px; border-radius: 4px; margin-bottom: 10px; }
 .step:last-child { margin-bottom: 0; }
 .step-teal   { background: var(--teal-l);   border-left: 4px solid var(--teal); }
