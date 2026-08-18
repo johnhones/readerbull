@@ -1095,6 +1095,18 @@ async function generateNarrative(input, competitors, pageRank, nicheStats) {
     'step suggesting the author think about a second, related title, since a second book compounds ' +
     'discoverability (cross-sell, a new keyword footprint, a new category placement). Do not suggest ' +
     'this if authorBookCount is missing, null, or greater than 1. ' +
+    'Book Insight (rewritten 18 August 2026, per John: the old version read as confusing jargon, not ' +
+    'encouraging): bookInsight is the very first thing an author sees about their book, it must feel ' +
+    'encouraging and rewarding, never confusing or technical. Never state a rank comparison as a ratio ' +
+    'or multiple, phrases like "150 times deeper in rank" or "3x behind" mean nothing to an author and ' +
+    'must never appear here or anywhere else in the narrative. Lead with genuine good news the data ' +
+    'actually supports (star rating, review quality, evergreen or real demand) before naming any gap. ' +
+    'When nicheStats.estimatedNicheRevenue is given, reference it concretely to make the opportunity ' +
+    'feel real and enticing, for example noting that comparable books in this niche are earning roughly ' +
+    'that much a month, never invent a figure if it is missing. If you mention building reviews toward ' +
+    'the Amazon Ads threshold here, phrase it as an encouraging range ("build to 10-15 reviews"), never ' +
+    'a single bald number like "you need exactly 15". Write 2-3 short, warm sentences, not one dense ' +
+    'sentence, and end on the single clearest next action. ' +
     'Professional Assessment: write a short, direct verdict (2 short paragraphs) for the Overview tab, in ' +
     'the voice of an experienced KDP consultant giving a straight read of where this book stands right now. ' +
     'Ground it in nicheStats.bestSellerRank (how this book\'s best category placement compares to the niche ' +
@@ -1125,7 +1137,7 @@ async function generateNarrative(input, competitors, pageRank, nicheStats) {
     'rough order when the data supports it: how the book\'s rank compares to the niche, its review ' +
     'and rating position, and the competitive landscape (competitor count/revenue if given). ' +
     'Respond with ONLY a JSON object, no markdown fences, no commentary, matching exactly this shape: ' +
-    '{"bookInsight": "one bolded-worthy sentence summarising the single biggest takeaway", ' +
+    '{"bookInsight": "2-3 short, encouraging sentences, see Book Insight guidance above", ' +
     '"marketAnalysis": [{"heading": "short heading", "body": "1-2 short sentences"}], ' +
     '"strategySteps": [{"title": "short step title", "body": "1-2 sentences, specific to this book\'s data"}], ' +
     '"quickWins": [{"title": "short action title", "body": "1-2 sentences on why this is the next best move"}], ' +
