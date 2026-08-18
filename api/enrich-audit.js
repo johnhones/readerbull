@@ -120,21 +120,38 @@ module.exports = async function handler(req, res) {
   var input = req.body || {};
   var result = { competitors: [], pageRank: null, keywordResearch: null, narrative: null };
 
-  var competitors = await findCompetitors(input);
-
-  // Competitor bestseller rank (3 August 2026): bounded to the top 2
-  // competitors only, one extra paid SerpApi call each, same
-  // cost-bounded philosophy already used for findPageRank below ("one
-  // extra call per book, not per item"). Powers the Overview "Best
-  // Seller Rank: yours vs niche average vs top competitor" comparison.
-  // Best-effort: a competitor without a resolvable BSR just doesn't
-  // contribute to the average rather than blocking the rest of the audit.
-  await attachCompetitorBsr(competitors);
+  // Parallelised (18 August 2026, per John: audits were taking too long).
+  // These three used to run one after another (competitors+BSR, then
+  // page rank, then keyword research), each a several-second SerpApi/
+  // DataForSEO round trip, so their latency simply added up. None of the
+  // three depends on either of the others' output: findCompetitors and
+  // findPageRank both only read `input`, and findKeywordResearch (with
+  // its own internal Anthropic classify call) only reads `input` too.
+  // Running them concurrently means the wait is however long the
+  // slowest one takes, not the sum of all three. Only generateNarrative
+  // below has a real dependency (it needs competitors, pageRank and
+  // nicheStats), so it correctly still runs after this settles, not
+  // inside it.
+  var parallelResults = await Promise.all([
+    (async function () {
+      var competitors = await findCompetitors(input);
+      // Competitor bestseller rank (3 August 2026): bounded to the top 2
+      // competitors only, one extra paid SerpApi call each, same
+      // cost-bounded philosophy already used for findPageRank below ("one
+      // extra call per book, not per item"). Powers the Overview "Best
+      // Seller Rank: yours vs niche average vs top competitor" comparison.
+      // Best-effort: a competitor without a resolvable BSR just doesn't
+      // contribute to the average rather than blocking the rest of the audit.
+      await attachCompetitorBsr(competitors);
+      return competitors;
+    })(),
+    findPageRank(input),
+    findKeywordResearch(input)
+  ]);
+  var competitors = parallelResults[0];
   result.competitors = competitors;
-
-  result.pageRank = await findPageRank(input);
-
-  result.keywordResearch = await findKeywordResearch(input);
+  result.pageRank = parallelResults[1];
+  result.keywordResearch = parallelResults[2];
 
   var nicheStats = estimateNicheStats(input, competitors);
   var assessmentTags = buildAssessmentTags(input, result.pageRank);
