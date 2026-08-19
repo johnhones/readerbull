@@ -837,6 +837,47 @@
       );
     }
 
+    // Book Insight 4-bullet render (built 19 August 2026, replaces the old
+    // single-sentence/paragraph bookInsight narrative, per rule 17 in
+    // ReaderBull_Project_Rules.md). Shared by bookSummaryHtml below and
+    // marketAnalysisHtml further down, since rule 17 requires both render
+    // sites to move to bullets together, not just the Book Summary card.
+    // Reuses the existing .item/.item-icon/.icon-teal/.item-b icon-circle
+    // classes already used elsewhere on this page (style.css), per Project
+    // Rules rule 3 (extend the existing design system rather than invent
+    // new CSS), all four bullets use icon-teal (never a teal/orange mix,
+    // per rule 17's colour note).
+    //
+    // narrative.bookInsight is now an object with exactly these 4 keys
+    // (see the rewritten prompt in api/enrich-audit.js), not the old
+    // single-string or 2-paragraph shape this branch previously had.
+    // Older stored narratives (anything audited before this shipped) do
+    // not satisfy hasAllBullets below, same graceful "render nothing until
+    // the data is there" convention already used elsewhere in this file:
+    // that book's insight will show blank here until its next audit
+    // repopulates bookInsight in this new shape. Not backfilled
+    // automatically, flagged in the build handover rather than silently
+    // assumed.
+    var BOOK_INSIGHT_BULLETS = [
+      { key: 'potential', label: 'Potential', icon: '&#36;' },
+      { key: 'whatsWorking', label: "What's working", icon: '&#10003;' },
+      { key: 'whatNeedsAttention', label: 'What needs attention', icon: '&#33;' },
+      { key: 'whatToDoNext', label: 'What to do next', icon: '&#8594;' }
+    ];
+    function bookInsightBulletsHtml(insight) {
+      if (!insight || typeof insight !== 'object' || Array.isArray(insight)) return '';
+      var hasAllBullets = BOOK_INSIGHT_BULLETS.every(function (def) { return !!insight[def.key]; });
+      if (!hasAllBullets) return '';
+      return BOOK_INSIGHT_BULLETS.map(function (def) {
+        return (
+          '<div class="item">' +
+            '<div class="item-icon icon-teal">' + def.icon + '</div>' +
+            '<div class="item-b"><span style="font-weight:700;color:var(--black);">' + escapeHtml(def.label) + ':</span> ' + escapeHtml(insight[def.key]) + '</div>' +
+          '</div>'
+        );
+      }).join('');
+    }
+
     function bookSummaryHtml(b) {
       var narrative = b.audit_narrative_json;
       var stats = narrative && narrative.nicheStats;
@@ -857,9 +898,9 @@
       // cleanly without a bigger refactor.
       var descHtml = '';
 
-      var insightHtml = insight
-        ? '<p style="font-weight:400;color:var(--navy);margin-bottom:4px;">' + escapeHtml(insight) + '</p>'
-        : '';
+      // Bullet format built 19 August 2026, replaces the old single-string
+      // narrative render (see bookInsightBulletsHtml above).
+      var insightHtml = bookInsightBulletsHtml(insight);
 
       var competitorCount = stats && stats.competitorCount > 0 ? stats.competitorCount : null;
       var revenue = stats ? stats.estimatedNicheRevenue : null;
@@ -1471,9 +1512,10 @@
     // 3 discrete checkmark insight items here, that needs a narrative
     // schema change (structured insight points, not just a paragraph
     // blob) not made this session, flagged as a follow-up.
-    var insightHtml = (narrative && narrative.bookInsight)
-      ? '<div class="callout">' + escapeHtml(narrative.bookInsight) + '</div>'
-      : '';
+    // Bullet format built 19 August 2026, replaces the old single-string
+    // narrative render (see bookInsightBulletsHtml above bookSummaryHtml).
+    var insightBulletsHtml = bookInsightBulletsHtml(narrative && narrative.bookInsight);
+    var insightHtml = insightBulletsHtml ? '<div class="callout">' + insightBulletsHtml + '</div>' : '';
 
     return (
       '<div class="sec-label">Market Analysis</div>' +
