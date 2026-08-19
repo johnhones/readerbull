@@ -1041,7 +1041,19 @@ async function generateNarrative(input, competitors, pageRank, nicheStats) {
     },
     scoreBreakdown: breakdown,
     competitors: competitors,
-    nicheStats: nicheStats || null
+    nicheStats: nicheStats || null,
+    // Added 19 August 2026 for the rebuilt bookInsight "what needs
+    // attention" bullet (rule 17/18): the author's own chosen Growth
+    // Tracker competitors, once that table exists (not built yet). Each
+    // entry expected as {name, rank, monthlyRevenue}, sourced from real
+    // tracked-competitor data, never computed here. Until the Growth
+    // Tracker ships and its caller passes input.trackedCompetitors, this
+    // is always null and the prompt below falls back to niche-relative
+    // language with no named competitors, per the "never invent data"
+    // rule. No caller currently sets input.trackedCompetitors, this field
+    // is forward-compatible plumbing only, added now so the Growth
+    // Tracker build doesn't need to touch this prompt again later.
+    trackedCompetitors: Array.isArray(input.trackedCompetitors) ? input.trackedCompetitors : null
   };
 
   // Content-quality rewrite, 29 July 2026 (ReaderBull_Next_Chat_Handover_Prompt.md
@@ -1095,6 +1107,55 @@ async function generateNarrative(input, competitors, pageRank, nicheStats) {
     'step suggesting the author think about a second, related title, since a second book compounds ' +
     'discoverability (cross-sell, a new keyword footprint, a new category placement). Do not suggest ' +
     'this if authorBookCount is missing, null, or greater than 1. ' +
+    'Book Insight (rebuilt as 4 bullets, 19 August 2026, per rule 17 in ReaderBull_Project_Rules.md, ' +
+    'replaces the old single-sentence format entirely): bookInsight is the very first thing an author sees ' +
+    'about their book and must feel like a real opportunity, not a data report. It is now an object with ' +
+    'exactly these 4 keys, potential, whatsWorking, whatNeedsAttention, whatToDoNext (see the JSON shape ' +
+    'below), each a single string of 1-2 short, warm sentences, never an array and never one long block ' +
+    'of text. Vary your phrasing, structure and word choice meaningfully from book to book, this must ' +
+    'never read like the same template sentence with numbers swapped in. Never state a rank comparison ' +
+    'as a ratio or multiple ("150 times deeper", "3x behind"), that phrasing is banned everywhere in the ' +
+    'narrative, not just here. Never use the term "rank gap" or any other internal-sounding jargon label ' +
+    'anywhere in these 4 bullets, state the actual numbers plainly instead, the numbers already carry the ' +
+    'meaning. ' +
+    'potential: name a concrete real revenue figure for top books in this niche, sourced only from ' +
+    'nicheStats.benchmarkCompetitor.estimatedRevenue or nicheStats.targetRevenue/revenueRange, phrased ' +
+    'like "top books in this niche earn around $X/month". If revenue data is genuinely missing, name the ' +
+    'niche\'s real demand instead (nicheStats.estimatedNicheRevenue or competitorCount) rather than ' +
+    'inventing a number or falling back to jargon. ' +
+    'whatsWorking: name the book\'s genuinely strong metric(s), reviews and/or rating, stated plainly. ' +
+    'Only credit book.rating as a positive signal once book.reviewCount is 3 or higher, a perfect average ' +
+    'built on 1-2 reviews is not credible evidence of anything and must not be praised as if it were. If ' +
+    'neither reviews nor rating are genuinely strong yet, say so honestly rather than inventing a strength ' +
+    'that is not there, for example note plainly that nothing there is holding the book back and point ' +
+    'forward to where the real opportunity is, never force a compliment the data does not support. ' +
+    'whatNeedsAttention: the real gap, using actual numbers. Ground this in nicheStats.bestSellerRank, ' +
+    'book\'s own category rank (nicheStats.bestSellerRank.yours) against nicheAverage and/or ' +
+    'topCompetitor. When trackedCompetitors is given (the author\'s own chosen Growth Tracker competitors, ' +
+    'each with name, rank and monthlyRevenue, real tracked data, never invented or estimated by you), name ' +
+    'up to 2 of them by name, but only after introducing them first, for example "one similar book you\'re ' +
+    'tracking, [name]," or "two similar books you\'re tracking, [name] and [name],", never drop a name in ' +
+    'cold with no lead-in. Follow the name(s) immediately with that competitor\'s real category rank, then ' +
+    'its real monthly sales figure from trackedCompetitors, in the pattern "sit at A and B. Monthly sales ' +
+    'are $X and $Y, respectively." (adjust to singular for one competitor). When trackedCompetitors is ' +
+    'empty or not given, which is the normal case until the author has added tracked competitors on their ' +
+    'Growth Tracker, do not name any competitor, use niche-relative language instead, comparing this ' +
+    'book\'s own rank against nicheAverage and/or topCompetitor plainly, then name the real cause ' +
+    '(visibility and discoverability, keyword coverage, category fit, whichever the data best supports), ' +
+    'never book quality. Either way, end by naming the real cause of the gap plainly, this is the pattern ' +
+    'to follow, using only real data every time, never these literal names, numbers or exact wording: ' +
+    '"your book sits at 195 in its category. Two similar books you\'re tracking, Bake & Blend Co. and The ' +
+    'Herbal Kitchen, sit at 55 and 31. Monthly sales are $410 and $748, respectively. That gap is ' +
+    'visibility and discoverability, not book quality." ' +
+    'whatToDoNext: the plain-English next action. Point at the Growth Tracker by name generally ("track ' +
+    'your progress on your Growth Tracker"), never re-list any competitor name(s) already used in ' +
+    'whatNeedsAttention. Mention ensuring the book listing is fully optimised and running a paid ads ' +
+    'campaign. Keep this short: no ad budget figures, no ad-return target, no sales-per-spend ratio. ' +
+    'Apply rule 14\'s tone (ReaderBull_Project_Rules.md) to all 4 bullets: confident and direct, never ' +
+    'hedge ("likely", "probably", "may be"), and whenever a bullet names a strong metric only to rule it ' +
+    'out as the cause of a gap, credit that metric plainly first, then name the real cause, never state ' +
+    'that a strong metric helped cause or is responsible for a gap the book is losing on, that is ' +
+    'logically backwards. ' +
     'Professional Assessment: write a short, direct verdict (2 short paragraphs) for the Overview tab, in ' +
     'the voice of an experienced KDP consultant giving a straight read of where this book stands right now. ' +
     'Ground it in nicheStats.bestSellerRank (how this book\'s best category placement compares to the niche ' +
@@ -1113,7 +1174,10 @@ async function generateNarrative(input, competitors, pageRank, nicheStats) {
     'guides, tax-season, back-to-school, diet-after-New-Year). Default to "Evergreen" unless the subject ' +
     'clearly fits one of the other two, most self-published non-fiction and fiction is evergreen. ' +
     'Respond with ONLY a JSON object, no markdown fences, no commentary, matching exactly this shape: ' +
-    '{"bookInsight": "one bolded-worthy sentence summarising the single biggest takeaway", ' +
+    '{"bookInsight": {"potential": "real earning potential for top books in this niche", ' +
+    '"whatsWorking": "the book\'s genuinely strong metric(s), stated plainly", ' +
+    '"whatNeedsAttention": "the real gap, named competitors if trackedCompetitors is given, niche-relative if not", ' +
+    '"whatToDoNext": "the plain-English next action, points at the Growth Tracker generally"}, ' +
     '"marketAnalysis": "2-3 short paragraphs on where this book stands versus the competitors given", ' +
     '"strategySteps": [{"title": "short step title", "body": "1-2 sentences, specific to this book\'s data"}], ' +
     '"quickWins": [{"title": "short action title", "body": "1-2 sentences on why this is the next best move"}], ' +
