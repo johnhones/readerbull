@@ -211,6 +211,12 @@ async function handleAdd(req, res) {
     return;
   }
 
+  try {
+    await ensureOwnSnapshot(bookId, auth.userId, serviceKey);
+  } catch (err) {
+    // best-effort, see comment on ensureOwnSnapshot
+  }
+
   res.status(200).json({ trackedCompetitor: inserted });
 }
 
@@ -236,7 +242,8 @@ async function insertOneTrackedCompetitor(bookId, userId, resolved, serviceKey) 
       user_id: userId,
       title: resolved.title,
       amazon_url: resolved.amazonUrl || null,
-      asin: resolved.asin || null
+      asin: resolved.asin || null,
+      cover_image_url: resolved.coverImage || null
     })
   });
 
@@ -266,6 +273,49 @@ async function insertOneTrackedCompetitor(bookId, userId, resolved, serviceKey) 
   }
 
   return inserted;
+}
+
+// Ensures the author's own book has an 'own' snapshot for the CURRENT
+// week the moment any competitor gets tracked (add or auto-populate),
+// rather than waiting for the weekly cron (handleSnapshotJob), which can
+// be up to 6 days away. Without this, gtTrendHtml's "Your book" series
+// has no data point at all until the next Monday run, which is what
+// produced the "the line charts... there's nothing on it" bug reported
+// 20 August 2026 (gtTrendHtml itself was never buggy, see its own comment
+// in dashboard.html, there was simply no row yet to read). Reads the
+// exact same fields handleSnapshotJob's own-book pass already reads
+// (live_review_count, audit_narrative_json.nicheStats), so this never
+// invents a number the weekly job wouldn't also have produced, it just
+// produces it up to 6 days sooner. upsertSnapshot's own
+// on_conflict=subject_key,week_start merge makes this idempotent, so
+// calling it more than once in the same week (e.g. an author adds two
+// competitors back to back) is a harmless no-op the second time round,
+// not a duplicate row. Best-effort: never blocks the add/auto-populate
+// response if it fails.
+async function ensureOwnSnapshot(bookId, userId, serviceKey) {
+  var ownResp = await fetch(
+    SUPABASE_URL + '/rest/v1/books?select=id,user_id,live_review_count,audit_narrative_json&id=eq.' + encodeURIComponent(bookId),
+    { headers: { apikey: serviceKey, Authorization: 'Bearer ' + serviceKey } }
+  );
+  var ownRows = ownResp.ok ? await ownResp.json() : [];
+  var ownBook = Array.isArray(ownRows) ? ownRows[0] : null;
+  if (!ownBook) return;
+
+  var nicheStats = (ownBook.audit_narrative_json && ownBook.audit_narrative_json.nicheStats) || {};
+  var ownRank = (nicheStats.bestSellerRank && typeof nicheStats.bestSellerRank.yours === 'number') ? nicheStats.bestSellerRank.yours : null;
+  var ownRevenue = (typeof nicheStats.yourEstimatedRevenue === 'number') ? nicheStats.yourEstimatedRevenue : null;
+
+  await upsertSnapshot({
+    bookId: bookId,
+    userId: userId,
+    snapshotType: 'own',
+    trackedCompetitorId: null,
+    subjectKey: 'own:' + bookId,
+    reviews: (typeof ownBook.live_review_count === 'number') ? ownBook.live_review_count : null,
+    categoryRank: ownRank,
+    estimatedRevenue: ownRevenue,
+    serviceKey: serviceKey
+  });
 }
 
 // ---------- action=auto-populate ----------
@@ -355,10 +405,23 @@ async function handleAutoPopulate(req, res) {
       amazonUrl: 'https://www.amazon.com/dp/' + c.asin,
       reviewCount: (typeof c.reviews === 'number') ? c.reviews : null,
       bestsellerRank: (typeof c.bestsellerRank === 'number') ? c.bestsellerRank : null,
-      estimatedRevenue: (estimatedRevenue != null) ? Math.round(estimatedRevenue) : null
+      estimatedRevenue: (estimatedRevenue != null) ? Math.round(estimatedRevenue) : null,
+      // findCompetitors/attachCompetitorBsr pass through whatever real
+      // thumbnail SerpApi gave them (see enrich-audit.js's
+      // fromBoughtTogether/trySerpApiCompetitorCandidates), null when
+      // Amazon didn't return one for that listing, never invented.
+      coverImage: c.image || null
     };
     var inserted = await insertOneTrackedCompetitor(bookId, auth.userId, resolved, serviceKey);
     if (inserted) addedCount++;
+  }
+
+  if (addedCount > 0) {
+    try {
+      await ensureOwnSnapshot(bookId, auth.userId, serviceKey);
+    } catch (err) {
+      // best-effort, see comment on ensureOwnSnapshot
+    }
   }
 
   res.status(200).json({ ok: true, added: addedCount });
@@ -608,6 +671,12 @@ async function fetchAmazonProduct(asin, apiKey) {
   var price = parsePrice(product.price);
   var estimatedRevenue = estimateMonthlyRevenue(storeWideRank, price);
 
+  // Same fallback chain as api/import-book.js's coverImage extraction
+  // (thumbnails[0], then thumbnail), so a manually-added or auto-populated
+  // competitor's cover art comes from the identical field Amazon actually
+  // returns, not a guess at which one SerpApi populated this time.
+  var coverImage = (product.thumbnails && product.thumbnails[0]) || product.thumbnail || null;
+
   return {
     asin: asin,
     title: product.title || null,
@@ -617,7 +686,8 @@ async function fetchAmazonProduct(asin, apiKey) {
     bestsellerRank: bestRank,
     storeWideRank: storeWideRank,
     price: price,
-    estimatedRevenue: (estimatedRevenue != null) ? Math.round(estimatedRevenue) : null
+    estimatedRevenue: (estimatedRevenue != null) ? Math.round(estimatedRevenue) : null,
+    coverImage: coverImage
   };
 }
 

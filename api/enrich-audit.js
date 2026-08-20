@@ -224,7 +224,13 @@ async function findCompetitors(input) {
         reviews: r.reviews || null,
         price: r.price || null,
         sponsored: false,
-        position: i + 1
+        position: i + 1,
+        // Passed straight through from import-book.js's boughtTogether
+        // mapping (r.image there), which already applied the same
+        // thumbnails[0]/thumbnail fallback used for the author's own
+        // cover, so Growth Tracker's competitor pills (20 August 2026)
+        // can show real cover art with zero new SerpApi calls.
+        image: r.image || null
       };
     });
   if (fromBoughtTogether.length) return fromBoughtTogether;
@@ -283,7 +289,12 @@ async function trySerpApiCompetitorCandidates(candidates, apiKey, ownAsin) {
             reviews: r.reviews || null,
             price: r.price || null,
             sponsored: !!r.sponsored,
-            position: r.position || null
+            position: r.position || null,
+            // Same thumbnails[0]/thumbnail fallback as import-book.js's
+            // coverImage extraction, SerpApi's Amazon Search engine
+            // (engine=amazon) returns the same thumbnail shape as
+            // amazon_product does, confirmed against a live response.
+            image: (r.thumbnails && r.thumbnails[0]) || r.thumbnail || null
           };
         });
 
