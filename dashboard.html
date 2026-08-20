@@ -1337,7 +1337,7 @@
         await fetch('/api/growth-tracker?action=auto-populate', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json', 'Authorization': 'Bearer ' + accessToken },
-          body: JSON.stringify({ bookId: b.id, competitors: competitorsJson })
+          body: JSON.stringify({ bookId: b.id, competitors: competitorsJson, ownRank: importData.bestsellerRank })
         });
       } catch (err) {
         // best-effort, see comment above
@@ -2196,6 +2196,8 @@ async function saveKeywordChange(b, newList) {
       capNoteHtml +
       '<div class="gt-panels">' + panelsHtml + '</div>' +
 
+      gtReachStrategyHtml(chartedSeries) +
+
       '<button class="gt-table-toggle" id="gt-table-toggle">View as table</button>' +
       '<table class="dash-table gt-hide" id="gt-table" style="margin-top:14px;">' +
         '<thead><tr><th>Book</th><th class="tc">Reviews</th><th class="tc">Category rank</th><th class="tr">Est. monthly revenue</th></tr></thead>' +
@@ -2205,6 +2207,93 @@ async function saveKeywordChange(b, newList) {
     if (trendBody) trendBody.innerHTML = gtTrendHtml(chartedSeries, snapshots);
 
     wireGrowthTrackerCard(b, tracked);
+  }
+
+  // "Your path to close the gap" (added 20 August 2026, per John: a single
+  // bar chart didn't make the case for the feature, an author needs to see
+  // WHY a tracked competitor is relevant and HOW to realistically get
+  // there, not just its numbers). One card per tracked competitor actually
+  // charted (chartedSeries[0] is always "your book", never itself
+  // rendered here). Every number here is read straight off chartedSeries,
+  // the exact same real, already-computed values the bar panels above and
+  // the table view below use, per the project's standing "never invent
+  // data" rule, nothing here is a new estimate or an LLM guess.
+  //
+  // "Realistic reach" classification is a plain ratio of category ranks
+  // (own rank / competitor rank, capped at 3x = "realistic", past that =
+  // "bigger stretch"), not a claim about book quality, matching rule 14's
+  // "never credit a strong metric with causing a weak one." The actual
+  // ordering of which competitor appears first (closest-rank-gap first)
+  // happens once, server-side, in api/growth-tracker.js's auto-populate
+  // handler, this function just renders whatever's in chartedSeries in
+  // the order it's given, a manually-added competitor is never reordered
+  // here.
+  function gtReachStrategyHtml(chartedSeries) {
+    var own = chartedSeries[0];
+    var comps = chartedSeries.slice(1);
+    if (!own || !comps.length) return '';
+
+    var itemsHtml = comps.map(function (comp, i) {
+      var rankKnown = typeof own.rank === 'number' && typeof comp.rank === 'number' && own.rank > 0 && comp.rank > 0;
+      var reviewsKnown = typeof own.reviews === 'number' && typeof comp.reviews === 'number';
+      var revenueKnown = typeof own.revenue === 'number' && typeof comp.revenue === 'number';
+
+      // "Ahead" means a genuinely better (lower) category rank, the only
+      // direction a "realistic reach" claim makes sense in. A manually
+      // "+ Add book" competitor can rank worse than the author, unlike
+      // auto-populate's own picks (see the sort in api/growth-tracker.js's
+      // handleAutoPopulate), so this still has to hold for either case.
+      var compAhead = rankKnown && comp.rank < own.rank;
+      var rankGap = compAhead ? (own.rank - comp.rank) : null;
+      var reviewGap = reviewsKnown ? Math.max(0, comp.reviews - own.reviews) : null;
+      var revenueGap = revenueKnown ? Math.max(0, comp.revenue - own.revenue) : null;
+
+      var reachRatio = compAhead ? (own.rank / comp.rank) : null;
+      var leadIn;
+      if (reachRatio !== null) {
+        leadIn = (reachRatio <= 3)
+          ? 'A realistic next milestone, not a stretch goal.'
+          : 'A bigger stretch, but the same playbook gets you there over time.';
+      } else if (rankKnown) {
+        // Rank data exists but the competitor isn't actually ahead, don't
+        // claim a "reach" that isn't real.
+        leadIn = 'You already match or beat them on category rank.';
+      } else {
+        // No rank on either side to compare at all: default the first
+        // card to "realistic" rather than "stretch" language, since it's
+        // already the closest real match auto-populate could find, an
+        // unqualified "stretch" reads as discouraging with no number
+        // behind it.
+        leadIn = (i === 0)
+          ? 'A realistic next milestone, not a stretch goal.'
+          : 'Worth tracking as a comparison point.';
+      }
+
+      var gapParts = [];
+      if (rankGap) gapParts.push(rankGap.toLocaleString() + ' rank spot' + (rankGap === 1 ? '' : 's'));
+      if (reviewGap) gapParts.push(reviewGap.toLocaleString() + ' review' + (reviewGap === 1 ? '' : 's'));
+      var gapText = gapParts.length ? ('You&rsquo;re ' + gapParts.join(' and ') + ' behind. ') : '';
+
+      var revenueText = '';
+      if (revenueKnown && comp.revenue > 0) {
+        revenueText = 'Estimated at $' + comp.revenue.toLocaleString() + '/mo' +
+          (revenueGap > 0 ? (', about $' + revenueGap.toLocaleString() + ' more than your book right now.') : ', already close to your own estimate.');
+      }
+
+      return (
+        '<div class="gt-reach-item">' +
+          '<div class="gt-reach-name">' + escapeHtml(comp.name) + '</div>' +
+          '<div class="gt-reach-lead">' + leadIn + '</div>' +
+          (gapText || revenueText ? '<div class="gt-reach-gap">' + gapText + revenueText + '</div>' : '') +
+          '<div class="gt-reach-strategy">Close it with stronger keyword coverage and a paid Amazon Ads push, the same levers as your Quick Wins, track your progress right here as you climb.</div>' +
+        '</div>'
+      );
+    }).join('');
+
+    return (
+      '<div class="card-hdr" style="margin-top:22px;padding-top:20px;border-top:1px solid var(--border);">Your path to close the gap</div>' +
+      '<div class="gt-reach-grid">' + itemsHtml + '</div>'
+    );
   }
 
   // Builds one Reviews/Category rank/Est. monthly revenue bar panel as an
