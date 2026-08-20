@@ -2381,11 +2381,22 @@ async function saveKeywordChange(b, newList) {
       if (flagged) {
         metaHtml += ' &middot; <span class="pill pill-orange">Link needs fixing</span>';
       }
+      // "Read manuscript" only makes sense for the Manuscript tier — Kindle
+      // Unlimited and Verified Purchase books were never uploaded as a PDF,
+      // so r.manuscriptPath points at a file that doesn't exist for them.
+      // Showing the button anyway used to end in a raw alert() when the
+      // signed-URL fetch failed (found 20 August 2026, live two-account
+      // test). The reviewer already saw "Buy on Amazon" on the Library
+      // card they claimed this from, so for those two tiers we just omit
+      // the button rather than invent a second Amazon link here.
+      var readBtnHtml = (!r.offerType || r.offerType === 'manuscript')
+        ? '<button type="button" class="btn btn-outline arc-read-btn" data-path="' + escapeHtmlLocal(r.manuscriptPath) + '">Read manuscript</button>'
+        : '';
       var actionHtml = flagged
         ? '<button type="button" class="btn btn-outline arc-fix-proof-btn" data-assignment-id="' + r.assignmentId + '">Fix submission</button>'
         : r.status === 'completed'
         ? ''
-        : '<button type="button" class="btn btn-outline arc-read-btn" data-path="' + escapeHtmlLocal(r.manuscriptPath) + '">Read manuscript</button>' +
+                : readBtnHtml +
           (notYetEligible
             ? '<span class="arc-row-meta" style="align-self:center;">Mark as done in ' + daysLeft + ' day' + (daysLeft === 1 ? '' : 's') + '</span>'
             : '<button type="button" class="btn btn-primary arc-done-btn" data-assignment-id="' + r.assignmentId + '" data-offer-type="' + (r.offerType || 'manuscript') + '">Mark as done</button>');
