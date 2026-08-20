@@ -1326,6 +1326,24 @@
       // swallow, this step is best-effort, same as onboarding.html
     }
 
+    // Growth Tracker auto-populate (20 August 2026, see onboarding.html's
+    // matching call for the full reasoning). Covers both a brand new book
+    // being refreshed for the first time and an older book whose audit
+    // predates this feature, either way the server-side handler only ever
+    // acts when this book has zero tracked competitors, so it can never
+    // overwrite a competitor the author added themselves.
+    if (competitorsJson && competitorsJson.length) {
+      try {
+        await fetch('/api/growth-tracker?action=auto-populate', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json', 'Authorization': 'Bearer ' + accessToken },
+          body: JSON.stringify({ bookId: b.id, competitors: competitorsJson })
+        });
+      } catch (err) {
+        // best-effort, see comment above
+      }
+    }
+
     var scoreResult = computeDiscoverabilityScore({
       title: importData.title || b.book_title,
       reviewCount: importData.reviewCount,

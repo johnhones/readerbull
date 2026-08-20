@@ -639,6 +639,27 @@ narrativeJson.keywordResearch = enrichData.keywordResearch;
 // swallow, this step is best-effort
 }
 
+// Growth Tracker auto-populate (20 August 2026, per John: new/
+// inexperienced authors won't know what "+ Add book" is for, so seed
+// the tracker with real competitors from this same audit's already-
+// fetched data immediately, rather than leaving it empty until the
+// author discovers the manual control themselves). Best-effort, same
+// swallow-on-failure convention as the enrich-audit call just above:
+// never blocks onboarding if this fails, and the server-side handler
+// itself is a no-op whenever the book already has any tracked
+// competitor, so this can never overwrite a manual choice.
+if (competitorsJson && competitorsJson.length) {
+try {
+await fetch('/api/growth-tracker?action=auto-populate', {
+method: 'POST',
+headers: { 'Content-Type': 'application/json', 'Authorization': 'Bearer ' + accessToken },
+body: JSON.stringify({ bookId: b.rowId, competitors: competitorsJson })
+});
+} catch (err) {
+// best-effort, see comment above
+}
+}
+
 var scoreResult = computeDiscoverabilityScore({
 title: b.title,
 reviewCount: b.reviewCount,
