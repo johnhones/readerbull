@@ -252,6 +252,58 @@
 <script src="scoring.js"></script>
 <script>
 (async function () {
+  // Book Insight 4-bullet render (built 19 August 2026, replaces the old
+  // single-sentence/paragraph bookInsight narrative, per rule 17 in
+  // ReaderBull_Project_Rules.md). Shared by bookSummaryHtml (nested inside
+  // renderOverview further down) and marketAnalysisHtml (a top-level
+  // sibling function further still), since rule 17 requires both render
+  // sites to move to bullets together, not just the Book Summary card.
+  //
+  // Placed here, as the very first statement in this IIFE, before even
+  // requireUser()/await, after TWO separate live bugs from getting this
+  // positioning wrong:
+  //  1. First added nested INSIDE renderOverview(), invisible to the
+  //     sibling marketAnalysisHtml -> ReferenceError on every load.
+  //  2. Fixed #1 by hoisting to this top-level scope, but left the
+  //     definition physically further down the file (just above
+  //     renderOverview()'s own definition). Function declarations
+  //     (bookInsightBulletsHtml) are fully hoisted regardless of position,
+  //     but `var BOOK_INSIGHT_BULLETS = [...]` is only hoisted as a
+  //     declaration (value undefined) until execution actually reaches
+  //     that line. The very first render (`renderOverview()` in the
+  //     legacyBook dispatch below) runs BEFORE that line was reached,
+  //     so BOOK_INSIGHT_BULLETS was still undefined the instant a real
+  //     book got selected -> TypeError: Cannot read properties of
+  //     undefined (reading 'every'), thrown synchronously, uncaught,
+  //     aborting the rest of this IIFE (including the tab-switching
+  //     click handlers near the end) on every single page load with at
+  //     least one book. Same root failure mode as bug #1 (a render call
+  //     reaching this code before it's actually available), different
+  //     mechanism (value-hoisting order, not closure visibility).
+  // Moving the assignment itself to the top of the IIFE, ahead of every
+  // await and every render call, removes the ordering hazard entirely
+  // rather than just moving it further down the same list of things that
+  // could still run first.
+  var BOOK_INSIGHT_BULLETS = [
+    { key: 'potential', label: 'Potential', icon: '&#36;' },
+    { key: 'whatsWorking', label: "What's working", icon: '&#10003;' },
+    { key: 'whatNeedsAttention', label: 'What needs attention', icon: '&#33;' },
+    { key: 'whatToDoNext', label: 'What to do next', icon: '&#8594;' }
+  ];
+  function bookInsightBulletsHtml(insight) {
+    if (!insight || typeof insight !== 'object' || Array.isArray(insight)) return '';
+    var hasAllBullets = BOOK_INSIGHT_BULLETS.every(function (def) { return !!insight[def.key]; });
+    if (!hasAllBullets) return '';
+    return BOOK_INSIGHT_BULLETS.map(function (def) {
+      return (
+        '<div class="item">' +
+          '<div class="item-icon icon-teal">' + def.icon + '</div>' +
+          '<div class="item-b"><span style="font-weight:700;color:var(--black);">' + escapeHtml(def.label) + ':</span> ' + escapeHtml(insight[def.key]) + '</div>' +
+        '</div>'
+      );
+    }).join('');
+  }
+
   var user = await readerbull.requireUser('index.html');
   if (!user) return;
 
@@ -633,57 +685,6 @@
     overviewPanel.appendChild(emptyPanel);
     refreshSwitcherTrigger();
     renderAuditPanels(null);
-  }
-
-  // Book Insight 4-bullet render (built 19 August 2026, replaces the old
-  // single-sentence/paragraph bookInsight narrative, per rule 17 in
-  // ReaderBull_Project_Rules.md). Shared by bookSummaryHtml (nested inside
-  // renderOverview below) and marketAnalysisHtml (a top-level sibling
-  // function further down), since rule 17 requires both render sites to
-  // move to bullets together, not just the Book Summary card. Hoisted up
-  // to this top-level scope on 20 August 2026 after a live bug: it was
-  // first added nested INSIDE renderOverview(), which made it invisible
-  // to marketAnalysisHtml (a sibling function, not a child of
-  // renderOverview) — every real page load threw a ReferenceError the
-  // instant Market Analysis rendered, which happens synchronously during
-  // initial book selection, before the tab-switching click handlers near
-  // the end of this script ever got attached. That silently broke every
-  // sidebar nav link, not just Growth Tracker's, on every page load. Kept
-  // at this scope, not re-nested, so both call sites can always reach it.
-  // Reuses the existing .item/.item-icon/.icon-teal/.item-b icon-circle
-  // classes already used elsewhere on this page (style.css), per Project
-  // Rules rule 3 (extend the existing design system rather than invent
-  // new CSS), all four bullets use icon-teal (never a teal/orange mix,
-  // per rule 17's colour note).
-  //
-  // narrative.bookInsight is now an object with exactly these 4 keys
-  // (see the rewritten prompt in api/enrich-audit.js), not the old
-  // single-string or 2-paragraph shape this branch previously had.
-  // Older stored narratives (anything audited before this shipped) do
-  // not satisfy hasAllBullets below, same graceful "render nothing until
-  // the data is there" convention already used elsewhere in this file:
-  // that book's insight will show blank here until its next audit
-  // repopulates bookInsight in this new shape. Not backfilled
-  // automatically, flagged in the build handover rather than silently
-  // assumed.
-  var BOOK_INSIGHT_BULLETS = [
-    { key: 'potential', label: 'Potential', icon: '&#36;' },
-    { key: 'whatsWorking', label: "What's working", icon: '&#10003;' },
-    { key: 'whatNeedsAttention', label: 'What needs attention', icon: '&#33;' },
-    { key: 'whatToDoNext', label: 'What to do next', icon: '&#8594;' }
-  ];
-  function bookInsightBulletsHtml(insight) {
-    if (!insight || typeof insight !== 'object' || Array.isArray(insight)) return '';
-    var hasAllBullets = BOOK_INSIGHT_BULLETS.every(function (def) { return !!insight[def.key]; });
-    if (!hasAllBullets) return '';
-    return BOOK_INSIGHT_BULLETS.map(function (def) {
-      return (
-        '<div class="item">' +
-          '<div class="item-icon icon-teal">' + def.icon + '</div>' +
-          '<div class="item-b"><span style="font-weight:700;color:var(--black);">' + escapeHtml(def.label) + ':</span> ' + escapeHtml(insight[def.key]) + '</div>' +
-        '</div>'
-      );
-    }).join('');
   }
 
   // Overview now shows the selected book's score detail directly, no card
