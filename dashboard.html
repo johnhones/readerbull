@@ -42,6 +42,7 @@
       <button class="shell-nav-item" data-panel="marketing-strategy" data-navigate-extra><i class="ti ti-speakerphone"></i> Marketing Strategy</button>
       <button class="shell-nav-item" data-panel="keywords" data-navigate-extra><i class="ti ti-search"></i> Keywords</button>
       <button class="shell-nav-item" data-panel="quick-wins" data-navigate-extra><i class="ti ti-bolt"></i> Quick Wins</button>
+      <button class="shell-nav-item" data-panel="growth-tracker" data-navigate-extra><i class="ti ti-chart-line"></i> Growth Tracker</button>
 
       <hr class="shell-divider">
       <div class="shell-section-label">Tools</div>
@@ -78,6 +79,7 @@
     <div id="panel-marketing-strategy" class="shell-panel" style="display:none;"></div>
     <div id="panel-keywords" class="shell-panel" style="display:none;"></div>
     <div id="panel-quick-wins" class="shell-panel" style="display:none;"></div>
+    <div id="panel-growth-tracker" class="shell-panel" style="display:none;"></div>
 
     <div id="panel-get-reviews" class="shell-panel" style="display:none;">
       <div class="shell-empty">
@@ -1387,7 +1389,8 @@
       'market-analysis': document.getElementById('panel-market-analysis'),
       'marketing-strategy': document.getElementById('panel-marketing-strategy'),
       'keywords': document.getElementById('panel-keywords'),
-      'quick-wins': document.getElementById('panel-quick-wins')
+      'quick-wins': document.getElementById('panel-quick-wins'),
+      'growth-tracker': document.getElementById('panel-growth-tracker')
     };
 
     if (!b) {
@@ -1395,6 +1398,7 @@
       panels['marketing-strategy'].innerHTML = auditEmptyHtml('speakerphone', 'Marketing Strategy', 'Add and score a book to get a tailored action plan.');
       panels['keywords'].innerHTML = auditEmptyHtml('search', 'Keywords', 'Add and score a book to see its keyword coverage.');
       panels['quick-wins'].innerHTML = auditEmptyHtml('bolt', 'Quick Wins', 'Add and score a book to see your highest-leverage next step.');
+      panels['growth-tracker'].innerHTML = auditEmptyHtml('chart-line', 'Growth Tracker', 'Add and score a book to start tracking it against competitors you choose.');
       return;
     }
 
@@ -1403,6 +1407,8 @@
     panels['keywords'].innerHTML = keywordsHtml(b);
     wireKeywordsPanel(b);
     panels['quick-wins'].innerHTML = quickWinsHtml(b);
+    panels['growth-tracker'].innerHTML = growthTrackerHtml(b);
+    loadGrowthTracker(b);
   }
 
   // Narrative text from the LLM may contain paragraph breaks, render each
@@ -1944,6 +1950,461 @@ async function saveKeywordChange(b, newList) {
     );
   }
 
+  // ========== BOOK GROWTH TRACKER (built 19 August 2026, see rule 18 in
+  // ReaderBull_Project_Rules.md, Section 6.2 of the Master Handover, and
+  // growth_tracker_mockup.html for the approved spec this follows).
+  // Per-book panel, wired the same way as market-analysis/keywords/etc.
+  // via renderAuditPanels(b), plus its own async data load (tracked
+  // competitors + weekly snapshots aren't part of the `books` row, so
+  // they can't render synchronously the way the other panels do). ==========
+
+  // Single source of truth for the three chart identity colours. Every
+  // place in this section that needs one of them reads from here, never
+  // a second hardcoded hex, so the "legend updated, chart data array
+  // wasn't" bug called out in rule 18 cannot happen structurally.
+  var GT_COLORS = { you: '#F47421', c1: '#00B5AD', c2: '#264E8F', extra: '#9AAAB2' };
+
+  // Mirrors api/growth-tracker.js's COMPETITOR_LIMIT_BY_PLAN. Used here
+  // only to decide, before the author clicks "+ Add book", which dropdown
+  // to open (the add form or the upgrade prompt) rather than waiting on a
+  // round trip. The server is the sole authority on the real limit, if
+  // these two constants ever drift apart the server's answer always wins,
+  // this one is display-only. Pro's "4" is the same flagged assumption as
+  // the backend file (rule 18 left Pro's exact number open), change both
+  // together if John wants a different number.
+  var GT_LIMIT_BY_PLAN = { free: 1, plus: 2, pro: 4 };
+  function gtPlanLimit(plan) { return GT_LIMIT_BY_PLAN[plan] || GT_LIMIT_BY_PLAN.free; }
+
+  function gtAttr(s) { return escapeHtml(String(s == null ? '' : s)); }
+
+  // 'YYYY-MM-DD' week_start -> a short real date ("Aug 18"), not a
+  // generic "Wk 1..8". A brand new tracker won't have 8 clean weeks yet
+  // and may skip a week if a cron run is ever missed, a real date stays
+  // honest either way, a "Wk N" label would quietly imply an unbroken
+  // run that may not exist. Not part of the locked-down mockup copy
+  // (that covered section/button/prompt text, not axis-tick format).
+  function gtWeekLabel(iso) {
+    var parts = String(iso).split('-');
+    if (parts.length !== 3) return escapeHtml(iso);
+    var months = ['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'];
+    var m = parseInt(parts[1], 10) - 1;
+    var d = parseInt(parts[2], 10);
+    return (months[m] || '') + ' ' + d;
+  }
+
+  function growthTrackerHtml(b) {
+    return (
+      '<div class="sec-label">Book Growth Tracker</div>' +
+      '<div class="card" id="gt-card" data-book-id="' + gtAttr(b.id) + '">' +
+        '<p style="font-size:13px;color:var(--mid);">Loading your growth tracker&hellip;</p>' +
+      '</div>' +
+      '<div class="card gt-card-gap" id="gt-trend-card" data-book-id="' + gtAttr(b.id) + '">' +
+        '<div class="gt-trend-title">Est. monthly revenue, last 8 weeks</div>' +
+        '<div class="gt-trend-sub">Same tracked books. This is the one to watch for growth, it reflects all sales, however a buyer found the book, paid ads included, Amazon doesn&rsquo;t split its rank by channel.</div>' +
+        '<div id="gt-trend-body"><p style="font-size:13px;color:var(--mid);">Loading&hellip;</p></div>' +
+        '<div class="gt-update-note">Updated weekly, same data ReaderBull already pulls for your audit, no new cost to track this.</div>' +
+      '</div>'
+    );
+  }
+
+  async function loadGrowthTracker(b) {
+    var card = document.getElementById('gt-card');
+    if (!card || card.getAttribute('data-book-id') !== String(b.id)) return;
+
+    var trackedResult = await readerbull.client
+      .from('tracked_competitors')
+      .select('id,title,amazon_url,asin,added_at')
+      .eq('book_id', b.id)
+      .is('removed_at', null)
+      .order('added_at', { ascending: true });
+    var tracked = (trackedResult && trackedResult.data) || [];
+
+    var snapResult = await readerbull.client
+      .from('growth_tracker_snapshots')
+      .select('subject_key,week_start,reviews,category_rank,estimated_revenue')
+      .eq('book_id', b.id)
+      .order('week_start', { ascending: true });
+    var snapshots = (snapResult && snapResult.data) || [];
+
+    // Guard against the author switching books (or this panel being
+    // re-rendered again) while the two requests above were in flight.
+    card = document.getElementById('gt-card');
+    if (!card || card.getAttribute('data-book-id') !== String(b.id)) return;
+
+    renderGrowthTracker(b, tracked, snapshots);
+  }
+
+  function renderGrowthTracker(b, tracked, snapshots) {
+    var card = document.getElementById('gt-card');
+    var trendBody = document.getElementById('gt-trend-body');
+    if (!card) return;
+
+    function latestSnapshotFor(subjectKey) {
+      var rows = snapshots.filter(function (s) { return s.subject_key === subjectKey; });
+      return rows.length ? rows[rows.length - 1] : null; // pre-sorted by week_start ascending
+    }
+
+    var nicheStats = (b.audit_narrative_json && b.audit_narrative_json.nicheStats) || {};
+    var ownSubjectKey = 'own:' + b.id;
+
+    // Charts and the trend line show "your book" plus the first 2 tracked
+    // books (by when they were added), matching the two competitor
+    // colours the approved mockup actually defines (teal, navy). A Pro
+    // account tracking a 3rd or 4th book still gets full credit toward
+    // its plan limit and still sees every tracked book in the pills and
+    // the table view below, it just isn't charted in an unapproved 4th
+    // colour. Flagged to John as a scope decision, not silently invented.
+    var chartSubjects = tracked.slice(0, 2);
+    var extraCount = Math.max(0, tracked.length - chartSubjects.length);
+
+    var chartedSeries = [{
+      key: ownSubjectKey,
+      name: 'Your book',
+      color: GT_COLORS.you,
+      reviews: (typeof b.live_review_count === 'number') ? b.live_review_count : null,
+      rank: (typeof b.bestseller_rank_number === 'number') ? b.bestseller_rank_number : null,
+      revenue: (typeof nicheStats.yourEstimatedRevenue === 'number') ? nicheStats.yourEstimatedRevenue : null
+    }].concat(chartSubjects.map(function (tc, i) {
+      var latest = latestSnapshotFor(tc.id);
+      return {
+        key: tc.id,
+        name: tc.title,
+        color: i === 0 ? GT_COLORS.c1 : GT_COLORS.c2,
+        reviews: (latest && typeof latest.reviews === 'number') ? latest.reviews : null,
+        rank: (latest && typeof latest.category_rank === 'number') ? latest.category_rank : null,
+        revenue: (latest && typeof latest.estimated_revenue === 'number') ? latest.estimated_revenue : null
+      };
+    }));
+
+    var extraRows = tracked.slice(2).map(function (tc) {
+      var latest = latestSnapshotFor(tc.id);
+      return {
+        name: tc.title,
+        reviews: (latest && typeof latest.reviews === 'number') ? latest.reviews : null,
+        rank: (latest && typeof latest.category_rank === 'number') ? latest.category_rank : null,
+        revenue: (latest && typeof latest.estimated_revenue === 'number') ? latest.estimated_revenue : null
+      };
+    });
+
+    // ---- legend + cap note ----
+    var legendHtml = chartedSeries.map(function (s) {
+      return '<div class="gt-legend-item"><span class="gt-legend-swatch" style="background:' + s.color + '"></span>' + escapeHtml(s.name) + '</div>';
+    }).join('');
+
+    var capNoteHtml = extraCount > 0
+      ? '<p class="gt-cap-note">Charts below show your book plus your first 2 tracked books. ' + extraCount +
+        ' more tracked book' + (extraCount === 1 ? '' : 's') + ' still count' + (extraCount === 1 ? 's' : '') +
+        ' toward your plan limit and appear' + (extraCount === 1 ? 's' : '') + ' in the table view below.</p>'
+      : '';
+
+    // ---- bar panels: Reviews / Category rank / Est. monthly revenue ----
+    var metrics = [
+      { key: 'reviews', label: 'Reviews', fmt: function (v) { return v.toLocaleString(); }, invert: false },
+      { key: 'rank', label: 'Category rank', fmt: function (v) { return '#' + v; }, invert: true },
+      { key: 'revenue', label: 'Est. monthly revenue', fmt: function (v) { return '$' + v.toLocaleString(); }, invert: false }
+    ];
+    var panelsHtml = metrics.map(function (m) { return gtBarPanelSvg(m, chartedSeries); }).join('');
+
+    // ---- table view (every tracked book, including any past the 2-colour cap) ----
+    var allRowsForTable = chartedSeries.concat(extraRows);
+    var tableRowsHtml = allRowsForTable.map(function (s) {
+      return '<tr><td>' + escapeHtml(s.name) + '</td>' +
+        '<td class="tc">' + (typeof s.reviews === 'number' ? s.reviews.toLocaleString() : 'Not available') + '</td>' +
+        '<td class="tc">' + (typeof s.rank === 'number' ? ('#' + s.rank) : 'Not available') + '</td>' +
+        '<td class="tr">' + (typeof s.revenue === 'number' ? ('$' + s.revenue.toLocaleString()) : 'Not available') + '</td></tr>';
+    }).join('');
+
+    // ---- pills ----
+    var pillsHtml = tracked.map(function (tc, i) {
+      var color = i === 0 ? GT_COLORS.c1 : (i === 1 ? GT_COLORS.c2 : GT_COLORS.extra);
+      return '<span class="gt-pill"><span class="gt-dot" style="background:' + color + '"></span>' + escapeHtml(tc.title) +
+        ' <span class="gt-x" data-gt-remove="' + gtAttr(tc.id) + '" title="Remove from tracker">&times;</span></span>';
+    }).join('');
+
+    // ---- add / upgrade dropdowns ----
+    var limit = gtPlanLimit(userPlan);
+    var atLimit = tracked.length >= limit;
+
+    var addDropdownHtml =
+      '<div class="gt-dropdown" id="gt-dropdown-add">' +
+        '<input type="text" id="gt-add-input" placeholder="Paste an Amazon book link, or search by title">' +
+        '<button class="gt-confirm" id="gt-add-confirm">Add to tracker</button>' +
+        '<div class="gt-err" id="gt-add-err"></div>' +
+        '<div class="gt-hint">You choose who counts as competition, not just whatever ReaderBull finds automatically.</div>' +
+      '</div>';
+
+    var upgradeTitle, upgradeBtnHtml;
+    if (userPlan === 'pro') {
+      // No higher tier to send a Pro account to, rule 18 only specifies
+      // the Free-to-Plus and Plus-to-Pro wording. Flagged to John as an
+      // edge case the approved copy doesn't cover.
+      upgradeTitle = "You've reached your Pro plan's limit to track books.";
+      upgradeBtnHtml = '';
+    } else {
+      var nextPlan = userPlan === 'plus' ? 'Pro' : 'Plus';
+      upgradeTitle = "You've reached the " + planLabel(userPlan) + " limit to track books.";
+      upgradeBtnHtml = '<button class="gt-confirm" id="gt-upgrade-btn">Upgrade to ' + nextPlan + '</button>';
+    }
+    var upgradeDropdownHtml =
+      '<div class="gt-dropdown" id="gt-dropdown-upgrade">' +
+        '<div class="gt-upgrade-title">' + escapeHtml(upgradeTitle) + '</div>' +
+        upgradeBtnHtml +
+      '</div>';
+
+    card.innerHTML =
+      '<div class="gt-tracking-row">' +
+        '<div class="gt-tracking-left">' +
+          '<span class="gt-tracking-label">Competing Books</span>' +
+          '<div class="gt-pills" id="gt-pills">' + pillsHtml + '</div>' +
+        '</div>' +
+        '<button class="gt-add-btn" id="gt-add-btn">+ Add book</button>' +
+        addDropdownHtml +
+        upgradeDropdownHtml +
+      '</div>' +
+
+      '<div class="card-hdr" style="margin-top:22px;padding-top:20px;border-top:1px solid var(--border);">Your book vs. the competition</div>' +
+      '<div class="gt-legend">' + legendHtml + '</div>' +
+      capNoteHtml +
+      '<div class="gt-panels">' + panelsHtml + '</div>' +
+
+      '<button class="gt-table-toggle" id="gt-table-toggle">View as table</button>' +
+      '<table class="dash-table gt-hide" id="gt-table" style="margin-top:14px;">' +
+        '<thead><tr><th>Book</th><th class="tc">Reviews</th><th class="tc">Category rank</th><th class="tr">Est. monthly revenue</th></tr></thead>' +
+        '<tbody>' + tableRowsHtml + '</tbody>' +
+      '</table>';
+
+    if (trendBody) trendBody.innerHTML = gtTrendHtml(chartedSeries, snapshots);
+
+    wireGrowthTrackerCard(b, tracked);
+  }
+
+  // Builds one Reviews/Category rank/Est. monthly revenue bar panel as an
+  // SVG string, string-built like every other panel in this file rather
+  // than the mockup's imperative DOM-node version, to match this file's
+  // existing convention. A series with no real value yet (a competitor
+  // whose initial SerpApi lookup failed) draws a minimal placeholder bar
+  // labelled "n/a" in a neutral grey, never a guessed number, per the
+  // project's standing "never invent data" rule.
+  function gtBarPanelSvg(m, series) {
+    var PW = 220, PH = 170, barW = 40, gap = 26, baseY = PH - 24, topY = 14;
+    var knownValues = series.map(function (s) { return s[m.key]; }).filter(function (v) { return typeof v === 'number'; });
+    var maxV = knownValues.length ? Math.max.apply(null, knownValues) : 1;
+    var minV = knownValues.length ? Math.min.apply(null, knownValues) : 0;
+    if (maxV === minV) maxV = minV + 1; // avoid a divide-by-zero when every known bar is equal
+
+    var barsHtml = series.map(function (s, i) {
+      var raw = s[m.key];
+      var known = typeof raw === 'number';
+      var x = 20 + i * (barW + gap);
+      var h, y;
+      if (!known) {
+        h = 6; y = baseY - h;
+      } else {
+        var frac = m.invert
+          ? (maxV - raw + (maxV - minV) * 0.15) / (maxV - minV + (maxV - minV) * 0.15)
+          : raw / (maxV * 1.15);
+        h = Math.max(6, frac * (baseY - topY));
+        y = baseY - h;
+      }
+      var label = known ? m.fmt(raw) : 'n/a';
+      var color = known ? s.color : '#DDE3E7';
+      var labelColor = known ? s.color : 'var(--muted)';
+      var nameLabel = s.name.length > 12 ? (s.name.slice(0, 11) + '…') : s.name;
+      return (
+        '<rect x="' + x + '" y="' + y + '" width="' + barW + '" height="' + h + '" rx="4" ry="4" fill="' + color + '"></rect>' +
+        '<text class="gt-bar-val" x="' + (x + barW / 2) + '" y="' + (y - 8) + '" fill="' + labelColor + '">' + escapeHtml(label) + '</text>' +
+        '<text class="gt-bar-name" x="' + (x + barW / 2) + '" y="' + (PH - 6) + '">' + escapeHtml(nameLabel) + '</text>'
+      );
+    }).join('');
+
+    return (
+      '<div><div class="gt-panel-title">' + escapeHtml(m.label) + '</div>' +
+      '<svg class="gt-barchart" viewBox="0 0 ' + PW + ' ' + PH + '">' +
+        '<line class="gt-baseline" x1="8" x2="' + (PW - 8) + '" y1="' + baseY + '" y2="' + baseY + '"></line>' +
+        barsHtml +
+      '</svg></div>'
+    );
+  }
+
+  // Revenue-only trend line, last up to 8 real weeks. Deliberately never
+  // interpolates or repeats a value into a week with no real snapshot, a
+  // series with zero real data points is left out of the chart entirely
+  // rather than drawn as a flat invented line, per the "never invent
+  // data" rule, this is most visible in a tracker's first few days before
+  // the first Monday snapshot job has run.
+  function gtTrendHtml(series, snapshots) {
+    var weekSet = {};
+    series.forEach(function (s) {
+      snapshots.forEach(function (sn) {
+        if (sn.subject_key === s.key && typeof sn.estimated_revenue === 'number') weekSet[sn.week_start] = true;
+      });
+    });
+    var weeks = Object.keys(weekSet).sort();
+    if (weeks.length > 8) weeks = weeks.slice(weeks.length - 8);
+
+    if (!weeks.length) {
+      return '<p style="font-size:13px;color:var(--mid);">No growth history yet. Your first data point is captured as soon as you add a tracked book, weekly updates follow every Monday.</p>';
+    }
+
+    var seriesPoints = series.map(function (s) {
+      var bySubj = {};
+      snapshots.forEach(function (sn) { if (sn.subject_key === s.key && typeof sn.estimated_revenue === 'number') bySubj[sn.week_start] = sn.estimated_revenue; });
+      var pts = weeks
+        .map(function (w, i) { return { i: i, week: w, value: bySubj[w] }; })
+        .filter(function (p) { return typeof p.value === 'number'; });
+      return { name: s.name, color: s.color, pts: pts };
+    }).filter(function (s) { return s.pts.length; });
+
+    if (!seriesPoints.length) {
+      return '<p style="font-size:13px;color:var(--mid);">No growth history yet. Your first data point is captured as soon as you add a tracked book, weekly updates follow every Monday.</p>';
+    }
+
+    var TW = 680, TH = 220, tPadL = 40, tPadR = 90, tPadT = 16, tPadB = 30;
+    var tPlotW = TW - tPadL - tPadR, tPlotH = TH - tPadT - tPadB;
+    var allVals = seriesPoints.reduce(function (acc, s) { return acc.concat(s.pts.map(function (p) { return p.value; })); }, []);
+    var revMax = Math.max(100, Math.ceil((Math.max.apply(null, allVals) * 1.1) / 100) * 100);
+
+    function txFor(i) { return weeks.length > 1 ? (tPadL + (i / (weeks.length - 1)) * tPlotW) : (tPadL + tPlotW / 2); }
+    function tyFor(v) { return tPadT + (1 - v / revMax) * tPlotH; }
+
+    var gridHtml = '';
+    var tsteps = 4;
+    for (var g = 0; g <= tsteps; g++) {
+      var v = Math.round((g / tsteps) * revMax);
+      var gy = tyFor(v);
+      gridHtml += '<line class="gt-trend-grid" x1="' + tPadL + '" x2="' + (TW - tPadR) + '" y1="' + gy + '" y2="' + gy + '"></line>' +
+        '<text class="gt-trend-axis" x="' + (tPadL - 8) + '" y="' + (gy + 4) + '" text-anchor="end">$' + v.toLocaleString() + '</text>';
+    }
+
+    var axisHtml = weeks.map(function (w, i) {
+      return '<text class="gt-trend-axis" x="' + txFor(i) + '" y="' + (TH - 8) + '" text-anchor="middle">' + gtWeekLabel(w) + '</text>';
+    }).join('');
+
+    var linesHtml = seriesPoints.map(function (s) {
+      var ptsAttr = s.pts.map(function (p) { return txFor(p.i) + ',' + tyFor(p.value); }).join(' ');
+      var dotsHtml = s.pts.map(function (p) {
+        return '<circle class="gt-trend-dot" cx="' + txFor(p.i) + '" cy="' + tyFor(p.value) + '" r="4" fill="' + s.color + '"></circle>';
+      }).join('');
+      var last = s.pts[s.pts.length - 1];
+      var polyline = s.pts.length > 1 ? '<polyline class="gt-trend-line" points="' + ptsAttr + '" stroke="' + s.color + '"></polyline>' : '';
+      var endLabel = '<text class="gt-trend-end-label" x="' + (txFor(last.i) + 10) + '" y="' + (tyFor(last.value) + 4) + '" fill="' + s.color + '">$' + Math.round(last.value).toLocaleString() + '</text>';
+      return polyline + dotsHtml + endLabel;
+    }).join('');
+
+    return '<svg class="gt-trend" viewBox="0 0 ' + TW + ' ' + TH + '">' + gridHtml + axisHtml + linesHtml + '</svg>';
+  }
+
+  function wireGrowthTrackerCard(b, tracked) {
+    var card = document.getElementById('gt-card');
+    if (!card) return;
+
+    var toggleBtn = document.getElementById('gt-table-toggle');
+    var table = document.getElementById('gt-table');
+    if (toggleBtn && table) {
+      toggleBtn.addEventListener('click', function () {
+        table.classList.toggle('gt-hide');
+        toggleBtn.textContent = table.classList.contains('gt-hide') ? 'View as table' : 'Hide table';
+      });
+    }
+
+    var addBtn = document.getElementById('gt-add-btn');
+    var addDropdown = document.getElementById('gt-dropdown-add');
+    var upgradeDropdown = document.getElementById('gt-dropdown-upgrade');
+    var limit = gtPlanLimit(userPlan);
+    var atLimit = tracked.length >= limit;
+
+    if (addBtn) {
+      addBtn.addEventListener('click', function (e) {
+        e.stopPropagation();
+        var target = atLimit ? upgradeDropdown : addDropdown;
+        var other = atLimit ? addDropdown : upgradeDropdown;
+        if (other) other.classList.remove('show');
+        if (target) target.classList.toggle('show');
+      });
+    }
+    [addDropdown, upgradeDropdown].forEach(function (dd) {
+      if (dd) dd.addEventListener('click', function (e) { e.stopPropagation(); });
+    });
+
+    var upgradeBtn = document.getElementById('gt-upgrade-btn');
+    if (upgradeBtn) {
+      upgradeBtn.addEventListener('click', function () {
+        openBillingModal("You've reached your " + planLabel(userPlan) + " plan's tracking limit for this book. Upgrade to track more competitors.");
+      });
+    }
+
+    var addConfirm = document.getElementById('gt-add-confirm');
+    var addInput = document.getElementById('gt-add-input');
+    var addErr = document.getElementById('gt-add-err');
+    if (addConfirm && addInput) {
+      addConfirm.addEventListener('click', function () { gtSubmitAdd(b, addInput, addConfirm, addErr); });
+      addInput.addEventListener('keydown', function (e) {
+        if (e.key === 'Enter') gtSubmitAdd(b, addInput, addConfirm, addErr);
+      });
+    }
+
+    card.querySelectorAll('[data-gt-remove]').forEach(function (x) {
+      x.addEventListener('click', function () { gtSubmitRemove(b, x.getAttribute('data-gt-remove')); });
+    });
+  }
+
+  async function gtSubmitAdd(b, inputEl, btnEl, errEl) {
+    var value = (inputEl.value || '').trim();
+    if (errEl) { errEl.style.display = 'none'; errEl.textContent = ''; }
+    if (!value) {
+      if (errEl) { errEl.textContent = 'Paste a link or type a title first.'; errEl.style.display = 'block'; }
+      return;
+    }
+    btnEl.disabled = true;
+    var originalLabel = btnEl.textContent;
+    btnEl.textContent = 'Adding…';
+    try {
+      var resp = await fetch('/api/growth-tracker?action=add', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', 'Authorization': 'Bearer ' + accessToken },
+        body: JSON.stringify({ bookId: b.id, input: value })
+      });
+      var data = await resp.json().catch(function () { return {}; });
+      if (!resp.ok) {
+        if (errEl) { errEl.textContent = data.message || data.error || 'Could not add that book, please try again.'; errEl.style.display = 'block'; }
+        return;
+      }
+      inputEl.value = '';
+      loadGrowthTracker(b);
+    } catch (err) {
+      if (errEl) { errEl.textContent = 'Network error, please try again.'; errEl.style.display = 'block'; }
+    } finally {
+      btnEl.disabled = false;
+      btnEl.textContent = originalLabel;
+    }
+  }
+
+  async function gtSubmitRemove(b, trackedCompetitorId) {
+    if (!trackedCompetitorId) return;
+    try {
+      await fetch('/api/growth-tracker?action=remove', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', 'Authorization': 'Bearer ' + accessToken },
+        body: JSON.stringify({ trackedCompetitorId: trackedCompetitorId })
+      });
+    } catch (err) {
+      // best-effort, loadGrowthTracker below reflects whatever the server
+      // actually did rather than assuming this call succeeded
+    }
+    loadGrowthTracker(b);
+  }
+
+  // Closes whichever Growth Tracker dropdown (add-book / upgrade) is open
+  // when clicking anywhere outside it. Installed once here rather than
+  // inside renderGrowthTracker(), which re-runs on every book switch, a
+  // listener added there would stack a new one on `document` each time.
+  document.addEventListener('click', function () {
+    var addDd = document.getElementById('gt-dropdown-add');
+    var upgradeDd = document.getElementById('gt-dropdown-upgrade');
+    if (addDd) addDd.classList.remove('show');
+    if (upgradeDd) upgradeDd.classList.remove('show');
+  });
+
   // Tab switching between Navigate items.
   document.querySelectorAll('.shell-nav-item[data-panel]').forEach(function (btn) {
     btn.addEventListener('click', function () {
@@ -1955,7 +2416,7 @@ async function saveKeywordChange(b, newList) {
       var target = btn.getAttribute('data-panel');
       document.getElementById('panel-overview').style.display = (target === 'overview') ? 'block' : 'none';
       [
-        'market-analysis', 'marketing-strategy', 'keywords', 'quick-wins',
+        'market-analysis', 'marketing-strategy', 'keywords', 'quick-wins', 'growth-tracker',
         'get-reviews', 'build-arc', 'ad-campaigns',
         'amazon-kdp', 'tiktok-shop', 'barnes-noble', 'apple-books', 'audible-acx'
       ].forEach(function (name) {

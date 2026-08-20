@@ -618,3 +618,66 @@ AI narrative), which can take 15-30+ seconds. */
   .c3-split > div:first-child > p { margin-left: auto; margin-right: auto; }
   .c3-outcomes { justify-content: center; }
 }
+
+/* ---------- BOOK GROWTH TRACKER (19 August 2026, see rule 18 in
+   ReaderBull_Project_Rules.md / Section 6.2 of the Master Handover, and
+   growth_tracker_mockup.html for the approved visual/interaction spec).
+   Classes are gt- prefixed since this is a brand new dashboard section,
+   not an extension of an existing one, avoids any chance of colliding
+   with an existing name. .card/.card-hdr/.dash-table/.badge above are
+   reused as-is, not redefined here, per rule 3 ("extend the existing
+   design system"). Deliberately, no brand identity colour (orange/teal/
+   navy-blue for "your book"/competitor 1/competitor 2) is hardcoded
+   anywhere in this file: those three colours live in exactly one place,
+   the GT_COLORS constant in dashboard.html's script, so the "same colour
+   defined in two places, one gets missed" bug flagged in rule 18 cannot
+   happen here structurally, not just by discipline. ---------- */
+.gt-tracking-row { display: flex; align-items: center; justify-content: space-between; gap: 24px; flex-wrap: wrap; position: relative; }
+.gt-tracking-left { display: flex; align-items: center; gap: 18px; flex-wrap: wrap; }
+.gt-tracking-label { font-size: 13px; font-weight: 700; color: var(--navy); white-space: nowrap; margin-right: 2px; }
+.gt-pills { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; }
+.gt-pill { display: inline-flex; align-items: center; gap: 6px; background: var(--light); color: var(--navy); font-size: 12px; padding: 5px 10px 5px 8px; border-radius: 20px; }
+.gt-pill .gt-dot { width: 8px; height: 8px; border-radius: 50%; flex-shrink: 0; }
+.gt-pill .gt-x { cursor: pointer; opacity: .6; font-weight: 700; font-size: 12px; margin-left: 2px; }
+.gt-pill .gt-x:hover { opacity: 1; }
+.gt-add-btn { background: var(--orange); color: #fff; border: none; padding: 8px 16px; border-radius: 6px; font-size: 12px; font-weight: 700; cursor: pointer; white-space: nowrap; flex-shrink: 0; }
+.gt-dropdown { display: none; position: absolute; top: calc(100% + 8px); right: 0; width: 300px; background: #fff; border: 1px solid var(--border); border-radius: 8px; box-shadow: 0 12px 30px rgba(27,58,72,.12); padding: 16px; z-index: 10; }
+.gt-dropdown.show { display: block; }
+.gt-dropdown input { width: 100%; box-sizing: border-box; padding: 9px 12px; border: 1px solid var(--border); border-radius: 6px; font-size: 13px; color: var(--navy); margin-bottom: 8px; }
+.gt-dropdown .gt-confirm { width: 100%; background: var(--orange); color: #fff; border: none; padding: 9px; border-radius: 6px; font-size: 13px; font-weight: 700; cursor: pointer; }
+.gt-dropdown .gt-confirm:disabled { opacity: .6; cursor: not-allowed; }
+.gt-dropdown .gt-hint { font-size: 11px; color: var(--muted); margin-top: 8px; }
+.gt-dropdown .gt-err { font-size: 12px; color: #B23B3B; margin-top: 8px; display: none; }
+.gt-upgrade-title { font-size: 13px; font-weight: 700; color: var(--orange-d); margin-bottom: 12px; }
+
+.gt-legend { display: flex; gap: 20px; flex-wrap: wrap; margin: 4px 0 20px; }
+.gt-legend-item { display: flex; align-items: center; gap: 7px; font-size: 13px; color: var(--navy); }
+.gt-legend-swatch { width: 12px; height: 12px; border-radius: 3px; flex-shrink: 0; }
+.gt-cap-note { font-size: 12px; color: var(--muted); margin: -10px 0 18px; }
+
+.gt-panels { display: grid; grid-template-columns: repeat(3, 1fr); gap: 20px; }
+.gt-panel-title { font-size: 13px; font-weight: 700; color: var(--navy); margin-bottom: 14px; }
+svg.gt-barchart { display: block; width: 100%; height: auto; overflow: visible; }
+.gt-bar-val { font-size: 12px; font-weight: 700; text-anchor: middle; }
+.gt-bar-name { font-size: 10px; text-anchor: middle; fill: var(--muted); }
+.gt-baseline { stroke: var(--border); stroke-width: 1; }
+
+.gt-table-toggle { font-size: 12px; color: var(--teal-d); background: none; border: none; text-decoration: underline; cursor: pointer; padding: 0; margin-top: 20px; }
+.gt-hide { display: none !important; }
+
+.gt-trend-title { font-size: 13px; font-weight: 700; color: var(--navy); margin-bottom: 4px; }
+.gt-trend-sub { font-size: 12px; color: var(--muted); margin-bottom: 16px; }
+svg.gt-trend { display: block; width: 100%; height: auto; overflow: visible; }
+.gt-trend-line { fill: none; stroke-width: 2; stroke-linecap: round; stroke-linejoin: round; }
+.gt-trend-dot { stroke: var(--white); stroke-width: 2; }
+.gt-trend-grid { stroke: #EDF1F3; stroke-width: 1; }
+.gt-trend-axis { font-size: 11px; fill: var(--muted); }
+.gt-trend-end-label { font-size: 11px; font-weight: 700; }
+.gt-update-note { font-size: 12px; color: var(--muted); margin-top: 18px; }
+.gt-card-gap { margin-top: 24px; }
+
+@media(max-width: 720px) {
+  .gt-panels { grid-template-columns: 1fr; }
+  .gt-tracking-row { flex-direction: column; align-items: flex-start; }
+  .gt-dropdown { right: auto; left: 0; width: 100%; max-width: 320px; }
+}

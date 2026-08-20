@@ -1,0 +1,5 @@
+{
+  "crons": [
+    { "path": "/api/growth-tracker?action=snapshot", "schedule": "0 6 * * 1" }
+  ]
+}
