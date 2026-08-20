@@ -1264,3 +1264,16 @@ function sendErrorAlert(endpoint, detail) {
     })
   }).catch(function () {});
 }
+
+// Added 19 August 2026 for the Growth Tracker weekly snapshot job
+// (api/growth-tracker.js): exposes the existing BSR-to-revenue estimator
+// as named properties on the default export, so that file can
+// require('./enrich-audit').estimateMonthlyRevenue etc. and reuse the
+// exact same calculation rather than a second copy drifting out of sync,
+// per rule 18 ("reuse that logic rather than writing a second
+// BSR-to-revenue estimator"). module.exports stays a function (the
+// Vercel request handler for THIS file's own route), attaching named
+// properties onto it doesn't change that, Node functions are objects.
+module.exports.parsePrice = parsePrice;
+module.exports.estimateMonthlySalesFromRank = estimateMonthlySalesFromRank;
+module.exports.estimateMonthlyRevenue = estimateMonthlyRevenue;

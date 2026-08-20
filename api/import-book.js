@@ -290,3 +290,12 @@ function sendErrorAlert(endpoint, detail) {
     })
   }).catch(function () {});
 }
+
+// Added 19 August 2026 for api/growth-tracker.js's "+ Add book" handler,
+// so pasting an Amazon link/ASIN to track a competitor resolves the same
+// way importing the author's own book already does, one implementation,
+// not a second copy that could drift (same reasoning as the
+// estimateMonthlyRevenue export added to api/enrich-audit.js this
+// session).
+module.exports.resolveAsin = resolveAsin;
+module.exports.extractAsin = extractAsin;
