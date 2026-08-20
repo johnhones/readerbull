@@ -15,7 +15,7 @@
 // Routes (all via this one file, action decides behaviour):
 //   POST /api/growth-tracker?action=add             { bookId, input }              -> add a tracked competitor
 //   POST /api/growth-tracker?action=remove           { trackedCompetitorId }        -> soft-remove one
-//   POST /api/growth-tracker?action=auto-populate    { bookId, competitors }        -> seed 1 (Free) / 2 (Plus) / 4 (Pro) real competitors on first audit
+//   POST /api/growth-tracker?action=auto-populate    { bookId, competitors, ownReviews, ownRank }   -> seed at least 2 real, reachable competitors on first audit
 //   GET  /api/growth-tracker?action=snapshot                                        -> weekly cron job (CRON_SECRET only, see vercel.json)
 //
 // auto-populate (added 20 August 2026, per John: new/inexperienced authors
@@ -29,6 +29,27 @@
 // book has ANY active tracked competitor already, whether from a previous
 // auto-populate or the author's own manual "+ Add book", this must never
 // overwrite an author's own choices, only fill a genuinely empty tracker.
+//
+// **Seeds at least 2 competitors, not just the plan's manual-tracking
+// limit** (revised 20 August 2026, per John: showing a single competitor
+// didn't make the case for the feature, an author needs a believable
+// "here's a realistic next target, and here's one further out" pair to see
+// the point). This deliberately can seed a Free account (manual limit 1)
+// past its own advertised limit; that's intentional here, the manual
+// "+ Add book" limit in handleAdd is untouched, an already-at-limit
+// account just can't add a 3rd manually, same graceful "downgrade leaves
+// an account over its limit" handling rule 18 already calls for.
+//
+// **Ordered for reachability, not just data completeness.** Candidates
+// with a real bestsellerRank (attachCompetitorBsr's enrichment) sort
+// first, since only those can carry a real, honest gap number. Among
+// those, the ones closest to the author's own current category rank
+// (ownRank, passed in by the caller, the same rank this exact audit just
+// pulled, not a stale books-row value) sort first too, so the first
+// competitor shown is a genuinely reachable next milestone, not the
+// niche's single biggest outlier. dashboard.html's gtReachStrategyHtml
+// renders the actual "how you get there" copy from these same real
+// numbers, never invented.
 //
 // add/remove require the caller's own Supabase session (Bearer token,
 // same pattern as api/import-book.js). snapshot is never called by an
@@ -259,6 +280,15 @@ async function handleAutoPopulate(req, res) {
 
   var bookId = req.body && req.body.bookId;
   var candidates = Array.isArray(req.body && req.body.competitors) ? req.body.competitors : [];
+  // The category rank THIS audit just pulled for the author's own book,
+  // passed by the caller rather than re-read from the books row, which at
+  // this exact point in the audit flow (see dashboard.html/onboarding.html)
+  // may still hold the pre-refresh value, or not exist yet at all for a
+  // book being onboarded for the first time. Only used to order candidates
+  // by reachability below, dashboard.html's own gtReachStrategyHtml reads
+  // the author's live numbers straight from Supabase for display, this
+  // endpoint doesn't need to return anything back for that.
+  var ownRank = (typeof (req.body && req.body.ownRank) === 'number') ? req.body.ownRank : null;
   if (!bookId || !candidates.length) { res.status(200).json({ ok: true, added: 0 }); return; }
 
   var bookResp = await fetch(
@@ -285,16 +315,31 @@ async function handleAutoPopulate(req, res) {
   // a real title AND a real ASIN, exactly what findCompetitors already
   // verified during this same audit. Competitors attachCompetitorBsr
   // enriched with a real bestsellerRank (its top-2-per-audit cap) sort
-  // first, since those are the ones that can show a real revenue estimate
-  // immediately, the whole point of seeding this automatically rather than
-  // leaving it for the author to notice and fill in themselves.
+  // first, since only those can carry a real, honest gap number. Among
+  // those, closest-to-own-rank sorts first (see the comment above this
+  // function), a believable, reachable first target rather than whichever
+  // happened to come back first from findCompetitors.
   var real = candidates.filter(function (c) { return c && c.asin && c.title; });
   real.sort(function (a, b) {
     var aHas = (typeof a.bestsellerRank === 'number') ? 0 : 1;
     var bHas = (typeof b.bestsellerRank === 'number') ? 0 : 1;
-    return aHas - bHas;
+    if (aHas !== bHas) return aHas - bHas;
+    if (ownRank != null && typeof a.bestsellerRank === 'number' && typeof b.bestsellerRank === 'number') {
+      // A "realistic reach" target has to actually be ahead of the author
+      // (a lower/better category rank) to make sense as something to
+      // reach for, so genuinely-ahead candidates sort before ones that
+      // aren't, closest-gap-first within each group.
+      var aAhead = (a.bestsellerRank < ownRank) ? 0 : 1;
+      var bAhead = (b.bestsellerRank < ownRank) ? 0 : 1;
+      if (aAhead !== bAhead) return aAhead - bAhead;
+      return Math.abs(ownRank - a.bestsellerRank) - Math.abs(ownRank - b.bestsellerRank);
+    }
+    return 0;
   });
-  var chosen = real.slice(0, limit);
+  // At least 2 where real data allows it, even past the plan's own manual
+  // "+ Add book" limit, see the comment above this function for why.
+  var seedCount = Math.max(2, limit);
+  var chosen = real.slice(0, seedCount);
 
   var addedCount = 0;
   for (var i = 0; i < chosen.length; i++) {
