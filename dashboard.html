@@ -2042,7 +2042,7 @@ async function saveKeywordChange(b, newList) {
 
     var trackedResult = await readerbull.client
       .from('tracked_competitors')
-      .select('id,title,amazon_url,asin,added_at')
+      .select('id,title,amazon_url,asin,added_at,cover_image_url')
       .eq('book_id', b.id)
       .is('removed_at', null)
       .order('added_at', { ascending: true });
@@ -2143,11 +2143,30 @@ async function saveKeywordChange(b, newList) {
         '<td class="tr">' + (typeof s.revenue === 'number' ? ('$' + s.revenue.toLocaleString()) : 'Not available') + '</td></tr>';
     }).join('');
 
-    // ---- pills ----
+    // ---- pills (redesigned 20 August 2026, per John: a single-line text
+    // pill wrapped a long title across 2-3 lines and was "unreadable" at a
+    // glance, especially once 2+ books were tracked). Each tracked book is
+    // now a small cover-image tile with its title underneath, matching how
+    // the book switcher elsewhere on this dashboard already shows a cover
+    // (see switcherCover/score-cover a few hundred lines up), so this is a
+    // pattern already established in this file, not a new one. Falls back
+    // to a colour-tinted placeholder (no invented artwork) when a tracked
+    // book has no cover_image_url yet, either because it predates the 20
+    // August cover-image field or Amazon's own listing had none.
     var pillsHtml = tracked.map(function (tc, i) {
       var color = i === 0 ? GT_COLORS.c1 : (i === 1 ? GT_COLORS.c2 : GT_COLORS.extra);
-      return '<span class="gt-pill"><span class="gt-dot" style="background:' + color + '"></span>' + escapeHtml(tc.title) +
-        ' <span class="gt-x" data-gt-remove="' + gtAttr(tc.id) + '" title="Remove from tracker">&times;</span></span>';
+      var coverInner = tc.cover_image_url
+        ? '<img src="' + escapeHtml(tc.cover_image_url) + '" alt="">'
+        : '<span class="gt-book-cover-placeholder" style="background:' + color + '22"><span class="gt-dot" style="background:' + color + '"></span></span>';
+      return (
+        '<div class="gt-book-tile">' +
+          '<div class="gt-book-cover" style="border-color:' + color + '">' +
+            coverInner +
+          '</div>' +
+          '<div class="gt-book-title" title="' + escapeHtml(tc.title) + '">' + escapeHtml(tc.title) + '</div>' +
+          '<span class="gt-x" data-gt-remove="' + gtAttr(tc.id) + '" title="Remove from tracker">&times;</span>' +
+        '</div>'
+      );
     }).join('');
 
     // ---- add / upgrade dropdowns ----
@@ -2304,7 +2323,10 @@ async function saveKeywordChange(b, newList) {
   // labelled "n/a" in a neutral grey, never a guessed number, per the
   // project's standing "never invent data" rule.
   function gtBarPanelSvg(m, series) {
-    var PW = 220, PH = 170, barW = 40, gap = 26, baseY = PH - 24, topY = 14;
+    // PH shortened 20 August 2026 (from 170) now that gtBarPanelSvg no
+    // longer draws a per-bar name label at the bottom, so there's no
+    // leftover blank strip under the bars.
+    var PW = 220, PH = 145, barW = 40, gap = 26, baseY = PH - 24, topY = 14;
     var knownValues = series.map(function (s) { return s[m.key]; }).filter(function (v) { return typeof v === 'number'; });
     var maxV = knownValues.length ? Math.max.apply(null, knownValues) : 1;
     var minV = knownValues.length ? Math.min.apply(null, knownValues) : 0;
@@ -2327,11 +2349,15 @@ async function saveKeywordChange(b, newList) {
       var label = known ? m.fmt(raw) : 'n/a';
       var color = known ? s.color : '#DDE3E7';
       var labelColor = known ? s.color : 'var(--muted)';
-      var nameLabel = s.name.length > 12 ? (s.name.slice(0, 11) + '…') : s.name;
+      // No per-bar name label here any more (removed 20 August 2026, per
+      // John: a 12-character truncation like "Amazon FBA …" reads as
+      // meaningless noise, not a book title). The colour swatch + full
+      // title already lives in the .gt-legend block rendered right above
+      // these panels, that's the single source of truth for "which colour
+      // is which book" now, never duplicated (and re-truncated) per chart.
       return (
         '<rect x="' + x + '" y="' + y + '" width="' + barW + '" height="' + h + '" rx="4" ry="4" fill="' + color + '"></rect>' +
-        '<text class="gt-bar-val" x="' + (x + barW / 2) + '" y="' + (y - 8) + '" fill="' + labelColor + '">' + escapeHtml(label) + '</text>' +
-        '<text class="gt-bar-name" x="' + (x + barW / 2) + '" y="' + (PH - 6) + '">' + escapeHtml(nameLabel) + '</text>'
+        '<text class="gt-bar-val" x="' + (x + barW / 2) + '" y="' + (y - 8) + '" fill="' + labelColor + '">' + escapeHtml(label) + '</text>'
       );
     }).join('');
 
