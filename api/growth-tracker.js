@@ -13,9 +13,22 @@
 // true.
 //
 // Routes (all via this one file, action decides behaviour):
-//   POST /api/growth-tracker?action=add       { bookId, input }              -> add a tracked competitor
-//   POST /api/growth-tracker?action=remove     { trackedCompetitorId }        -> soft-remove one
-//   GET  /api/growth-tracker?action=snapshot                                  -> weekly cron job (CRON_SECRET only, see vercel.json)
+//   POST /api/growth-tracker?action=add             { bookId, input }              -> add a tracked competitor
+//   POST /api/growth-tracker?action=remove           { trackedCompetitorId }        -> soft-remove one
+//   POST /api/growth-tracker?action=auto-populate    { bookId, competitors }        -> seed 1 (Free) / 2 (Plus) / 4 (Pro) real competitors on first audit
+//   GET  /api/growth-tracker?action=snapshot                                        -> weekly cron job (CRON_SECRET only, see vercel.json)
+//
+// auto-populate (added 20 August 2026, per John: new/inexperienced authors
+// won't know what "+ Add book" is for or why it matters, so the Growth
+// Tracker should show real value immediately rather than starting empty).
+// Called by dashboard.html/onboarding.html right after a normal audit
+// returns its competitors array (api/enrich-audit.js's findCompetitors +
+// attachCompetitorBsr), reusing that already-fetched, already-paid-for
+// data, zero new SerpApi calls, same "no new vendor, no new cost"
+// direction as the rest of this file. Deliberately a no-op the instant the
+// book has ANY active tracked competitor already, whether from a previous
+// auto-populate or the author's own manual "+ Add book", this must never
+// overwrite an author's own choices, only fill a genuinely empty tracker.
 //
 // add/remove require the caller's own Supabase session (Bearer token,
 // same pattern as api/import-book.js). snapshot is never called by an
@@ -63,6 +76,9 @@ module.exports = async function handler(req, res) {
     }
     if (action === 'remove' && req.method === 'POST') {
       return await handleRemove(req, res);
+    }
+    if (action === 'auto-populate' && req.method === 'POST') {
+      return await handleAutoPopulate(req, res);
     }
     res.status(400).json({ error: 'Unknown action, or wrong HTTP method for that action.' });
   } catch (err) {
@@ -168,6 +184,24 @@ async function handleAdd(req, res) {
     }
   }
 
+  var inserted = await insertOneTrackedCompetitor(bookId, auth.userId, resolved, serviceKey);
+  if (!inserted) {
+    res.status(500).json({ error: 'Could not save that competitor, please try again.' });
+    return;
+  }
+
+  res.status(200).json({ trackedCompetitor: inserted });
+}
+
+// Shared by handleAdd (one author-chosen competitor) and
+// handleAutoPopulate (up to the plan limit, seeded from an audit's
+// already-fetched competitor data). `resolved` must carry at minimum
+// title + asin; reviewCount/bestsellerRank/estimatedRevenue are optional
+// and, if present, feed the same-week initial snapshot so the bar panels
+// and trend chart have a real data point immediately rather than an empty
+// chart until next Monday's cron. Returns the inserted tracked_competitors
+// row, or null on failure (caller decides how to report that).
+async function insertOneTrackedCompetitor(bookId, userId, resolved, serviceKey) {
   var insertResp = await fetch(SUPABASE_URL + '/rest/v1/tracked_competitors', {
     method: 'POST',
     headers: {
@@ -178,7 +212,7 @@ async function handleAdd(req, res) {
     },
     body: JSON.stringify({
       book_id: bookId,
-      user_id: auth.userId,
+      user_id: userId,
       title: resolved.title,
       amazon_url: resolved.amazonUrl || null,
       asin: resolved.asin || null
@@ -187,21 +221,17 @@ async function handleAdd(req, res) {
 
   if (!insertResp.ok) {
     var insertErrText = await insertResp.text();
-    await sendErrorAlert('growth-tracker (add)', 'Insert into tracked_competitors failed: ' + insertErrText);
-    res.status(500).json({ error: 'Could not save that competitor, please try again.' });
-    return;
+    await sendErrorAlert('growth-tracker (insert)', 'Insert into tracked_competitors failed: ' + insertErrText);
+    return null;
   }
 
   var inserted = (await insertResp.json())[0];
 
-  // Best-effort initial snapshot, same week the competitor was added, so
-  // the bar panels and trend chart have at least one real data point
-  // immediately rather than an empty chart until next Monday's job.
-  // Never blocks the add itself if this fails.
+  // Best-effort initial snapshot, never blocks the insert itself if it fails.
   try {
     await upsertSnapshot({
       bookId: bookId,
-      userId: auth.userId,
+      userId: userId,
       snapshotType: 'competitor',
       trackedCompetitorId: inserted.id,
       subjectKey: inserted.id,
@@ -214,7 +244,79 @@ async function handleAdd(req, res) {
     // best-effort, see comment above
   }
 
-  res.status(200).json({ trackedCompetitor: inserted });
+  return inserted;
+}
+
+// ---------- action=auto-populate ----------
+async function handleAutoPopulate(req, res) {
+  var auth = await authenticate(req);
+  if (!auth) { res.status(401).json({ error: 'Please sign in again, your session could not be found.' }); return; }
+
+  var serviceKey = process.env.SUPABASE_SERVICE_ROLE_KEY;
+  // Best-effort feature: never surface a hard error back into the audit
+  // flow that called this, a missing key just means no auto-populate.
+  if (!serviceKey) { res.status(200).json({ ok: true, added: 0, skipped: 'not_configured' }); return; }
+
+  var bookId = req.body && req.body.bookId;
+  var candidates = Array.isArray(req.body && req.body.competitors) ? req.body.competitors : [];
+  if (!bookId || !candidates.length) { res.status(200).json({ ok: true, added: 0 }); return; }
+
+  var bookResp = await fetch(
+    SUPABASE_URL + '/rest/v1/books?select=id,user_id&id=eq.' + encodeURIComponent(bookId) + '&user_id=eq.' + encodeURIComponent(auth.userId),
+    { headers: { apikey: serviceKey, Authorization: 'Bearer ' + serviceKey } }
+  );
+  var bookRows = bookResp.ok ? await bookResp.json() : [];
+  if (!Array.isArray(bookRows) || !bookRows.length) { res.status(200).json({ ok: true, added: 0 }); return; }
+
+  // Never overwrite an author's own choices: only seed when this book
+  // genuinely has zero active tracked competitors yet, whether that's
+  // because it's brand new or because a previous auto-populate already ran.
+  var countResp = await fetch(
+    SUPABASE_URL + '/rest/v1/tracked_competitors?select=id&book_id=eq.' + encodeURIComponent(bookId) + '&removed_at=is.null',
+    { headers: { apikey: serviceKey, Authorization: 'Bearer ' + serviceKey } }
+  );
+  var currentRows = countResp.ok ? await countResp.json() : [];
+  if (Array.isArray(currentRows) && currentRows.length) { res.status(200).json({ ok: true, added: 0, skipped: 'already_tracked' }); return; }
+
+  var plan = await getPlan(auth.userId, serviceKey);
+  var limit = COMPETITOR_LIMIT_BY_PLAN[plan] || COMPETITOR_LIMIT_BY_PLAN.free;
+
+  // Real competitors only, per rule 3/12's "never invent data": must carry
+  // a real title AND a real ASIN, exactly what findCompetitors already
+  // verified during this same audit. Competitors attachCompetitorBsr
+  // enriched with a real bestsellerRank (its top-2-per-audit cap) sort
+  // first, since those are the ones that can show a real revenue estimate
+  // immediately, the whole point of seeding this automatically rather than
+  // leaving it for the author to notice and fill in themselves.
+  var real = candidates.filter(function (c) { return c && c.asin && c.title; });
+  real.sort(function (a, b) {
+    var aHas = (typeof a.bestsellerRank === 'number') ? 0 : 1;
+    var bHas = (typeof b.bestsellerRank === 'number') ? 0 : 1;
+    return aHas - bHas;
+  });
+  var chosen = real.slice(0, limit);
+
+  var addedCount = 0;
+  for (var i = 0; i < chosen.length; i++) {
+    var c = chosen[i];
+    var price = parsePrice(c.price);
+    var estimatedRevenue = (typeof c.storeWideRank === 'number') ? estimateMonthlyRevenue(c.storeWideRank, price) : null;
+    var resolved = {
+      title: c.title,
+      asin: c.asin,
+      // findCompetitors never gives a listing URL, only an ASIN, this is
+      // Amazon's own canonical /dp/ URL format for that real ASIN, not an
+      // invented link.
+      amazonUrl: 'https://www.amazon.com/dp/' + c.asin,
+      reviewCount: (typeof c.reviews === 'number') ? c.reviews : null,
+      bestsellerRank: (typeof c.bestsellerRank === 'number') ? c.bestsellerRank : null,
+      estimatedRevenue: (estimatedRevenue != null) ? Math.round(estimatedRevenue) : null
+    };
+    var inserted = await insertOneTrackedCompetitor(bookId, auth.userId, resolved, serviceKey);
+    if (inserted) addedCount++;
+  }
+
+  res.status(200).json({ ok: true, added: addedCount });
 }
 
 // ---------- action=remove ----------
