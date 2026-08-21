@@ -703,4 +703,90 @@ finishes before the audit does or shows a raw ticking second count. */
   .arc-row { flex-wrap: wrap; align-items: flex-start; }
   .arc-row-actions { width: 100%; }
   .arc-row-actions .btn { flex: 1; }
+/* ---------- BOOK GROWTH TRACKER (19 August 2026, see rule 18 in
+   ReaderBull_Project_Rules.md / Section 6.2 of the Master Handover, and
+   growth_tracker_mockup.html for the approved visual/interaction spec).
+   Classes are gt- prefixed since this is a brand new dashboard section,
+   not an extension of an existing one, avoids any chance of colliding
+   with an existing name. .card/.card-hdr/.dash-table/.badge above are
+   reused as-is, not redefined here, per rule 3 ("extend the existing
+   design system"). Deliberately, no brand identity colour (orange/teal/
+   navy-blue for "your book"/competitor 1/competitor 2) is hardcoded
+   anywhere in this file: those three colours live in exactly one place,
+   the GT_COLORS constant in dashboard.html's script, so the "same colour
+   defined in two places, one gets missed" bug flagged in rule 18 cannot
+   happen here structurally, not just by discipline. ---------- */
+.gt-tracking-row { display: flex; align-items: center; justify-content: space-between; gap: 24px; flex-wrap: wrap; position: relative; }
+.gt-tracking-left { display: flex; align-items: center; gap: 18px; flex-wrap: wrap; }
+.gt-tracking-label { font-size: 13px; font-weight: 700; color: var(--navy); white-space: nowrap; margin-right: 2px; }
+/* Tracked-book tiles (redesigned 20 August 2026, replacing the old
+   single-line .gt-pill text pill, per John: a long title wrapped across
+   2-3 lines inside a pill was "unreadable" on the live page). Each tile
+   is a small cover image (or, with no cover_image_url yet, a colour-
+   tinted placeholder using the exact same GT_COLORS value the bar
+   charts/legend use for that book, never a second colour source) with
+   the title underneath, clamped to 2 lines rather than left to wrap
+   indefinitely. */
+.gt-pills { display: flex; align-items: flex-start; gap: 16px; flex-wrap: wrap; }
+.gt-book-tile { position: relative; display: flex; flex-direction: column; align-items: center; width: 76px; }
+.gt-book-cover { width: 56px; height: 56px; border-radius: 8px; border: 2px solid var(--border); overflow: hidden; background: var(--light); display: flex; align-items: center; justify-content: center; flex-shrink: 0; }
+.gt-book-cover img { width: 100%; height: 100%; object-fit: cover; display: block; }
+.gt-book-cover-placeholder { width: 100%; height: 100%; display: flex; align-items: center; justify-content: center; }
+.gt-book-cover-placeholder .gt-dot { width: 10px; height: 10px; border-radius: 50%; }
+.gt-book-title { margin-top: 6px; font-size: 11px; line-height: 1.35; color: var(--navy); text-align: center; width: 100%; overflow: hidden; display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; }
+.gt-book-tile .gt-x { position: absolute; top: -7px; right: -7px; width: 18px; height: 18px; border-radius: 50%; background: var(--white); border: 1px solid var(--border); display: flex; align-items: center; justify-content: center; font-size: 12px; font-weight: 700; line-height: 1; color: var(--muted); cursor: pointer; }
+.gt-book-tile .gt-x:hover { color: #B23B3B; border-color: #B23B3B; }
+.gt-add-btn { background: var(--orange); color: #fff; border: none; padding: 8px 16px; border-radius: 6px; font-size: 12px; font-weight: 700; cursor: pointer; white-space: nowrap; flex-shrink: 0; }
+.gt-dropdown { display: none; position: absolute; top: calc(100% + 8px); right: 0; width: 300px; background: #fff; border: 1px solid var(--border); border-radius: 8px; box-shadow: 0 12px 30px rgba(27,58,72,.12); padding: 16px; z-index: 10; }
+.gt-dropdown.show { display: block; }
+.gt-dropdown input { width: 100%; box-sizing: border-box; padding: 9px 12px; border: 1px solid var(--border); border-radius: 6px; font-size: 13px; color: var(--navy); margin-bottom: 8px; }
+.gt-dropdown .gt-confirm { width: 100%; background: var(--orange); color: #fff; border: none; padding: 9px; border-radius: 6px; font-size: 13px; font-weight: 700; cursor: pointer; }
+.gt-dropdown .gt-confirm:disabled { opacity: .6; cursor: not-allowed; }
+.gt-dropdown .gt-hint { font-size: 11px; color: var(--muted); margin-top: 8px; }
+.gt-dropdown .gt-err { font-size: 12px; color: #B23B3B; margin-top: 8px; display: none; }
+.gt-upgrade-title { font-size: 13px; font-weight: 700; color: var(--orange-d); margin-bottom: 12px; }
+
+.gt-legend { display: flex; gap: 20px; flex-wrap: wrap; margin: 4px 0 20px; }
+.gt-legend-item { display: flex; align-items: center; gap: 7px; font-size: 13px; color: var(--navy); }
+.gt-legend-swatch { width: 12px; height: 12px; border-radius: 3px; flex-shrink: 0; }
+.gt-cap-note { font-size: 12px; color: var(--muted); margin: -10px 0 18px; }
+
+.gt-panels { display: grid; grid-template-columns: repeat(3, 1fr); gap: 20px; }
+.gt-panel-title { font-size: 13px; font-weight: 700; color: var(--navy); margin-bottom: 14px; }
+svg.gt-barchart { display: block; width: 100%; height: auto; overflow: visible; }
+.gt-bar-val { font-size: 12px; font-weight: 700; text-anchor: middle; }
+.gt-bar-name { font-size: 10px; text-anchor: middle; fill: var(--muted); }
+.gt-baseline { stroke: var(--border); stroke-width: 1; }
+
+/* "Your path to close the gap" cards (20 August 2026): one per tracked
+   competitor actually charted, real gap numbers + a fixed strategy line,
+   see gtReachStrategyHtml in dashboard.html. Reuses the .card-hdr /
+   var(--navy)/var(--mid)/var(--border) tokens already established
+   elsewhere in this file, per Project Rules rule 3, no new design tokens
+   introduced for this. */
+.gt-reach-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(240px, 1fr)); gap: 16px; }
+.gt-reach-item { background: var(--light); border: 1px solid var(--border); border-radius: 10px; padding: 16px 18px; }
+.gt-reach-name { font-size: 13px; font-weight: 700; color: var(--navy); margin-bottom: 4px; }
+.gt-reach-lead { font-size: 12px; font-weight: 700; color: var(--teal-d); margin-bottom: 8px; }
+.gt-reach-gap { font-size: 13px; color: var(--mid); line-height: 1.5; margin-bottom: 8px; }
+.gt-reach-strategy { font-size: 12px; color: var(--muted); line-height: 1.6; }
+
+.gt-table-toggle { font-size: 12px; color: var(--teal-d); background: none; border: none; text-decoration: underline; cursor: pointer; padding: 0; margin-top: 20px; }
+.gt-hide { display: none !important; }
+
+.gt-trend-title { font-size: 13px; font-weight: 700; color: var(--navy); margin-bottom: 4px; }
+.gt-trend-sub { font-size: 12px; color: var(--muted); margin-bottom: 16px; }
+svg.gt-trend { display: block; width: 100%; height: auto; overflow: visible; }
+.gt-trend-line { fill: none; stroke-width: 2; stroke-linecap: round; stroke-linejoin: round; }
+.gt-trend-dot { stroke: var(--white); stroke-width: 2; }
+.gt-trend-grid { stroke: #EDF1F3; stroke-width: 1; }
+.gt-trend-axis { font-size: 11px; fill: var(--muted); }
+.gt-trend-end-label { font-size: 11px; font-weight: 700; }
+.gt-update-note { font-size: 12px; color: var(--muted); margin-top: 18px; }
+.gt-card-gap { margin-top: 24px; }
+
+@media(max-width: 720px) {
+  .gt-panels { grid-template-columns: 1fr; }
+  .gt-tracking-row { flex-direction: column; align-items: flex-start; }
+  .gt-dropdown { right: auto; left: 0; width: 100%; max-width: 320px; }
 }

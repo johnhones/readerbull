@@ -42,6 +42,7 @@
       <button class="shell-nav-item" data-panel="marketing-strategy" data-navigate-extra><i class="ti ti-speakerphone"></i> Marketing Strategy</button>
       <button class="shell-nav-item" data-panel="keywords" data-navigate-extra><i class="ti ti-search"></i> Keywords</button>
       <button class="shell-nav-item" data-panel="quick-wins" data-navigate-extra><i class="ti ti-bolt"></i> Quick Wins</button>
+      <button class="shell-nav-item" data-panel="growth-tracker" data-navigate-extra><i class="ti ti-chart-line"></i> Growth Tracker</button>
 
       <hr class="shell-divider">
       <div class="shell-section-label">Tools</div>
@@ -77,6 +78,7 @@
     <div id="panel-marketing-strategy" class="shell-panel" style="display:none;"></div>
     <div id="panel-keywords" class="shell-panel" style="display:none;"></div>
     <div id="panel-quick-wins" class="shell-panel" style="display:none;"></div>
+    <div id="panel-growth-tracker" class="shell-panel" style="display:none;"></div>
 
     <div id="panel-get-reviews" class="shell-panel" style="display:none;">
       <div style="max-width:760px;margin:0 auto;padding:40px 0 8px;text-align:center;">
@@ -409,6 +411,58 @@
 <script src="scoring.js"></script>
 <script>
 (async function () {
+  // Book Insight 4-bullet render (built 19 August 2026, replaces the old
+  // single-sentence/paragraph bookInsight narrative, per rule 17 in
+  // ReaderBull_Project_Rules.md). Shared by bookSummaryHtml (nested inside
+  // renderOverview further down) and marketAnalysisHtml (a top-level
+  // sibling function further still), since rule 17 requires both render
+  // sites to move to bullets together, not just the Book Summary card.
+  //
+  // Placed here, as the very first statement in this IIFE, before even
+  // requireUser()/await, after TWO separate live bugs from getting this
+  // positioning wrong:
+  //  1. First added nested INSIDE renderOverview(), invisible to the
+  //     sibling marketAnalysisHtml -> ReferenceError on every load.
+  //  2. Fixed #1 by hoisting to this top-level scope, but left the
+  //     definition physically further down the file (just above
+  //     renderOverview()'s own definition). Function declarations
+  //     (bookInsightBulletsHtml) are fully hoisted regardless of position,
+  //     but `var BOOK_INSIGHT_BULLETS = [...]` is only hoisted as a
+  //     declaration (value undefined) until execution actually reaches
+  //     that line. The very first render (`renderOverview()` in the
+  //     legacyBook dispatch below) runs BEFORE that line was reached,
+  //     so BOOK_INSIGHT_BULLETS was still undefined the instant a real
+  //     book got selected -> TypeError: Cannot read properties of
+  //     undefined (reading 'every'), thrown synchronously, uncaught,
+  //     aborting the rest of this IIFE (including the tab-switching
+  //     click handlers near the end) on every single page load with at
+  //     least one book. Same root failure mode as bug #1 (a render call
+  //     reaching this code before it's actually available), different
+  //     mechanism (value-hoisting order, not closure visibility).
+  // Moving the assignment itself to the top of the IIFE, ahead of every
+  // await and every render call, removes the ordering hazard entirely
+  // rather than just moving it further down the same list of things that
+  // could still run first.
+  var BOOK_INSIGHT_BULLETS = [
+    { key: 'potential', label: 'Potential', icon: '&#36;' },
+    { key: 'whatsWorking', label: "What's working", icon: '&#10003;' },
+    { key: 'whatNeedsAttention', label: 'What needs attention', icon: '&#33;' },
+    { key: 'whatToDoNext', label: 'What to do next', icon: '&#8594;' }
+  ];
+  function bookInsightBulletsHtml(insight) {
+    if (!insight || typeof insight !== 'object' || Array.isArray(insight)) return '';
+    var hasAllBullets = BOOK_INSIGHT_BULLETS.every(function (def) { return !!insight[def.key]; });
+    if (!hasAllBullets) return '';
+    return BOOK_INSIGHT_BULLETS.map(function (def) {
+      return (
+        '<div class="item">' +
+          '<div class="item-icon icon-teal">' + def.icon + '</div>' +
+          '<div class="item-b"><span style="font-weight:700;color:var(--black);">' + escapeHtml(def.label) + ':</span> ' + escapeHtml(insight[def.key]) + '</div>' +
+        '</div>'
+      );
+    }).join('');
+  }
+
   var user = await readerbull.requireUser('index.html');
   if (!user) return;
 
@@ -1016,20 +1070,13 @@
       // cleanly without a bigger refactor.
       var descHtml = '';
 
-      // Fixed 19 August 2026: bookInsight is generated as a 2-element array
-      // (see enrich-audit.js generateNarrative), but this was still being
-      // passed straight into escapeHtml() as if it were a single string.
-      // String(array) silently joins with a bare comma and no paragraph
-      // break, mashing both paragraphs together with no space, instead of
-      // rendering them as two separate <p> tags. Never caught because no
-      // audit had actually been re-run and viewed live since the array
-      // format shipped. Wrapping the legacy single-string shape in an
-      // array here means one code path handles both shapes safely.
-      var insightHtml = insight
-        ? (Array.isArray(insight) ? insight : [insight]).map(function (p, i, arr) {
-            return '<p style="font-weight:400;color:var(--navy);margin-bottom:' + (i === arr.length - 1 ? '4px' : '10px') + ';">' + escapeHtml(p) + '</p>';
-          }).join('')
-        : '';
+      // Bullet format built 19 August 2026, replaces the old single-string
+      // narrative render (see bookInsightBulletsHtml above). Supersedes an
+      // earlier 19 August fix (main, commit 5b5dfe7) for a comma-mashing
+      // bug in the old 2-paragraph array render, that render path no
+      // longer exists so the fix is moot, not lost, folded in here during
+      // the main/staging merge (21 August 2026).
+      var insightHtml = bookInsightBulletsHtml(insight);
 
       var competitorCount = stats && stats.competitorCount > 0 ? stats.competitorCount : null;
       var revenue = stats ? stats.estimatedNicheRevenue : null;
@@ -1452,6 +1499,24 @@
       // swallow, this step is best-effort, same as onboarding.html
     }
 
+    // Growth Tracker auto-populate (20 August 2026, see onboarding.html's
+    // matching call for the full reasoning). Covers both a brand new book
+    // being refreshed for the first time and an older book whose audit
+    // predates this feature, either way the server-side handler only ever
+    // acts when this book has zero tracked competitors, so it can never
+    // overwrite a competitor the author added themselves.
+    if (competitorsJson && competitorsJson.length) {
+      try {
+        await fetch('/api/growth-tracker?action=auto-populate', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json', 'Authorization': 'Bearer ' + accessToken },
+          body: JSON.stringify({ bookId: b.id, competitors: competitorsJson, ownRank: importData.bestsellerRank })
+        });
+      } catch (err) {
+        // best-effort, see comment above
+      }
+    }
+
     var scoreResult = computeDiscoverabilityScore({
       title: importData.title || b.book_title,
       reviewCount: importData.reviewCount,
@@ -1526,7 +1591,8 @@
       'market-analysis': document.getElementById('panel-market-analysis'),
       'marketing-strategy': document.getElementById('panel-marketing-strategy'),
       'keywords': document.getElementById('panel-keywords'),
-      'quick-wins': document.getElementById('panel-quick-wins')
+      'quick-wins': document.getElementById('panel-quick-wins'),
+      'growth-tracker': document.getElementById('panel-growth-tracker')
     };
 
     if (!b) {
@@ -1534,6 +1600,7 @@
       panels['marketing-strategy'].innerHTML = auditEmptyHtml('speakerphone', 'Marketing Strategy', 'Add and score a book to get a tailored action plan.');
       panels['keywords'].innerHTML = auditEmptyHtml('search', 'Keywords', 'Add and score a book to see its keyword coverage.');
       panels['quick-wins'].innerHTML = auditEmptyHtml('bolt', 'Quick Wins', 'Add and score a book to see your highest-leverage next step.');
+      panels['growth-tracker'].innerHTML = auditEmptyHtml('chart-line', 'Growth Tracker', 'Add and score a book to start tracking it against competitors you choose.');
       return;
     }
 
@@ -1542,6 +1609,8 @@
     panels['keywords'].innerHTML = keywordsHtml(b);
     wireKeywordsPanel(b);
     panels['quick-wins'].innerHTML = quickWinsHtml(b);
+    panels['growth-tracker'].innerHTML = growthTrackerHtml(b);
+    loadGrowthTracker(b);
   }
 
   // Narrative text from the LLM may contain paragraph breaks, render each
@@ -1576,7 +1645,100 @@
   // (b.bestseller_rank_number, nicheStats.yourEstimatedRevenue).
 function competitorTableHtml(b) { var competitors = b.competitors_json; if (!competitors || !competitors.length) return ''; var nicheStats = (b.audit_narrative_json && b.audit_narrative_json.nicheStats) || {}; var rows = competitors.map(function (c) { return ('<tr>' + '<td>' + escapeHtml(c.title || '') + '</td>' + '<td class="tc">' + fmtBsrCell(c.bestsellerRank) + '</td>' + '<td class="tr">' + fmtRevCell(c.estimatedRevenue) + '</td>' + '<td class="tc">' + (c.reviews != null ? escapeHtml(String(c.reviews)) : 'Not available') + '</td>' + '<td class="tc"><span class="badge ' + (c.sponsored ? 'b-teal' : 'b-muted') + '">' + (c.sponsored ? 'Yes' : 'No') + '</span></td>' + '</tr>'); }).join(''); rows += ('<tr>' + '<td style="font-weight:700;color:var(--teal-d);">Your Book</td>' + '<td class="tc">' + fmtBsrCell(b.bestseller_rank_number) + '</td>' + '<td class="tr" style="color:var(--orange);">' + fmtRevCell(nicheStats.yourEstimatedRevenue) + '</td>' + '<td class="tc">' + (b.live_review_count != null ? escapeHtml(String(b.live_review_count)) : 'Not available') + '</td>' + '<td class="tc"><span class="badge b-muted">No</span></td>' + '</tr>'); return ('<div style="overflow-x:auto;">' + '<table class="dash-table">' + '<thead><tr><th>Book</th><th class="tc">Sales Rank</th><th class="tr">Est. Revenue / Mo</th><th class="tc">Reviews</th><th class="tc">Running Ads</th></tr></thead>' + '<tbody>' + rows + '</tbody>' + '</table>' + '</div>' + '<div style="font-size:11px;color:var(--muted);margin-top:10px;">Sales rank and revenue are estimated from each listing\'s live Amazon data, a lower rank means more sales. Running Ads flags whether this listing showed up as a sponsored result during this search.</div>'); }
 
-  function hasCompetitorInsight(b) { var competitors = b.competitors_json; return !!(competitors && competitors.length && competitors.some(function (c) { return typeof c.bestsellerRank === 'number' || typeof c.estimatedRevenue === 'number'; })); } function marketAnalysisHtml(b) { var narrative = b.audit_narrative_json; var nicheStats = (narrative && narrative.nicheStats) || {}; var rankNum = b.bestseller_rank_number; var rankBullet; var bsrStats = (nicheStats && nicheStats.bestSellerRank) || null; var nicheAvgForRank = (bsrStats && typeof bsrStats.nicheAverage === 'number' && bsrStats.nicheAverage > 0) ? bsrStats.nicheAverage : null; if (rankNum && nicheAvgForRank) { var rankRatio = rankNum / nicheAvgForRank; if (rankRatio <= 3) { rankBullet = 'This book ranks strongly for its category, right in line with the niche average (#' + nicheAvgForRank.toLocaleString() + '). The focus now is protecting that position: keep reviews coming in and keep the listing optimised.'; } else if (rankRatio <= 25) { rankBullet = 'This book has a foothold in its category, but sits behind the niche average (#' + nicheAvgForRank.toLocaleString() + '). Reviews and category fit are the two levers most likely to close that gap.'; } else { rankBullet = 'This book\'s category rank (#' + rankNum.toLocaleString() + ') is well behind the niche average (#' + nicheAvgForRank.toLocaleString() + '). Reviews, keyword coverage, and category placement are the places to focus first.'; } } else if (rankNum && rankNum <= 10000) { rankBullet = 'This book ranks strongly in its category already. The focus now is protecting that position: keep reviews coming in and keep the listing optimised.'; } else if (rankNum && rankNum <= 100000) { rankBullet = 'This book has a solid foothold in its category, with real room to climb. Reviews and category fit are the two levers most likely to move the rank.'; } else if (rankNum) { rankBullet = 'This book\'s bestseller rank shows it needs more visibility in its category. Reviews, keyword coverage, and category placement are the places to focus first.'; } else { rankBullet = 'We don\'t have a bestseller rank for this book yet. Once Amazon reports one, we\'ll use it here to gauge category standing.'; } var reviewCount = Number(b.live_review_count) || 0; var reviewBullet = reviewCount >= 15 ? 'With ' + reviewCount + ' reviews, this book has enough social proof to support running ads.' : 'With ' + reviewCount + ' review' + (reviewCount === 1 ? '' : 's') + ', this book is still building the review base most competitive listings in a category carry (a common benchmark is 15+) before ads pay off.'; var bullets = [rankBullet, reviewBullet]; var marketAnalysisSectionsHtml = ''; if (narrative && narrative.marketAnalysis) { if (Array.isArray(narrative.marketAnalysis)) { marketAnalysisSectionsHtml = narrative.marketAnalysis.map(function (sec) { if (!sec || !sec.body) return ''; return '<div class="ma-block">' + (sec.heading ? '<div class="ma-heading">' + escapeHtml(sec.heading) + '</div>' : '') + '<div class="ma-body">' + escapeHtml(sec.body) + '</div>' + '</div>'; }).join(''); } else { bullets.push(narrative.marketAnalysis); } } var competitorCount = (nicheStats.competitorCount > 0) ? nicheStats.competitorCount : null; var revenue = (typeof nicheStats.estimatedNicheRevenue === 'number') ? nicheStats.estimatedNicheRevenue : null; if (competitorCount != null || revenue != null) { var landscapeBits = []; if (competitorCount != null) landscapeBits.push(competitorCount + ' other book' + (competitorCount === 1 ? '' : 's') + ' selling well in this category'); if (revenue != null) landscapeBits.push('an estimated ' + fmtRevCell(revenue) + '/month in category-wide revenue'); bullets.push('This category shows ' + landscapeBits.join(' and ') + '.'); } var insightHtml = (narrative && narrative.bookInsight) ? '<div class="callout">' + (Array.isArray(narrative.bookInsight) ? narrative.bookInsight : [narrative.bookInsight]).map(function (p) { return '<p>' + escapeHtml(p) + '</p>'; }).join('') + '</div>' : ''; var bulletsHtml = bullets.map(function (t) { return '<div class="item"><div class="item-icon icon-orange">&#10003;</div><div class="item-b">' + escapeHtml(t) + '</div></div>'; }).join(''); var arrowHtml = '<div style="text-align:center;margin-top:-4px;margin-bottom:20px;"><span style="font-size:28px;color:var(--orange);line-height:1;">&#8595;</span></div>'; var compareHtml = hasCompetitorInsight(b) ? (arrowHtml + '<div class="hb-card">' + '<div class="hb-eyebrow">How You Compare' + (b.amazon_category ? (': ' + escapeHtml(b.amazon_category)) : '') + '</div>' + competitorTableHtml(b) + '</div>') : ''; return ('<div class="sec-label">Market Analysis</div>' + '<div class="hb-card">' + '<div class="hb-eyebrow">Your Category Standing</div>' + insightHtml + bulletsHtml + marketAnalysisSectionsHtml + '</div>' + compareHtml); }
+  // Merge note (21 August 2026, main/staging reconciliation): the
+  // duplicate old-header competitor-table body that used to sit here on
+  // the staging side of this conflict was staging's byte-identical copy
+  // of the pre-merge ancestor's competitorTableHtml (staging never
+  // touched that function; it only showed up in this diff hunk because
+  // main's rewrite of competitorTableHtml sat in the same changed region
+  // as this function). The real competitorTableHtml (main's rewrite, new
+  // "Sales Rank"/"Running Ads" headers) lives above, unchanged. This
+  // function combines main's rank-ratio bug fix and array-of-sections
+  // marketAnalysis rendering (18 August 2026) with staging's 4-bullet
+  // bookInsight render via bookInsightBulletsHtml (19 August 2026).
+  function hasCompetitorInsight(b) {
+    var competitors = b.competitors_json;
+    return !!(competitors && competitors.length && competitors.some(function (c) { return typeof c.bestsellerRank === 'number' || typeof c.estimatedRevenue === 'number'; }));
+  }
+
+  function marketAnalysisHtml(b) {
+    var narrative = b.audit_narrative_json;
+    var nicheStats = (narrative && narrative.nicheStats) || {};
+    var rankNum = b.bestseller_rank_number;
+    var rankBullet;
+    var bsrStats = (nicheStats && nicheStats.bestSellerRank) || null;
+    var nicheAvgForRank = (bsrStats && typeof bsrStats.nicheAverage === 'number' && bsrStats.nicheAverage > 0) ? bsrStats.nicheAverage : null;
+
+    if (rankNum && nicheAvgForRank) {
+      var rankRatio = rankNum / nicheAvgForRank;
+      if (rankRatio <= 3) {
+        rankBullet = 'This book ranks strongly for its category, right in line with the niche average (#' + nicheAvgForRank.toLocaleString() + '). The focus now is protecting that position: keep reviews coming in and keep the listing optimised.';
+      } else if (rankRatio <= 25) {
+        rankBullet = 'This book has a foothold in its category, but sits behind the niche average (#' + nicheAvgForRank.toLocaleString() + '). Reviews and category fit are the two levers most likely to close that gap.';
+      } else {
+        rankBullet = 'This book\'s category rank (#' + rankNum.toLocaleString() + ') is well behind the niche average (#' + nicheAvgForRank.toLocaleString() + '). Reviews, keyword coverage, and category placement are the places to focus first.';
+      }
+    } else if (rankNum && rankNum <= 10000) {
+      rankBullet = 'This book ranks strongly in its category already. The focus now is protecting that position: keep reviews coming in and keep the listing optimised.';
+    } else if (rankNum && rankNum <= 100000) {
+      rankBullet = 'This book has a solid foothold in its category, with real room to climb. Reviews and category fit are the two levers most likely to move the rank.';
+    } else if (rankNum) {
+      rankBullet = 'This book\'s bestseller rank shows it needs more visibility in its category. Reviews, keyword coverage, and category placement are the places to focus first.';
+    } else {
+      rankBullet = 'We don\'t have a bestseller rank for this book yet. Once Amazon reports one, we\'ll use it here to gauge category standing.';
+    }
+
+    var reviewCount = Number(b.live_review_count) || 0;
+    var reviewBullet = reviewCount >= 15
+      ? 'With ' + reviewCount + ' reviews, this book has enough social proof to support running ads.'
+      : 'With ' + reviewCount + ' review' + (reviewCount === 1 ? '' : 's') + ', this book is still building the review base most competitive listings in a category carry (a common benchmark is 15+) before ads pay off.';
+    var bullets = [rankBullet, reviewBullet];
+
+    var marketAnalysisSectionsHtml = '';
+    if (narrative && narrative.marketAnalysis) {
+      if (Array.isArray(narrative.marketAnalysis)) {
+        marketAnalysisSectionsHtml = narrative.marketAnalysis.map(function (sec) {
+          if (!sec || !sec.body) return '';
+          return '<div class="ma-block">' + (sec.heading ? '<div class="ma-heading">' + escapeHtml(sec.heading) + '</div>' : '') + '<div class="ma-body">' + escapeHtml(sec.body) + '</div></div>';
+        }).join('');
+      } else {
+        bullets.push(narrative.marketAnalysis);
+      }
+    }
+
+    var competitorCount = (nicheStats.competitorCount > 0) ? nicheStats.competitorCount : null;
+    var revenue = (typeof nicheStats.estimatedNicheRevenue === 'number') ? nicheStats.estimatedNicheRevenue : null;
+    if (competitorCount != null || revenue != null) {
+      var landscapeBits = [];
+      if (competitorCount != null) landscapeBits.push(competitorCount + ' other book' + (competitorCount === 1 ? '' : 's') + ' selling well in this category');
+      if (revenue != null) landscapeBits.push('an estimated ' + fmtRevCell(revenue) + '/month in category-wide revenue');
+      bullets.push('This category shows ' + landscapeBits.join(' and ') + '.');
+    }
+
+    // Bullet format built 19 August 2026, replaces the old single-string
+    // narrative render (see bookInsightBulletsHtml above bookSummaryHtml).
+    var insightBulletsHtml = bookInsightBulletsHtml(narrative && narrative.bookInsight);
+    var insightHtml = insightBulletsHtml ? '<div class="callout">' + insightBulletsHtml + '</div>' : '';
+
+    var bulletsHtml = bullets.map(function (t) {
+      return '<div class="item"><div class="item-icon icon-orange">&#10003;</div><div class="item-b">' + escapeHtml(t) + '</div></div>';
+    }).join('');
+    var arrowHtml = '<div style="text-align:center;margin-top:-4px;margin-bottom:20px;"><span style="font-size:28px;color:var(--orange);line-height:1;">&#8595;</span></div>';
+    var compareHtml = hasCompetitorInsight(b)
+      ? (arrowHtml + '<div class="hb-card">' + '<div class="hb-eyebrow">How You Compare' + (b.amazon_category ? (': ' + escapeHtml(b.amazon_category)) : '') + '</div>' + competitorTableHtml(b) + '</div>')
+      : '';
+
+    return (
+      '<div class="sec-label">Market Analysis</div>' +
+      '<div class="hb-card">' +
+        '<div class="hb-eyebrow">Your Category Standing</div>' +
+        insightHtml +
+        bulletsHtml +
+        marketAnalysisSectionsHtml +
+      '</div>' +
+      compareHtml
+    );
+  }
 
   // Template-driven strategy steps, used whenever no LLM narrative is
   // stored for this book (older imports, or if enrichment failed/was
@@ -1737,6 +1899,36 @@ function competitorTableHtml(b) { var competitors = b.competitors_json; if (!com
     );
   }
 
+  // Book portfolio opportunity (8 August 2026): surfaces up to 2 keywords
+  // from this book's own keyword research (api/enrich-audit.js's
+  // findKeywordResearch, one paid DataForSEO call, already fetched) that
+  // classifyKeywords flagged as a genuinely different book topic, not a
+  // variant of this book. No new paid call, reuses data already on the
+  // page. Most books won't have one, an empty array is expected and not
+  // treated as a gap, so this simply renders nothing in that case.
+  function portfolioOpportunityHtml(items) {
+    if (!items || !items.length) return '';
+    var rows = items.map(function (item) {
+      var volume = (item.volume === null || item.volume === undefined || item.volume === '')
+        ? ''
+        : (' &middot; ' + escapeHtml(String(item.volume)) + ' searches/mo');
+      return (
+        '<div style="padding:10px 0;border-bottom:1px solid var(--border);">' +
+          '<strong>' + escapeHtml(item.keyword || '') + '</strong>' + volume +
+          (item.why ? '<div style="color:var(--muted);font-size:13px;margin-top:4px;">' + escapeHtml(item.why) + '</div>' : '') +
+        '</div>'
+      );
+    }).join('');
+
+    return (
+      '<div class="breakdown-card" style="margin-top:24px;">' +
+        '<h2>Book Portfolio Opportunity</h2>' +
+        '<p>Spotted in this book\'s own keyword research: a related topic with real search demand that reads as a genuinely different book, not just another angle on this one.</p>' +
+        rows +
+      '</div>'
+    );
+  }
+
   function keywordsHtml(b) {
     var list = currentKeywordList(b);
     var chipsHtml = list.length
@@ -1779,7 +1971,8 @@ function competitorTableHtml(b) { var competitors = b.competitors_json; if (!com
           ? '<p style="font-size:13px;color:var(--muted);margin-top:16px;">Researched ' + escapeHtml(String(research.totalFound)) + ' keywords for "' + escapeHtml(research.seedKeyword || '') + '". Add any of them straight to your 7 KDP fields below.</p>'
           : '') +
         keywordTableHtml('Amazon Keywords', 'Every related keyword found for this niche, flagged Use or Skip.', research.amazonKeywords, list, null) +
-        keywordTableHtml('Readerbull Recommended Keywords', 'The strongest picks for your 7 KDP backend keyword fields, ranked by fit.', recommended, list, recommendedBlurAfter);
+        keywordTableHtml('Readerbull Recommended Keywords', 'The strongest picks for your 7 KDP backend keyword fields, ranked by fit.', recommended, list, recommendedBlurAfter) +
+        portfolioOpportunityHtml(research.portfolioOpportunities);
     } else {
       researchHtml = '<p style="font-size:13px;color:var(--muted);margin-top:16px;">Keyword research for this book has not run yet, or turned up nothing usable. It runs automatically the next time this book is re-submitted through onboarding.</p>';
     }
@@ -1978,7 +2171,16 @@ async function saveKeywordChange(b, newList) {
 
   async function reciprocalApi(path, opts) {
     opts = opts || {};
-    var resp = await fetch('/api/' + path, {
+    // Merge note (21 August 2026): reviews-browse.js/reviews-mark-done.js/
+    // reviews-my-status.js/reviews-pool-optin.js/reviews-request.js were
+    // consolidated into one api/reviews.js with ?action= routing (see that
+    // file's own header comment), to stay under Vercel Hobby's 12-function
+    // cap once Growth Tracker's own new function landed in the same api/
+    // folder. Callers below still pass the old filename-shaped path
+    // ('reviews-pool-optin' etc unchanged), this just maps it to the new
+    // single-file route so nothing else here needed to change.
+    var action = path.replace(/^reviews-/, '');
+    var resp = await fetch('/api/reviews?action=' + action, {
       method: opts.method || 'GET',
       headers: Object.assign(
         { Authorization: 'Bearer ' + accessToken },
@@ -2683,6 +2885,576 @@ async function saveKeywordChange(b, newList) {
     });
   }
 
+  // ========== BOOK GROWTH TRACKER (built 19 August 2026, see rule 18 in
+  // ReaderBull_Project_Rules.md, Section 6.2 of the Master Handover, and
+  // growth_tracker_mockup.html for the approved spec this follows).
+  // Per-book panel, wired the same way as market-analysis/keywords/etc.
+  // via renderAuditPanels(b), plus its own async data load (tracked
+  // competitors + weekly snapshots aren't part of the `books` row, so
+  // they can't render synchronously the way the other panels do). ==========
+
+  // Single source of truth for the three chart identity colours. Every
+  // place in this section that needs one of them reads from here, never
+  // a second hardcoded hex, so the "legend updated, chart data array
+  // wasn't" bug called out in rule 18 cannot happen structurally.
+  var GT_COLORS = { you: '#F47421', c1: '#00B5AD', c2: '#264E8F', extra: '#9AAAB2' };
+
+  // Mirrors api/growth-tracker.js's COMPETITOR_LIMIT_BY_PLAN. Used here
+  // only to decide, before the author clicks "+ Add book", which dropdown
+  // to open (the add form or the upgrade prompt) rather than waiting on a
+  // round trip. The server is the sole authority on the real limit, if
+  // these two constants ever drift apart the server's answer always wins,
+  // this one is display-only. Pro's "4" is the same flagged assumption as
+  // the backend file (rule 18 left Pro's exact number open), change both
+  // together if John wants a different number.
+  var GT_LIMIT_BY_PLAN = { free: 1, plus: 2, pro: 4 };
+  function gtPlanLimit(plan) { return GT_LIMIT_BY_PLAN[plan] || GT_LIMIT_BY_PLAN.free; }
+
+  function gtAttr(s) { return escapeHtml(String(s == null ? '' : s)); }
+
+  // 'YYYY-MM-DD' week_start -> a short real date ("Aug 18"), not a
+  // generic "Wk 1..8". A brand new tracker won't have 8 clean weeks yet
+  // and may skip a week if a cron run is ever missed, a real date stays
+  // honest either way, a "Wk N" label would quietly imply an unbroken
+  // run that may not exist. Not part of the locked-down mockup copy
+  // (that covered section/button/prompt text, not axis-tick format).
+  function gtWeekLabel(iso) {
+    var parts = String(iso).split('-');
+    if (parts.length !== 3) return escapeHtml(iso);
+    var months = ['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'];
+    var m = parseInt(parts[1], 10) - 1;
+    var d = parseInt(parts[2], 10);
+    return (months[m] || '') + ' ' + d;
+  }
+
+  function growthTrackerHtml(b) {
+    return (
+      '<div class="sec-label">Book Growth Tracker</div>' +
+      '<div class="card" id="gt-card" data-book-id="' + gtAttr(b.id) + '">' +
+        '<p style="font-size:13px;color:var(--mid);">Loading your growth tracker&hellip;</p>' +
+      '</div>' +
+      '<div class="card gt-card-gap" id="gt-trend-card" data-book-id="' + gtAttr(b.id) + '">' +
+        '<div class="gt-trend-title">Est. monthly revenue, last 8 weeks</div>' +
+        '<div class="gt-trend-sub">Same tracked books. This is the one to watch for growth, it reflects all sales, however a buyer found the book, paid ads included, Amazon doesn&rsquo;t split its rank by channel.</div>' +
+        '<div id="gt-trend-body"><p style="font-size:13px;color:var(--mid);">Loading&hellip;</p></div>' +
+        '<div class="gt-update-note">Updated weekly, same data ReaderBull already pulls for your audit, no new cost to track this.</div>' +
+      '</div>'
+    );
+  }
+
+  async function loadGrowthTracker(b) {
+    var card = document.getElementById('gt-card');
+    if (!card || card.getAttribute('data-book-id') !== String(b.id)) return;
+
+    var trackedResult = await readerbull.client
+      .from('tracked_competitors')
+      .select('id,title,amazon_url,asin,added_at,cover_image_url')
+      .eq('book_id', b.id)
+      .is('removed_at', null)
+      .order('added_at', { ascending: true });
+    var tracked = (trackedResult && trackedResult.data) || [];
+
+    var snapResult = await readerbull.client
+      .from('growth_tracker_snapshots')
+      .select('subject_key,week_start,reviews,category_rank,estimated_revenue')
+      .eq('book_id', b.id)
+      .order('week_start', { ascending: true });
+    var snapshots = (snapResult && snapResult.data) || [];
+
+    // Guard against the author switching books (or this panel being
+    // re-rendered again) while the two requests above were in flight.
+    card = document.getElementById('gt-card');
+    if (!card || card.getAttribute('data-book-id') !== String(b.id)) return;
+
+    renderGrowthTracker(b, tracked, snapshots);
+  }
+
+  function renderGrowthTracker(b, tracked, snapshots) {
+    var card = document.getElementById('gt-card');
+    var trendBody = document.getElementById('gt-trend-body');
+    if (!card) return;
+
+    function latestSnapshotFor(subjectKey) {
+      var rows = snapshots.filter(function (s) { return s.subject_key === subjectKey; });
+      return rows.length ? rows[rows.length - 1] : null; // pre-sorted by week_start ascending
+    }
+
+    var nicheStats = (b.audit_narrative_json && b.audit_narrative_json.nicheStats) || {};
+    var ownSubjectKey = 'own:' + b.id;
+
+    // Charts and the trend line show "your book" plus the first 2 tracked
+    // books (by when they were added), matching the two competitor
+    // colours the approved mockup actually defines (teal, navy). A Pro
+    // account tracking a 3rd or 4th book still gets full credit toward
+    // its plan limit and still sees every tracked book in the pills and
+    // the table view below, it just isn't charted in an unapproved 4th
+    // colour. Flagged to John as a scope decision, not silently invented.
+    var chartSubjects = tracked.slice(0, 2);
+    var extraCount = Math.max(0, tracked.length - chartSubjects.length);
+
+    var chartedSeries = [{
+      key: ownSubjectKey,
+      name: 'Your book',
+      color: GT_COLORS.you,
+      reviews: (typeof b.live_review_count === 'number') ? b.live_review_count : null,
+      rank: (typeof b.bestseller_rank_number === 'number') ? b.bestseller_rank_number : null,
+      revenue: (typeof nicheStats.yourEstimatedRevenue === 'number') ? nicheStats.yourEstimatedRevenue : null
+    }].concat(chartSubjects.map(function (tc, i) {
+      var latest = latestSnapshotFor(tc.id);
+      return {
+        key: tc.id,
+        name: tc.title,
+        color: i === 0 ? GT_COLORS.c1 : GT_COLORS.c2,
+        reviews: (latest && typeof latest.reviews === 'number') ? latest.reviews : null,
+        rank: (latest && typeof latest.category_rank === 'number') ? latest.category_rank : null,
+        revenue: (latest && typeof latest.estimated_revenue === 'number') ? latest.estimated_revenue : null
+      };
+    }));
+
+    var extraRows = tracked.slice(2).map(function (tc) {
+      var latest = latestSnapshotFor(tc.id);
+      return {
+        name: tc.title,
+        reviews: (latest && typeof latest.reviews === 'number') ? latest.reviews : null,
+        rank: (latest && typeof latest.category_rank === 'number') ? latest.category_rank : null,
+        revenue: (latest && typeof latest.estimated_revenue === 'number') ? latest.estimated_revenue : null
+      };
+    });
+
+    // ---- legend + cap note ----
+    var legendHtml = chartedSeries.map(function (s) {
+      return '<div class="gt-legend-item"><span class="gt-legend-swatch" style="background:' + s.color + '"></span>' + escapeHtml(s.name) + '</div>';
+    }).join('');
+
+    var capNoteHtml = extraCount > 0
+      ? '<p class="gt-cap-note">Charts below show your book plus your first 2 tracked books. ' + extraCount +
+        ' more tracked book' + (extraCount === 1 ? '' : 's') + ' still count' + (extraCount === 1 ? 's' : '') +
+        ' toward your plan limit and appear' + (extraCount === 1 ? 's' : '') + ' in the table view below.</p>'
+      : '';
+
+    // ---- bar panels: Reviews / Category rank / Est. monthly revenue ----
+    var metrics = [
+      { key: 'reviews', label: 'Reviews', fmt: function (v) { return v.toLocaleString(); }, invert: false },
+      { key: 'rank', label: 'Category rank', fmt: function (v) { return '#' + v; }, invert: true },
+      { key: 'revenue', label: 'Est. monthly revenue', fmt: function (v) { return '$' + v.toLocaleString(); }, invert: false }
+    ];
+    var panelsHtml = metrics.map(function (m) { return gtBarPanelSvg(m, chartedSeries); }).join('');
+
+    // ---- table view (every tracked book, including any past the 2-colour cap) ----
+    var allRowsForTable = chartedSeries.concat(extraRows);
+    var tableRowsHtml = allRowsForTable.map(function (s) {
+      return '<tr><td>' + escapeHtml(s.name) + '</td>' +
+        '<td class="tc">' + (typeof s.reviews === 'number' ? s.reviews.toLocaleString() : 'Not available') + '</td>' +
+        '<td class="tc">' + (typeof s.rank === 'number' ? ('#' + s.rank) : 'Not available') + '</td>' +
+        '<td class="tr">' + (typeof s.revenue === 'number' ? ('$' + s.revenue.toLocaleString()) : 'Not available') + '</td></tr>';
+    }).join('');
+
+    // ---- pills (redesigned 20 August 2026, per John: a single-line text
+    // pill wrapped a long title across 2-3 lines and was "unreadable" at a
+    // glance, especially once 2+ books were tracked). Each tracked book is
+    // now a small cover-image tile with its title underneath, matching how
+    // the book switcher elsewhere on this dashboard already shows a cover
+    // (see switcherCover/score-cover a few hundred lines up), so this is a
+    // pattern already established in this file, not a new one. Falls back
+    // to a colour-tinted placeholder (no invented artwork) when a tracked
+    // book has no cover_image_url yet, either because it predates the 20
+    // August cover-image field or Amazon's own listing had none.
+    var pillsHtml = tracked.map(function (tc, i) {
+      var color = i === 0 ? GT_COLORS.c1 : (i === 1 ? GT_COLORS.c2 : GT_COLORS.extra);
+      var coverInner = tc.cover_image_url
+        ? '<img src="' + escapeHtml(tc.cover_image_url) + '" alt="">'
+        : '<span class="gt-book-cover-placeholder" style="background:' + color + '22"><span class="gt-dot" style="background:' + color + '"></span></span>';
+      return (
+        '<div class="gt-book-tile">' +
+          '<div class="gt-book-cover" style="border-color:' + color + '">' +
+            coverInner +
+          '</div>' +
+          '<div class="gt-book-title" title="' + escapeHtml(tc.title) + '">' + escapeHtml(tc.title) + '</div>' +
+          '<span class="gt-x" data-gt-remove="' + gtAttr(tc.id) + '" title="Remove from tracker">&times;</span>' +
+        '</div>'
+      );
+    }).join('');
+
+    // ---- add / upgrade dropdowns ----
+    var limit = gtPlanLimit(userPlan);
+    var atLimit = tracked.length >= limit;
+
+    var addDropdownHtml =
+      '<div class="gt-dropdown" id="gt-dropdown-add">' +
+        '<input type="text" id="gt-add-input" placeholder="Paste an Amazon book link, or search by title">' +
+        '<button class="gt-confirm" id="gt-add-confirm">Add to tracker</button>' +
+        '<div class="gt-err" id="gt-add-err"></div>' +
+        '<div class="gt-hint">You choose who counts as competition, not just whatever ReaderBull finds automatically.</div>' +
+      '</div>';
+
+    var upgradeTitle, upgradeBtnHtml;
+    if (userPlan === 'pro') {
+      // No higher tier to send a Pro account to, rule 18 only specifies
+      // the Free-to-Plus and Plus-to-Pro wording. Flagged to John as an
+      // edge case the approved copy doesn't cover.
+      upgradeTitle = "You've reached your Pro plan's limit to track books.";
+      upgradeBtnHtml = '';
+    } else {
+      var nextPlan = userPlan === 'plus' ? 'Pro' : 'Plus';
+      upgradeTitle = "You've reached the " + planLabel(userPlan) + " limit to track books.";
+      upgradeBtnHtml = '<button class="gt-confirm" id="gt-upgrade-btn">Upgrade to ' + nextPlan + '</button>';
+    }
+    var upgradeDropdownHtml =
+      '<div class="gt-dropdown" id="gt-dropdown-upgrade">' +
+        '<div class="gt-upgrade-title">' + escapeHtml(upgradeTitle) + '</div>' +
+        upgradeBtnHtml +
+      '</div>';
+
+    card.innerHTML =
+      '<div class="gt-tracking-row">' +
+        '<div class="gt-tracking-left">' +
+          '<span class="gt-tracking-label">Competing Books</span>' +
+          '<div class="gt-pills" id="gt-pills">' + pillsHtml + '</div>' +
+        '</div>' +
+        '<button class="gt-add-btn" id="gt-add-btn">+ Add book</button>' +
+        addDropdownHtml +
+        upgradeDropdownHtml +
+      '</div>' +
+
+      '<div class="card-hdr" style="margin-top:22px;padding-top:20px;border-top:1px solid var(--border);">Your book vs. the competition</div>' +
+      '<div class="gt-legend">' + legendHtml + '</div>' +
+      capNoteHtml +
+      '<div class="gt-panels">' + panelsHtml + '</div>' +
+
+      gtReachStrategyHtml(chartedSeries) +
+
+      '<button class="gt-table-toggle" id="gt-table-toggle">View as table</button>' +
+      '<table class="dash-table gt-hide" id="gt-table" style="margin-top:14px;">' +
+        '<thead><tr><th>Book</th><th class="tc">Reviews</th><th class="tc">Category rank</th><th class="tr">Est. monthly revenue</th></tr></thead>' +
+        '<tbody>' + tableRowsHtml + '</tbody>' +
+      '</table>';
+
+    if (trendBody) trendBody.innerHTML = gtTrendHtml(chartedSeries, snapshots);
+
+    wireGrowthTrackerCard(b, tracked);
+  }
+
+  // "Your path to close the gap" (added 20 August 2026, per John: a single
+  // bar chart didn't make the case for the feature, an author needs to see
+  // WHY a tracked competitor is relevant and HOW to realistically get
+  // there, not just its numbers). One card per tracked competitor actually
+  // charted (chartedSeries[0] is always "your book", never itself
+  // rendered here). Every number here is read straight off chartedSeries,
+  // the exact same real, already-computed values the bar panels above and
+  // the table view below use, per the project's standing "never invent
+  // data" rule, nothing here is a new estimate or an LLM guess.
+  //
+  // "Realistic reach" classification is a plain ratio of category ranks
+  // (own rank / competitor rank, capped at 3x = "realistic", past that =
+  // "bigger stretch"), not a claim about book quality, matching rule 14's
+  // "never credit a strong metric with causing a weak one." The actual
+  // ordering of which competitor appears first (closest-rank-gap first)
+  // happens once, server-side, in api/growth-tracker.js's auto-populate
+  // handler, this function just renders whatever's in chartedSeries in
+  // the order it's given, a manually-added competitor is never reordered
+  // here.
+  function gtReachStrategyHtml(chartedSeries) {
+    var own = chartedSeries[0];
+    var comps = chartedSeries.slice(1);
+    if (!own || !comps.length) return '';
+
+    var itemsHtml = comps.map(function (comp, i) {
+      var rankKnown = typeof own.rank === 'number' && typeof comp.rank === 'number' && own.rank > 0 && comp.rank > 0;
+      var reviewsKnown = typeof own.reviews === 'number' && typeof comp.reviews === 'number';
+      var revenueKnown = typeof own.revenue === 'number' && typeof comp.revenue === 'number';
+
+      // "Ahead" means a genuinely better (lower) category rank, the only
+      // direction a "realistic reach" claim makes sense in. A manually
+      // "+ Add book" competitor can rank worse than the author, unlike
+      // auto-populate's own picks (see the sort in api/growth-tracker.js's
+      // handleAutoPopulate), so this still has to hold for either case.
+      var compAhead = rankKnown && comp.rank < own.rank;
+      var rankGap = compAhead ? (own.rank - comp.rank) : null;
+      var reviewGap = reviewsKnown ? Math.max(0, comp.reviews - own.reviews) : null;
+      var revenueGap = revenueKnown ? Math.max(0, comp.revenue - own.revenue) : null;
+
+      var reachRatio = compAhead ? (own.rank / comp.rank) : null;
+      var leadIn;
+      if (reachRatio !== null) {
+        leadIn = (reachRatio <= 3)
+          ? 'A realistic next milestone, not a stretch goal.'
+          : 'A bigger stretch, but the same playbook gets you there over time.';
+      } else if (rankKnown) {
+        // Rank data exists but the competitor isn't actually ahead, don't
+        // claim a "reach" that isn't real.
+        leadIn = 'You already match or beat them on category rank.';
+      } else {
+        // No rank on either side to compare at all: default the first
+        // card to "realistic" rather than "stretch" language, since it's
+        // already the closest real match auto-populate could find, an
+        // unqualified "stretch" reads as discouraging with no number
+        // behind it.
+        leadIn = (i === 0)
+          ? 'A realistic next milestone, not a stretch goal.'
+          : 'Worth tracking as a comparison point.';
+      }
+
+      var gapParts = [];
+      if (rankGap) gapParts.push(rankGap.toLocaleString() + ' rank spot' + (rankGap === 1 ? '' : 's'));
+      if (reviewGap) gapParts.push(reviewGap.toLocaleString() + ' review' + (reviewGap === 1 ? '' : 's'));
+      var gapText = gapParts.length ? ('You&rsquo;re ' + gapParts.join(' and ') + ' behind. ') : '';
+
+      var revenueText = '';
+      if (revenueKnown && comp.revenue > 0) {
+        revenueText = 'Estimated at $' + comp.revenue.toLocaleString() + '/mo' +
+          (revenueGap > 0 ? (', about $' + revenueGap.toLocaleString() + ' more than your book right now.') : ', already close to your own estimate.');
+      }
+
+      return (
+        '<div class="gt-reach-item">' +
+          '<div class="gt-reach-name">' + escapeHtml(comp.name) + '</div>' +
+          '<div class="gt-reach-lead">' + leadIn + '</div>' +
+          (gapText || revenueText ? '<div class="gt-reach-gap">' + gapText + revenueText + '</div>' : '') +
+          '<div class="gt-reach-strategy">Close it with stronger keyword coverage and a paid Amazon Ads push, the same levers as your Quick Wins, track your progress right here as you climb.</div>' +
+        '</div>'
+      );
+    }).join('');
+
+    return (
+      '<div class="card-hdr" style="margin-top:22px;padding-top:20px;border-top:1px solid var(--border);">Your path to close the gap</div>' +
+      '<div class="gt-reach-grid">' + itemsHtml + '</div>'
+    );
+  }
+
+  // Builds one Reviews/Category rank/Est. monthly revenue bar panel as an
+  // SVG string, string-built like every other panel in this file rather
+  // than the mockup's imperative DOM-node version, to match this file's
+  // existing convention. A series with no real value yet (a competitor
+  // whose initial SerpApi lookup failed) draws a minimal placeholder bar
+  // labelled "n/a" in a neutral grey, never a guessed number, per the
+  // project's standing "never invent data" rule.
+  function gtBarPanelSvg(m, series) {
+    // PH shortened 20 August 2026 (from 170) now that gtBarPanelSvg no
+    // longer draws a per-bar name label at the bottom, so there's no
+    // leftover blank strip under the bars.
+    var PW = 220, PH = 145, barW = 40, gap = 26, baseY = PH - 24, topY = 14;
+    var knownValues = series.map(function (s) { return s[m.key]; }).filter(function (v) { return typeof v === 'number'; });
+    var maxV = knownValues.length ? Math.max.apply(null, knownValues) : 1;
+    var minV = knownValues.length ? Math.min.apply(null, knownValues) : 0;
+    if (maxV === minV) maxV = minV + 1; // avoid a divide-by-zero when every known bar is equal
+
+    var barsHtml = series.map(function (s, i) {
+      var raw = s[m.key];
+      var known = typeof raw === 'number';
+      var x = 20 + i * (barW + gap);
+      var h, y;
+      if (!known) {
+        h = 6; y = baseY - h;
+      } else {
+        var frac = m.invert
+          ? (maxV - raw + (maxV - minV) * 0.15) / (maxV - minV + (maxV - minV) * 0.15)
+          : raw / (maxV * 1.15);
+        h = Math.max(6, frac * (baseY - topY));
+        y = baseY - h;
+      }
+      var label = known ? m.fmt(raw) : 'n/a';
+      var color = known ? s.color : '#DDE3E7';
+      var labelColor = known ? s.color : 'var(--muted)';
+      // No per-bar name label here any more (removed 20 August 2026, per
+      // John: a 12-character truncation like "Amazon FBA …" reads as
+      // meaningless noise, not a book title). The colour swatch + full
+      // title already lives in the .gt-legend block rendered right above
+      // these panels, that's the single source of truth for "which colour
+      // is which book" now, never duplicated (and re-truncated) per chart.
+      return (
+        '<rect x="' + x + '" y="' + y + '" width="' + barW + '" height="' + h + '" rx="4" ry="4" fill="' + color + '"></rect>' +
+        '<text class="gt-bar-val" x="' + (x + barW / 2) + '" y="' + (y - 8) + '" fill="' + labelColor + '">' + escapeHtml(label) + '</text>'
+      );
+    }).join('');
+
+    return (
+      '<div><div class="gt-panel-title">' + escapeHtml(m.label) + '</div>' +
+      '<svg class="gt-barchart" viewBox="0 0 ' + PW + ' ' + PH + '">' +
+        '<line class="gt-baseline" x1="8" x2="' + (PW - 8) + '" y1="' + baseY + '" y2="' + baseY + '"></line>' +
+        barsHtml +
+      '</svg></div>'
+    );
+  }
+
+  // Revenue-only trend line, last up to 8 real weeks. Deliberately never
+  // interpolates or repeats a value into a week with no real snapshot, a
+  // series with zero real data points is left out of the chart entirely
+  // rather than drawn as a flat invented line, per the "never invent
+  // data" rule, this is most visible in a tracker's first few days before
+  // the first Monday snapshot job has run.
+  function gtTrendHtml(series, snapshots) {
+    var weekSet = {};
+    series.forEach(function (s) {
+      snapshots.forEach(function (sn) {
+        if (sn.subject_key === s.key && typeof sn.estimated_revenue === 'number') weekSet[sn.week_start] = true;
+      });
+    });
+    var weeks = Object.keys(weekSet).sort();
+    if (weeks.length > 8) weeks = weeks.slice(weeks.length - 8);
+
+    if (!weeks.length) {
+      return '<p style="font-size:13px;color:var(--mid);">No growth history yet. Your first data point is captured as soon as you add a tracked book, weekly updates follow every Monday.</p>';
+    }
+
+    var seriesPoints = series.map(function (s) {
+      var bySubj = {};
+      snapshots.forEach(function (sn) { if (sn.subject_key === s.key && typeof sn.estimated_revenue === 'number') bySubj[sn.week_start] = sn.estimated_revenue; });
+      var pts = weeks
+        .map(function (w, i) { return { i: i, week: w, value: bySubj[w] }; })
+        .filter(function (p) { return typeof p.value === 'number'; });
+      return { name: s.name, color: s.color, pts: pts };
+    }).filter(function (s) { return s.pts.length; });
+
+    if (!seriesPoints.length) {
+      return '<p style="font-size:13px;color:var(--mid);">No growth history yet. Your first data point is captured as soon as you add a tracked book, weekly updates follow every Monday.</p>';
+    }
+
+    var TW = 680, TH = 220, tPadL = 40, tPadR = 90, tPadT = 16, tPadB = 30;
+    var tPlotW = TW - tPadL - tPadR, tPlotH = TH - tPadT - tPadB;
+    var allVals = seriesPoints.reduce(function (acc, s) { return acc.concat(s.pts.map(function (p) { return p.value; })); }, []);
+    var revMax = Math.max(100, Math.ceil((Math.max.apply(null, allVals) * 1.1) / 100) * 100);
+
+    function txFor(i) { return weeks.length > 1 ? (tPadL + (i / (weeks.length - 1)) * tPlotW) : (tPadL + tPlotW / 2); }
+    function tyFor(v) { return tPadT + (1 - v / revMax) * tPlotH; }
+
+    var gridHtml = '';
+    var tsteps = 4;
+    for (var g = 0; g <= tsteps; g++) {
+      var v = Math.round((g / tsteps) * revMax);
+      var gy = tyFor(v);
+      gridHtml += '<line class="gt-trend-grid" x1="' + tPadL + '" x2="' + (TW - tPadR) + '" y1="' + gy + '" y2="' + gy + '"></line>' +
+        '<text class="gt-trend-axis" x="' + (tPadL - 8) + '" y="' + (gy + 4) + '" text-anchor="end">$' + v.toLocaleString() + '</text>';
+    }
+
+    var axisHtml = weeks.map(function (w, i) {
+      return '<text class="gt-trend-axis" x="' + txFor(i) + '" y="' + (TH - 8) + '" text-anchor="middle">' + gtWeekLabel(w) + '</text>';
+    }).join('');
+
+    var linesHtml = seriesPoints.map(function (s) {
+      var ptsAttr = s.pts.map(function (p) { return txFor(p.i) + ',' + tyFor(p.value); }).join(' ');
+      var dotsHtml = s.pts.map(function (p) {
+        return '<circle class="gt-trend-dot" cx="' + txFor(p.i) + '" cy="' + tyFor(p.value) + '" r="4" fill="' + s.color + '"></circle>';
+      }).join('');
+      var last = s.pts[s.pts.length - 1];
+      var polyline = s.pts.length > 1 ? '<polyline class="gt-trend-line" points="' + ptsAttr + '" stroke="' + s.color + '"></polyline>' : '';
+      var endLabel = '<text class="gt-trend-end-label" x="' + (txFor(last.i) + 10) + '" y="' + (tyFor(last.value) + 4) + '" fill="' + s.color + '">$' + Math.round(last.value).toLocaleString() + '</text>';
+      return polyline + dotsHtml + endLabel;
+    }).join('');
+
+    return '<svg class="gt-trend" viewBox="0 0 ' + TW + ' ' + TH + '">' + gridHtml + axisHtml + linesHtml + '</svg>';
+  }
+
+  function wireGrowthTrackerCard(b, tracked) {
+    var card = document.getElementById('gt-card');
+    if (!card) return;
+
+    var toggleBtn = document.getElementById('gt-table-toggle');
+    var table = document.getElementById('gt-table');
+    if (toggleBtn && table) {
+      toggleBtn.addEventListener('click', function () {
+        table.classList.toggle('gt-hide');
+        toggleBtn.textContent = table.classList.contains('gt-hide') ? 'View as table' : 'Hide table';
+      });
+    }
+
+    var addBtn = document.getElementById('gt-add-btn');
+    var addDropdown = document.getElementById('gt-dropdown-add');
+    var upgradeDropdown = document.getElementById('gt-dropdown-upgrade');
+    var limit = gtPlanLimit(userPlan);
+    var atLimit = tracked.length >= limit;
+
+    if (addBtn) {
+      addBtn.addEventListener('click', function (e) {
+        e.stopPropagation();
+        var target = atLimit ? upgradeDropdown : addDropdown;
+        var other = atLimit ? addDropdown : upgradeDropdown;
+        if (other) other.classList.remove('show');
+        if (target) target.classList.toggle('show');
+      });
+    }
+    [addDropdown, upgradeDropdown].forEach(function (dd) {
+      if (dd) dd.addEventListener('click', function (e) { e.stopPropagation(); });
+    });
+
+    var upgradeBtn = document.getElementById('gt-upgrade-btn');
+    if (upgradeBtn) {
+      upgradeBtn.addEventListener('click', function () {
+        openBillingModal("You've reached your " + planLabel(userPlan) + " plan's tracking limit for this book. Upgrade to track more competitors.");
+      });
+    }
+
+    var addConfirm = document.getElementById('gt-add-confirm');
+    var addInput = document.getElementById('gt-add-input');
+    var addErr = document.getElementById('gt-add-err');
+    if (addConfirm && addInput) {
+      addConfirm.addEventListener('click', function () { gtSubmitAdd(b, addInput, addConfirm, addErr); });
+      addInput.addEventListener('keydown', function (e) {
+        if (e.key === 'Enter') gtSubmitAdd(b, addInput, addConfirm, addErr);
+      });
+    }
+
+    card.querySelectorAll('[data-gt-remove]').forEach(function (x) {
+      x.addEventListener('click', function () { gtSubmitRemove(b, x.getAttribute('data-gt-remove')); });
+    });
+  }
+
+  async function gtSubmitAdd(b, inputEl, btnEl, errEl) {
+    var value = (inputEl.value || '').trim();
+    if (errEl) { errEl.style.display = 'none'; errEl.textContent = ''; }
+    if (!value) {
+      if (errEl) { errEl.textContent = 'Paste a link or type a title first.'; errEl.style.display = 'block'; }
+      return;
+    }
+    btnEl.disabled = true;
+    var originalLabel = btnEl.textContent;
+    btnEl.textContent = 'Adding…';
+    try {
+      var resp = await fetch('/api/growth-tracker?action=add', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', 'Authorization': 'Bearer ' + accessToken },
+        body: JSON.stringify({ bookId: b.id, input: value })
+      });
+      var data = await resp.json().catch(function () { return {}; });
+      if (!resp.ok) {
+        if (errEl) { errEl.textContent = data.message || data.error || 'Could not add that book, please try again.'; errEl.style.display = 'block'; }
+        return;
+      }
+      inputEl.value = '';
+      loadGrowthTracker(b);
+    } catch (err) {
+      if (errEl) { errEl.textContent = 'Network error, please try again.'; errEl.style.display = 'block'; }
+    } finally {
+      btnEl.disabled = false;
+      btnEl.textContent = originalLabel;
+    }
+  }
+
+  async function gtSubmitRemove(b, trackedCompetitorId) {
+    if (!trackedCompetitorId) return;
+    try {
+      await fetch('/api/growth-tracker?action=remove', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', 'Authorization': 'Bearer ' + accessToken },
+        body: JSON.stringify({ trackedCompetitorId: trackedCompetitorId })
+      });
+    } catch (err) {
+      // best-effort, loadGrowthTracker below reflects whatever the server
+      // actually did rather than assuming this call succeeded
+    }
+    loadGrowthTracker(b);
+  }
+
+  // Closes whichever Growth Tracker dropdown (add-book / upgrade) is open
+  // when clicking anywhere outside it. Installed once here rather than
+  // inside renderGrowthTracker(), which re-runs on every book switch, a
+  // listener added there would stack a new one on `document` each time.
+  document.addEventListener('click', function () {
+    var addDd = document.getElementById('gt-dropdown-add');
+    var upgradeDd = document.getElementById('gt-dropdown-upgrade');
+    if (addDd) addDd.classList.remove('show');
+    if (upgradeDd) upgradeDd.classList.remove('show');
+  });
+
   // Tab switching between Navigate items.
   document.querySelectorAll('.shell-nav-item[data-panel]').forEach(function (btn) {
     btn.addEventListener('click', function () {
@@ -2694,7 +3466,15 @@ async function saveKeywordChange(b, newList) {
       var target = btn.getAttribute('data-panel');
       document.getElementById('panel-overview').style.display = (target === 'overview') ? 'block' : 'none';
       [
-        'market-analysis', 'marketing-strategy', 'keywords', 'quick-wins',
+        // Merge note (21 August 2026): staging's separate 'build-arc'
+        // "Coming Soon" stub nav item is intentionally dropped here, main's
+        // 'get-reviews' tab is the real, live, fully-built ARC Readers
+        // feature (reviews-browse/mark-done/pool-optin/request, admin proof
+        // queue) that staging's stub was a placeholder for before either
+        // branch knew the other had built it for real. Keeping both would
+        // put a working tab and a "Coming Soon" tab for the same feature
+        // side by side.
+        'market-analysis', 'marketing-strategy', 'keywords', 'quick-wins', 'growth-tracker',
         'get-reviews', 'ad-campaigns',
         'amazon-kdp', 'tiktok-shop', 'barnes-noble', 'apple-books', 'audible-acx'
       ].forEach(function (name) {
