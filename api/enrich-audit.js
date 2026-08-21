@@ -1209,8 +1209,10 @@ async function generateNarrative(input, competitors, pageRank, nicheStats) {
     'out as the cause of a gap, credit that metric plainly first, then name the real cause, never state ' +
     'that a strong metric helped cause or is responsible for a gap the book is losing on, that is ' +
     'logically backwards. ' +
-    'Professional Assessment: write a short, direct verdict (2 short paragraphs) for the Overview tab, in ' +
-    'the voice of an experienced KDP consultant giving a straight read of where this book stands right now. ' +
+    'Professional Assessment: write 3-4 short, direct bullet points (not paragraphs, 21 August 2026: John ' +
+    'wants this skimmable, same style as Marketing Strategy/Market Analysis, never long prose) for the ' +
+    'Overview tab, in the voice of an experienced KDP consultant giving a straight read of where this book ' +
+    'stands right now. Each bullet is 1-2 short sentences, no more than roughly 2 lines of text. ' +
     'Ground it in nicheStats.bestSellerRank (how this book\'s best category placement compares to the niche ' +
     'average and top competitor, always described as a rank comparison, never converted into a sales or ' +
     'revenue figure, nicheStats has no revenue numbers) and book.organicSearchPosition, book.formats, ' +
@@ -1246,7 +1248,7 @@ async function generateNarrative(input, competitors, pageRank, nicheStats) {
     '"marketAnalysis": [{"heading": "short heading", "body": "1-2 short sentences"}], ' +
     '"strategySteps": [{"title": "short step title", "body": "1-2 sentences, specific to this book\'s data"}], ' +
     '"quickWins": [{"title": "short action title", "body": "1-2 sentences on why this is the next best move"}], ' +
-    '"professionalAssessment": "2 short paragraphs, as described above", ' +
+    '"professionalAssessment": ["short bullet, 1-2 sentences", "short bullet, 1-2 sentences", "short bullet, 1-2 sentences"], ' +
     '"contentType": "Evergreen"|"Trending"|"Seasonal"}. ' +
     'Provide 3-5 strategySteps ordered by likely impact, and 3 quickWins ordered by ease and impact.';
 
