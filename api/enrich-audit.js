@@ -241,7 +241,13 @@ async function findCompetitors(input) {
         reviews: r.reviews || null,
         price: r.price || null,
         sponsored: false,
-        position: i + 1
+        position: i + 1,
+        // Passed straight through from import-book.js's boughtTogether
+        // mapping (r.image there), which already applied the same
+        // thumbnails[0]/thumbnail fallback used for the author's own
+        // cover, so Growth Tracker's competitor pills (20 August 2026)
+        // can show real cover art with zero new SerpApi calls.
+        image: r.image || null
       };
     });
   if (fromBoughtTogether.length) return fromBoughtTogether;
@@ -300,7 +306,12 @@ async function trySerpApiCompetitorCandidates(candidates, apiKey, ownAsin) {
             reviews: r.reviews || null,
             price: r.price || null,
             sponsored: !!r.sponsored,
-            position: r.position || null
+            position: r.position || null,
+            // Same thumbnails[0]/thumbnail fallback as import-book.js's
+            // coverImage extraction, SerpApi's Amazon Search engine
+            // (engine=amazon) returns the same thumbnail shape as
+            // amazon_product does, confirmed against a live response.
+            image: (r.thumbnails && r.thumbnails[0]) || r.thumbnail || null
           };
         });
 
@@ -658,6 +669,14 @@ function buildRevenueInsight(input, nicheStats) {
 // lookup. This satisfies ReaderBull_Project_Rules.md rule 12 (keyword
 // research must never come back completely empty) without the old
 // worst-case cost of up to 6 paid calls per audit.
+//
+// Book portfolio opportunity (8 August 2026): classifyKeywords below also
+// flags up to 2 keywords from this same DataForSEO pull that read as a
+// genuinely different book topic, not just a variant of this book. Zero
+// new paid calls, rides on the existing classification call. Surfaced in
+// dashboard.html as a small "Book Portfolio Opportunity" card on the
+// Keywords tab, only when non-empty. New/refreshed audits only, per John,
+// the ~15 existing legacy audits were deliberately not backfilled.
 var KEYWORD_CACHE_SUPABASE_URL = 'https://tqkeqjisqqvxasyzrfax.supabase.co';
 
 function normalizeSeed(seed) {
@@ -774,7 +793,11 @@ async function findKeywordResearch(input) {
       totalFound: 0,
       suggestedOnly: true,
       amazonKeywords: [],
-      recommendedKeywords: aiSeeds.map(function (s) { return { keyword: s, volume: null, status: 'Suggested' }; })
+      recommendedKeywords: aiSeeds.map(function (s) { return { keyword: s, volume: null, status: 'Suggested' }; }),
+      // No portfolio opportunity signal here either, classifyKeywords never ran
+      // (there was nothing from DataForSEO to classify), same empty-array
+      // convention used throughout this file.
+      portfolioOpportunities: []
     };
   }
 
@@ -792,7 +815,12 @@ async function findKeywordResearch(input) {
     seedKeyword: found.seed,
     totalFound: found.totalFound,
     amazonKeywords: found.items.slice(0, 30).map(function (it) { return { keyword: it.keyword, volume: it.volume, status: 'Use' }; }),
-    recommendedKeywords: []
+    recommendedKeywords: [],
+    // Classification (classifyKeywords) is what actually spots portfolio
+    // opportunities, this branch only runs when that call failed (e.g. no
+    // Anthropic key), so there's nothing to report, same empty-array
+    // convention as recommendedKeywords above.
+    portfolioOpportunities: []
   };
 }
 
@@ -921,9 +949,21 @@ async function classifyKeywords(input, seed, items) {
     'From the "Use" keywords, pick up to 8 for a "Recommended" list, the strongest few as ' +
     '"Priority" and the rest as "Best Fit", the ones most worth putting in the author\'s 7 KDP ' +
     'backend keyword fields. ' +
+    'Portfolio opportunity (added 8 August 2026, reuses this same keyword list, no extra paid ' +
+    'call): separately from the Use/Skip/Recommended judgment above, look for up to 2 keywords in ' +
+    'the SAME list that represent a genuinely different book topic or niche, not a variant, synonym ' +
+    'or sub-angle of THIS book (for example, if this book is about reincarnation, "twin flame" or ' +
+    '"shadow work" would qualify as a different topic, but "past life regression" would not, that\'s ' +
+    'still this book\'s own topic). Only include a keyword here if a knowledgeable KDP consultant ' +
+    'would genuinely say "that\'s a different book", not just a different phrasing of this one. It is ' +
+    'completely fine, and expected most of the time, for this list to be empty, only include a ' +
+    'keyword when the fit is real. For each one, write a single short sentence explaining why it ' +
+    'reads as a distinct opportunity rather than an angle on the current book. Never invent a ' +
+    'keyword or volume beyond what is given in the list below. ' +
     'Respond with ONLY a JSON object, no markdown fences, no commentary, matching exactly this shape: ' +
     '{"amazonKeywords": [{"keyword": "...", "volume": <number or null>, "status": "Use"|"Skip"}], ' +
-    '"recommendedKeywords": [{"keyword": "...", "volume": <number or null>, "status": "Priority"|"Best Fit"}]}. ' +
+    '"recommendedKeywords": [{"keyword": "...", "volume": <number or null>, "status": "Priority"|"Best Fit"}], ' +
+    '"portfolioOpportunities": [{"keyword": "...", "volume": <number or null>, "why": "one short sentence"}]}. ' +
     'Include every keyword given to you exactly once in amazonKeywords, preserve the volume value given. ' +
     'Output MINIFIED JSON on a single line, no indentation, no line breaks, no extra spaces, this keeps ' +
     'the response short enough to never get cut off.';
@@ -979,6 +1019,11 @@ async function classifyKeywords(input, seed, items) {
 
     if (!parsed || !Array.isArray(parsed.amazonKeywords)) return null;
     parsed.recommendedKeywords = Array.isArray(parsed.recommendedKeywords) ? parsed.recommendedKeywords.slice(0, 8) : [];
+    // Portfolio opportunity (8 August 2026): defensive default so
+    // dashboard.html can always assume an array, never undefined, same
+    // convention as recommendedKeywords above. Capped at 2, matching the
+    // limit already told to the model in the system prompt.
+    parsed.portfolioOpportunities = Array.isArray(parsed.portfolioOpportunities) ? parsed.portfolioOpportunities.slice(0, 2) : [];
     return parsed;
   } catch (err) {
     return null;
@@ -1000,14 +1045,6 @@ async function generateNarrative(input, competitors, pageRank, nicheStats) {
   // marketAnalysis to use this field verbatim instead of computing it.
   var reviewCountNum = (typeof input.reviewCount === 'number') ? input.reviewCount : (Number(input.reviewCount) || 0);
   var reviewsToNextThreshold = reviewCountNum < 15 ? (15 - reviewCountNum) : null;
-  // Added [fix, 18 August 2026, per John]: precomputed for the same reason
-  // as reviewsToNextThreshold above, don't make the model count the
-  // competitors array itself. sponsored is only ever reliably known for
-  // competitors found via a live SerpApi search, not the "bought
-  // together" source (see findCompetitors/attachCompetitorBsr comments),
-  // so this is always a floor on real ad activity in the niche, never an
-  // exact census, hence the "at least N" phrasing required below.
-  var sponsoredCompetitorCount = (competitors || []).filter(function (c) { return c && c.sponsored === true; }).length;
   var payload = {
     book: {
       title: input.title || null,
@@ -1043,7 +1080,26 @@ async function generateNarrative(input, competitors, pageRank, nicheStats) {
     scoreBreakdown: breakdown,
     competitors: competitors,
     nicheStats: nicheStats || null,
-    sponsoredCompetitorCount: sponsoredCompetitorCount
+    // Added 19 August 2026 for the rebuilt bookInsight "what needs
+    // attention" bullet (rule 17/18): the author's own chosen Growth
+    // Tracker competitors. Each entry expected as {name, rank,
+    // monthlyRevenue}, sourced from real tracked-competitor data, never
+    // computed here. Merge note (21 August 2026): the Growth Tracker
+    // table now exists (api/growth-tracker.js), but no caller passes
+    // input.trackedCompetitors into this endpoint yet, so this is still
+    // always null today and the prompt below falls back to
+    // niche-relative language with no named competitors, per the "never
+    // invent data" rule. Wiring an actual caller to pass this through is
+    // a real follow-up, not done as part of this merge.
+    //
+    // Replaces the old sponsoredCompetitorCount field (main, 18 August
+    // 2026), which existed only to support the 2-paragraph bookInsight
+    // format's "at least N comparable books are running ads" line. That
+    // format is superseded below by the 4-bullet rebuild, which doesn't
+    // reference sponsoredCompetitorCount, so the field and the (competitors
+    // || []).filter(sponsored) computation that fed it were dropped as
+    // dead code rather than carried forward unused.
+    trackedCompetitors: Array.isArray(input.trackedCompetitors) ? input.trackedCompetitors : null
   };
 
   // Content-quality rewrite, 29 July 2026 (ReaderBull_Next_Chat_Handover_Prompt.md
@@ -1104,44 +1160,55 @@ async function generateNarrative(input, competitors, pageRank, nicheStats) {
     'step suggesting the author think about a second, related title, since a second book compounds ' +
     'discoverability (cross-sell, a new keyword footprint, a new category placement). Do not suggest ' +
     'this if authorBookCount is missing, null, or greater than 1. ' +
-    'Book Insight (rewritten a third time, 18 August 2026, per John, after several rounds of live ' +
-    'review): bookInsight is the very first thing an author sees about their book and must feel like a ' +
-    'real opportunity, not a data report. It is an array of exactly 2 short paragraph strings (see the ' +
-    'JSON shape below), never one block of text. ' +
-    'Paragraph 1 leads with money: when nicheStats.benchmarkCompetitor or nicheStats.targetRevenue/ ' +
-    'revenueRange is given, open by naming a concrete real figure ("top books in this niche are earning ' +
-    'around $X a month") sourced only from that data, never invented. Then name the actual gap between ' +
-    'this book and that benchmark as review count/social proof specifically, comparing book.reviewCount ' +
-    'against nicheStats.benchmarkCompetitor.reviews when both exist ("the difference is social proof, ' +
-    'they have dozens of reviews, you have one"), never the star rating and never a bare rank number. ' +
-    'Only credit book.rating as a positive signal anywhere in bookInsight once book.reviewCount is 3 or ' +
-    'higher, a perfect average built on 1-2 reviews is not credible evidence of anything and must not ' +
-    'be praised as if it were. If revenue data is genuinely missing, write around it honestly (name the ' +
-    'niche\'s real demand instead) rather than inventing a number or falling back to jargon. ' +
-    'Paragraph 2 gives the practical next step, in plain language an author actually understands: never ' +
-    'use the words "unlock" or "build", and never use the term ACoS, no author knows what that means. ' +
-    'Branch this paragraph on book.amazonAdsActive (added 18 August 2026, per John, after a live review ' +
-    'question about authors who already run ads). When book.amazonAdsActive is false (ads not started ' +
-    'yet): state the review target as "aim for 10-15 reviews before you start paid ads", never a single ' +
-    'bald exact number like "you need exactly 15", then end on a plain-English target for once ads are ' +
-    'running: aim for around $3 in sales for every $1 spent. When book.amazonAdsActive is true (ads are ' +
-    'already running): never tell the author to "start" paid ads, they already have, instead talk about ' +
-    'optimizing or scaling the campaign that is already live, and give the same $3-in-sales-for-every-$1- ' +
-    'spent figure as the target to monitor and improve toward rather than a future goal, never repeat the ' +
-    '"aim for 10-15 reviews before you start" phrasing in this case, it no longer applies. Either way, ' +
-    'when sponsoredCompetitorCount is 1 or more, use that exact precomputed number (never count the ' +
-    'competitors array yourself) to name a real, book-specific fact about how many comparable books are ' +
-    'already running ads, phrased as "at least N of the comparable books here are running ads" since it ' +
-    'is always a floor, not an exact census (see the field\'s own note above). When sponsoredCompetitorCount ' +
-    'is 0, skip that detail entirely rather than implying no one in the niche advertises. The $3-per-$1 ' +
-    'ratio is a fixed general benchmark, not computed from this book\'s own data (no data source available ' +
-    'to this pipeline exposes competitors\' real ad spend or returns, that is private, advertiser-only ' +
-    'data), present it as a target to aim for and monitor against, never as a guarantee or a number this ' +
-    'specific book will get. ' +
-    'Vary your phrasing, structure and word choice meaningfully from book to book, this must never read ' +
-    'like the same template sentence with numbers swapped in. Never state a rank comparison as a ratio ' +
-    'or multiple ("150 times deeper", "3x behind"), that phrasing is banned everywhere in the narrative, ' +
-    'not just here. Each paragraph is 1-2 short, warm sentences. ' +
+    'Book Insight (rebuilt as 4 bullets, 19 August 2026, per rule 17 in ReaderBull_Project_Rules.md, ' +
+    'replaces the old single-sentence format entirely): bookInsight is the very first thing an author sees ' +
+    'about their book and must feel like a real opportunity, not a data report. It is now an object with ' +
+    'exactly these 4 keys, potential, whatsWorking, whatNeedsAttention, whatToDoNext (see the JSON shape ' +
+    'below), each a single string of 1-2 short, warm sentences, never an array and never one long block ' +
+    'of text. Vary your phrasing, structure and word choice meaningfully from book to book, this must ' +
+    'never read like the same template sentence with numbers swapped in. Never state a rank comparison ' +
+    'as a ratio or multiple ("150 times deeper", "3x behind"), that phrasing is banned everywhere in the ' +
+    'narrative, not just here. Never use the term "rank gap" or any other internal-sounding jargon label ' +
+    'anywhere in these 4 bullets, state the actual numbers plainly instead, the numbers already carry the ' +
+    'meaning. ' +
+    'potential: name a concrete real revenue figure for top books in this niche, sourced only from ' +
+    'nicheStats.benchmarkCompetitor.estimatedRevenue or nicheStats.targetRevenue/revenueRange, phrased ' +
+    'like "top books in this niche earn around $X/month". If revenue data is genuinely missing, name the ' +
+    'niche\'s real demand instead (nicheStats.estimatedNicheRevenue or competitorCount) rather than ' +
+    'inventing a number or falling back to jargon. ' +
+    'whatsWorking: name the book\'s genuinely strong metric(s), reviews and/or rating, stated plainly. ' +
+    'Only credit book.rating as a positive signal once book.reviewCount is 3 or higher, a perfect average ' +
+    'built on 1-2 reviews is not credible evidence of anything and must not be praised as if it were. If ' +
+    'neither reviews nor rating are genuinely strong yet, say so honestly rather than inventing a strength ' +
+    'that is not there, for example note plainly that nothing there is holding the book back and point ' +
+    'forward to where the real opportunity is, never force a compliment the data does not support. ' +
+    'whatNeedsAttention: the real gap, using actual numbers. Ground this in nicheStats.bestSellerRank, ' +
+    'book\'s own category rank (nicheStats.bestSellerRank.yours) against nicheAverage and/or ' +
+    'topCompetitor. When trackedCompetitors is given (the author\'s own chosen Growth Tracker competitors, ' +
+    'each with name, rank and monthlyRevenue, real tracked data, never invented or estimated by you), name ' +
+    'up to 2 of them by name, but only after introducing them first, for example "one similar book you\'re ' +
+    'tracking, [name]," or "two similar books you\'re tracking, [name] and [name],", never drop a name in ' +
+    'cold with no lead-in. Follow the name(s) immediately with that competitor\'s real category rank, then ' +
+    'its real monthly sales figure from trackedCompetitors, in the pattern "sit at A and B. Monthly sales ' +
+    'are $X and $Y, respectively." (adjust to singular for one competitor). When trackedCompetitors is ' +
+    'empty or not given, which is the normal case until the author has added tracked competitors on their ' +
+    'Growth Tracker, do not name any competitor, use niche-relative language instead, comparing this ' +
+    'book\'s own rank against nicheAverage and/or topCompetitor plainly, then name the real cause ' +
+    '(visibility and discoverability, keyword coverage, category fit, whichever the data best supports), ' +
+    'never book quality. Either way, end by naming the real cause of the gap plainly, this is the pattern ' +
+    'to follow, using only real data every time, never these literal names, numbers or exact wording: ' +
+    '"your book sits at 195 in its category. Two similar books you\'re tracking, Bake & Blend Co. and The ' +
+    'Herbal Kitchen, sit at 55 and 31. Monthly sales are $410 and $748, respectively. That gap is ' +
+    'visibility and discoverability, not book quality." ' +
+    'whatToDoNext: the plain-English next action. Point at the Growth Tracker by name generally ("track ' +
+    'your progress on your Growth Tracker"), never re-list any competitor name(s) already used in ' +
+    'whatNeedsAttention. Mention ensuring the book listing is fully optimised and running a paid ads ' +
+    'campaign. Keep this short: no ad budget figures, no ad-return target, no sales-per-spend ratio. ' +
+    'Apply rule 14\'s tone (ReaderBull_Project_Rules.md) to all 4 bullets: confident and direct, never ' +
+    'hedge ("likely", "probably", "may be"), and whenever a bullet names a strong metric only to rule it ' +
+    'out as the cause of a gap, credit that metric plainly first, then name the real cause, never state ' +
+    'that a strong metric helped cause or is responsible for a gap the book is losing on, that is ' +
+    'logically backwards. ' +
     'Professional Assessment: write a short, direct verdict (2 short paragraphs) for the Overview tab, in ' +
     'the voice of an experienced KDP consultant giving a straight read of where this book stands right now. ' +
     'Ground it in nicheStats.bestSellerRank (how this book\'s best category placement compares to the niche ' +
@@ -1172,7 +1239,10 @@ async function generateNarrative(input, competitors, pageRank, nicheStats) {
     'rough order when the data supports it: how the book\'s rank compares to the niche, its review ' +
     'and rating position, and the competitive landscape (competitor count/revenue if given). ' +
     'Respond with ONLY a JSON object, no markdown fences, no commentary, matching exactly this shape: ' +
-    '{"bookInsight": ["paragraph 1: real earning potential + the review-count gap", "paragraph 2: plain next step, sponsored-competitor fact if available, sales-per-spend target"], ' +
+    '{"bookInsight": {"potential": "real earning potential for top books in this niche", ' +
+    '"whatsWorking": "the book\'s genuinely strong metric(s), stated plainly", ' +
+    '"whatNeedsAttention": "the real gap, named competitors if trackedCompetitors is given, niche-relative if not", ' +
+    '"whatToDoNext": "the plain-English next action, points at the Growth Tracker generally"}, ' +
     '"marketAnalysis": [{"heading": "short heading", "body": "1-2 short sentences"}], ' +
     '"strategySteps": [{"title": "short step title", "body": "1-2 sentences, specific to this book\'s data"}], ' +
     '"quickWins": [{"title": "short action title", "body": "1-2 sentences on why this is the next best move"}], ' +
@@ -1259,3 +1329,16 @@ function sendErrorAlert(endpoint, detail) {
     })
   }).catch(function () {});
 }
+
+// Added 19 August 2026 for the Growth Tracker weekly snapshot job
+// (api/growth-tracker.js): exposes the existing BSR-to-revenue estimator
+// as named properties on the default export, so that file can
+// require('./enrich-audit').estimateMonthlyRevenue etc. and reuse the
+// exact same calculation rather than a second copy drifting out of sync,
+// per rule 18 ("reuse that logic rather than writing a second
+// BSR-to-revenue estimator"). module.exports stays a function (the
+// Vercel request handler for THIS file's own route), attaching named
+// properties onto it doesn't change that, Node functions are objects.
+module.exports.parsePrice = parsePrice;
+module.exports.estimateMonthlySalesFromRank = estimateMonthlySalesFromRank;
+module.exports.estimateMonthlyRevenue = estimateMonthlyRevenue;
