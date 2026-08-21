@@ -1220,6 +1220,11 @@ async function generateNarrative(input, competitors, pageRank, nicheStats) {
     'around the gap honestly instead of guessing a figure. Name the single biggest lever available (usually ' +
     'reviews, ads, or both) and roughly what closes the gap, without inventing a specific target number ' +
     'or dollar figure unless one is present in the data given. ' +
+    'Number formatting (21 August 2026, per John: raw digits like "1231" "look random"): whenever you ' +
+    'write out a rank number (bestseller rank, category rank, niche average, competitor rank) or a review ' +
+    'count inside bookInsight, marketAnalysis, strategySteps, quickWins or professionalAssessment text, ' +
+    'always format it with thousands-separator commas, e.g. "1,231" not "1231", "56,000" not "56000". ' +
+    'Dollar figures already get a "$" prefix per the instructions below, apply the same comma rule to those too. ' +
     'Rank-strength consistency: whenever you describe how strong, competitive or well-positioned ' +
     'this book\'s category rank is anywhere in bookInsight, marketAnalysis or professionalAssessment, ' +
     'that description must agree with nicheStats.bestSellerRank when it is given (yours versus ' +
