@@ -43,7 +43,7 @@ module.exports = async function handler(req, res) {
 // (Track A — see ReaderBull_Review_System_Scoping.md).
 //
 // -> { books: [ { poolEntryId, bookId, title, coverImageUrl, category,
-//                  cleanContentOnly, availableSlots } ] }
+//                  cleanContentOnly, availableSlots, asin } ] }
 //
 // "availableSlots" for a book = bonus_slots (one-time starter credit) +
 // completed reviews the book's OWNER has given to other authors - how many
@@ -74,7 +74,7 @@ async function handleBrowse(req, res) {
   // makes the embed work even for books the caller doesn't own).
   var poolResp = await fetch(
     SUPABASE_URL + '/rest/v1/review_pool_entries?select=id,book_id,user_id,bonus_slots,clean_content_only,offer_type,price_cents,' +
-      'books(book_title,cover_image_url,amazon_category,score)&active=eq.true',
+      'books(book_title,cover_image_url,amazon_category,score,asin)&active=eq.true',
     { headers: headers }
   );
   if (!poolResp.ok) {
@@ -144,7 +144,13 @@ async function handleBrowse(req, res) {
       // defaults to 'manuscript'/null for any pre-migration row (the
       // column's own DB default), so older entries render correctly too.
       offerType: entry.offer_type || 'manuscript',
-      priceCents: (typeof entry.price_cents === 'number') ? entry.price_cents : null
+      priceCents: (typeof entry.price_cents === 'number') ? entry.price_cents : null,
+      // asin added 22 August 2026 (handover Section 6.4 fix): lets the
+      // dashboard build a real Amazon link per marketplace
+      // (amazon.<tld>/dp/<asin>) instead of showing plain "Buy on Amazon"
+      // text with nothing behind it. No schema change — every book has
+      // stored this since import (api/import-book.js) already.
+      asin: b.asin || null
     });
   }
 
@@ -173,7 +179,7 @@ async function handleBrowse(req, res) {
 //
 // -> {
 //   myBooks: [ { bookId, title, manuscriptUploaded, inPool, availableSlots, poolCreatedAt } ],
-//   toReview: [ { assignmentId, bookId, title, coverImageUrl, status, assignedAt, completedAt } ],
+//   toReview: [ { assignmentId, bookId, title, coverImageUrl, status, assignedAt, completedAt, asin } ],
 //   beingReviewed: [ { bookId, title, activeCount, completedCount } ],
 //   beingReviewedEvents: [ { bookId, title, status, assignedAt, completedAt } ]
 // }
@@ -253,7 +259,7 @@ async function handleMyStatus(req, res) {
 
   // Books this author has been assigned to review.
   var toReviewResp = await fetch(
-    SUPABASE_URL + '/rest/v1/review_assignments?select=id,book_id,owner_id,status,assigned_at,completed_at,review_proof_url,proof_status,books(book_title,cover_image_url)&reviewer_id=eq.' +
+    SUPABASE_URL + '/rest/v1/review_assignments?select=id,book_id,owner_id,status,assigned_at,completed_at,review_proof_url,proof_status,books(book_title,cover_image_url,asin)&reviewer_id=eq.' +
       encodeURIComponent(authUser.id) + '&order=assigned_at.desc',
     { headers: headers }
   );
@@ -290,7 +296,10 @@ async function handleMyStatus(req, res) {
       offerType: tier.offer_type || 'manuscript',
       priceCents: (typeof tier.price_cents === 'number') ? tier.price_cents : null,
       reviewProofUrl: r.review_proof_url || null,
-      proofStatus: r.proof_status || null
+      proofStatus: r.proof_status || null,
+      // asin added 22 August 2026 (handover Section 6.4 fix) — same field
+      // as the browse response above, see that comment.
+      asin: bk.asin || null
     };
   });
 
