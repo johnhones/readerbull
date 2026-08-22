@@ -669,6 +669,16 @@ finishes before the audit does or shows a raw ticking second count. */
 .arc-row .arc-row-meta { font-size: 12px; color: var(--muted); }
 .arc-row .btn { padding: 7px 14px; font-size: 12px; white-space: nowrap; }
 .arc-row-actions { display: flex; gap: 8px; flex-shrink: 0; }
+/* Real Amazon marketplace links (22 August 2026 fix, handover Section
+   6.4) — styled distinctly from the plain arc-row-meta text around them
+   so it reads as a clickable link, not another status line. Restored
+   here (22 August 2026) after a later same-day style.css upload for the
+   homepage promise-card change overwrote this rule — GitHub's web-upload
+   replaces the whole file rather than merging, so a full-file upload
+   based on a stale local copy silently drops any change landed on main
+   in between. Re-pulling origin/main before editing avoids this. */
+.arc-amazon-link { color: var(--teal-d); font-weight: 700; text-decoration: underline; }
+.arc-amazon-link:hover { text-decoration: none; }
 
 .pill { display: inline-flex; align-items: center; gap: 5px; font-size: 11px; font-weight: 700; padding: 3px 10px; border-radius: 20px; text-transform: uppercase; letter-spacing: .3px; }
 .pill-teal { background: var(--teal-l); color: var(--teal-d); }
