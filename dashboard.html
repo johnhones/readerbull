@@ -2389,9 +2389,10 @@ async function saveKeywordChange(b, newList) {
       // so r.manuscriptPath points at a file that doesn't exist for them.
       // Showing the button anyway used to end in a raw alert() when the
       // signed-URL fetch failed (found 20 August 2026, live two-account
-      // test). The reviewer already saw "Buy on Amazon" on the Library
-      // card they claimed this from, so for those two tiers we just omit
-      // the button rather than invent a second Amazon link here.
+      // test). For those two tiers we omit the button and show a real
+      // Amazon link instead (below) — until the 22 August 2026 fix
+      // (handover Section 6.4) there was no link here at all, just the
+      // Library card's plain "Buy on Amazon" text with nothing behind it.
       var readBtnHtml = (!r.offerType || r.offerType === 'manuscript')
         ? '<button type="button" class="btn btn-outline arc-read-btn" data-path="' + escapeHtmlLocal(r.manuscriptPath) + '">Read manuscript</button>'
         : '';
@@ -2404,7 +2405,9 @@ async function saveKeywordChange(b, newList) {
             ? '<span class="arc-row-meta" style="align-self:center;">Mark as done in ' + daysLeft + ' day' + (daysLeft === 1 ? '' : 's') + '</span>'
             : '<button type="button" class="btn btn-primary arc-done-btn" data-assignment-id="' + r.assignmentId + '" data-offer-type="' + (r.offerType || 'manuscript') + '">Mark as done</button>');
       return '<div class="arc-row"><div><div class="arc-row-title">' + escapeHtmlLocal(r.title) + '</div>' +
-        '<div class="arc-row-meta">' + metaHtml + '</div></div>' +
+        '<div class="arc-row-meta">' + metaHtml + '</div>' +
+        arcAmazonMetaHtml(r.offerType || 'manuscript', r.priceCents, r.asin) +
+        '</div>' +
         (actionHtml ? '<div class="arc-row-actions">' + actionHtml + '</div>' : '') + '</div>';
     }).join('');
 
@@ -2566,6 +2569,38 @@ async function saveKeywordChange(b, newList) {
     return '$' + (cents / 100).toFixed(2);
   }
 
+  // Amazon links (22 August 2026 fix, handover Section 6.4): before this,
+  // neither the Library nor "Books You're Reviewing" ever gave a Kindle
+  // Unlimited / Verified Purchase reviewer a real way to reach the book on
+  // Amazon — "Buy on Amazon" was plain text with nothing behind it. Built
+  // client-side from the book's existing `asin` (api/reviews.js now
+  // returns it) — no schema change needed. Multi-marketplace: ASIN is
+  // shared across marketplaces for the same self-published edition
+  // (usually true for KDP, not a hard guarantee for every listing), so
+  // amazon.<tld>/dp/<asin> works for each site below. Two marketplaces for
+  // now per go-ahead; add more tlds here if reviewers need them.
+  var ARC_AMAZON_MARKETPLACES = [
+    { tld: 'com', label: 'Amazon.com' },
+    { tld: 'co.uk', label: 'Amazon.co.uk' }
+  ];
+  function arcAmazonLinksInline(asin) {
+    if (!asin) return '';
+    return ARC_AMAZON_MARKETPLACES.map(function (m) {
+      return '<a href="https://www.amazon.' + m.tld + '/dp/' + encodeURIComponent(asin) + '" target="_blank" rel="noopener noreferrer" class="arc-amazon-link">' + m.label + '</a>';
+    }).join(' &middot; ');
+  }
+  // Manuscript tier delivers the file directly and was never affected by
+  // this bug, so it never gets an Amazon-link row.
+  function arcAmazonMetaHtml(tier, priceCents, asin) {
+    if (tier === 'manuscript') return '';
+    var parts = [];
+    if (tier === 'verified_purchase' && priceCents) parts.push('Buy on Amazon &middot; ' + arcFormatPrice(priceCents));
+    var links = arcAmazonLinksInline(asin);
+    if (links) parts.push(links);
+    if (!parts.length) return '';
+    return '<div class="arc-row-meta">' + parts.join(' &middot; ') + '</div>';
+  }
+
   function renderArcLibrary(libraryBooks) {
     var el = document.getElementById('arc-library');
     if (!libraryBooks.length) {
@@ -2587,7 +2622,7 @@ async function saveKeywordChange(b, newList) {
         '</div>' +
         '<div class="arc-row-title">' + escapeHtmlLocal(b.title) + '</div>' +
         '<div class="arc-row-meta">' + (b.category ? escapeHtmlLocal(b.category) + ' &middot; ' : '') + b.availableSlots + ' open slot' + (b.availableSlots === 1 ? '' : 's') + '</div>' +
-        (tier === 'verified_purchase' && b.priceCents ? '<div class="arc-row-meta">Buy on Amazon &middot; ' + arcFormatPrice(b.priceCents) + '</div>' : '') +
+        arcAmazonMetaHtml(tier, b.priceCents, b.asin) +
         (b.cleanContentOnly ? '<div class="arc-row-meta">Clean content only</div>' : '') +
         '<button type="button" class="btn btn-primary arc-request-btn" data-book-id="' + b.bookId + '" data-offer-type="' + tier + '">Request to review</button></div>';
     }).join('') + '</div>';
