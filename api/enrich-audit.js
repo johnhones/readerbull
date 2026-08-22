@@ -1225,6 +1225,9 @@ async function generateNarrative(input, competitors, pageRank, nicheStats) {
     'count inside bookInsight, marketAnalysis, strategySteps, quickWins or professionalAssessment text, ' +
     'always format it with thousands-separator commas, e.g. "1,231" not "1231", "56,000" not "56000". ' +
     'Dollar figures already get a "$" prefix per the instructions below, apply the same comma rule to those too. ' +
+    'Terminology (21 August 2026, per John: authors were confusing this with Amazon\'s own overall store-wide ' +
+    'BSR, a different number): if you ever need to name nicheStats.bestSellerRank explicitly as a metric ' +
+    'rather than just stating the number, call it "niche best seller rank", never "best seller rank" alone. ' +
     'Rank-strength consistency: whenever you describe how strong, competitive or well-positioned ' +
     'this book\'s category rank is anywhere in bookInsight, marketAnalysis or professionalAssessment, ' +
     'that description must agree with nicheStats.bestSellerRank when it is given (yours versus ' +

@@ -76,12 +76,18 @@ module.exports = async function handler(req, res) {
     var details = data.product_details || {};
     var ranks = details.best_sellers_rank || [];
 
-    // Pick the strongest (lowest) rank across every category the book
-    // shows up in, that's the category most worth surfacing as "category
-    // fit" for the Discoverability Score, auto-picked, no author input.
+    // Pick the strongest (lowest) rank across every *book* category the
+    // book shows up in (Niche Best Seller Rank, renamed from "Best Seller
+    // Rank" 21 August 2026 per John: the old name invited direct comparison
+    // to Amazon's own store-wide BSR and never won that comparison, since
+    // it's a different number by design). Filtered through isBookCategory
+    // (21 August 2026) so a non-book department Amazon sometimes lists a
+    // listing under, e.g. "#127 in Amazon Online Shopping", can't win this
+    // "lowest number" contest and get surfaced as the book's niche rank,
+    // which is confusing and not what "category fit" is meant to mean.
     var bestRank = null;
     ranks.forEach(function (r) {
-      if (typeof r.extracted_rank === 'number' && (!bestRank || r.extracted_rank < bestRank.extracted_rank)) {
+      if (typeof r.extracted_rank === 'number' && isBookCategory(r) && (!bestRank || r.extracted_rank < bestRank.extracted_rank)) {
         bestRank = r;
       }
     });
@@ -106,7 +112,7 @@ module.exports = async function handler(req, res) {
       ? storeWideRankEntry.extracted_rank
       : null;
 
-    var coverImage = (product.thumbnails && product.thumbnails[0]) || product.thumbnail || null;
+    var coverImage = upsizeAmazonCover((product.thumbnails && product.thumbnails[0]) || product.thumbnail || null);
 
     // "Frequently bought together" for this exact ASIN, when Amazon shows
     // it (SerpApi surfaces it as `bought_together` on the same amazon_product
@@ -134,7 +140,7 @@ module.exports = async function handler(req, res) {
               // competitor pill (added 20 August 2026) can show real cover
               // art without a second SerpApi call, null when Amazon didn't
               // return one for this bought-together row.
-              image: (r.thumbnails && r.thumbnails[0]) || r.thumbnail || null
+              image: upsizeAmazonCover((r.thumbnails && r.thumbnails[0]) || r.thumbnail || null)
             };
           })
       : [];
@@ -331,6 +337,47 @@ function extractAsin(input) {
   return match ? match[1].toUpperCase() : null;
 }
 
+// A best_sellers_rank entry counts as a book category for Niche Best
+// Seller Rank purposes (21 August 2026, per John: the auto-picked "lowest
+// number" rank was landing on non-book departments like "Amazon Online
+// Shopping", which isn't a niche any author recognises as their own).
+// Deliberately a denylist, not an allowlist requiring "Books"/"Kindle
+// Store" to appear: confirmed live (21 August 2026, two real listings)
+// that Amazon doesn't always print that qualifier on every category entry
+// even when it genuinely is a book category (e.g. "1,700 in Starting a
+// Business" with no "(Books)" suffix, on the same listing as entries that
+// did have one). Requiring the qualifier would wrongly drop that entry.
+// Amazon's own generic cross-department buckets (the confirmed offender,
+// "Amazon Online Shopping") are the one pattern that's safe to name and
+// exclude on sight: no real book niche/BISAC category is itself named
+// "Amazon ...".
+function isBookCategory(r) {
+  var text = (r && (r.link_text || r.text)) || '';
+  // text is Amazon's full display string, e.g. "#127 in Amazon Online
+  // Shopping" or "317 in Starting a Business (Books)", not just the bare
+  // category name, so strip the leading "<rank> in " before checking what
+  // department the category name itself starts with.
+  var name = text.replace(/^\s*#?[\d,]+\s+in\s+/i, '').replace(/\s*\((?:Books|Kindle Store)\)\s*$/i, '').trim();
+  return !/^amazon\b/i.test(name);
+}
+
+// SerpApi's thumbnails[0]/thumbnail fields return Amazon's small listing
+// thumbnail, not the full-size cover (confirmed 21 August 2026, per
+// John: covers looked "pixelated grainy" everywhere they're shown,
+// including the small book-switcher icon where a genuine thumbnail
+// shouldn't visibly pixelate). Amazon's own image CDN (m.media-amazon.com)
+// encodes the requested size as a "._SXnnn_"/"._SYnnn_"/"._AC_SXnnn_"-style
+// modifier immediately before the file extension, sometimes with multiple
+// underscore-separated parts (e.g. "._AC_UX160_"). Swapping that modifier
+// for a much larger one is the standard, widely-documented way to pull the
+// same photo at full resolution with no second API call. Falls back to the
+// original URL untouched if the pattern isn't there, so a working image
+// never breaks.
+function upsizeAmazonCover(url) {
+  if (!url || typeof url !== 'string') return url || null;
+  return url.replace(/\._[A-Za-z0-9,_]+_(\.[a-z]+)$/i, '._SL1500_$1');
+}
+
 function sendErrorAlert(endpoint, detail) {
   var key = process.env.RESEND_API_KEY;
   if (!key) return Promise.resolve();
@@ -354,3 +401,5 @@ function sendErrorAlert(endpoint, detail) {
 // session).
 module.exports.resolveAsin = resolveAsin;
 module.exports.extractAsin = extractAsin;
+module.exports.isBookCategory = isBookCategory;
+module.exports.upsizeAmazonCover = upsizeAmazonCover;

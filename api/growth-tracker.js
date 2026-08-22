@@ -67,6 +67,8 @@ var parsePrice = enrichAudit.parsePrice;
 var estimateMonthlyRevenue = enrichAudit.estimateMonthlyRevenue;
 var importBook = require('./import-book');
 var resolveAsin = importBook.resolveAsin;
+var isBookCategory = importBook.isBookCategory;
+var upsizeAmazonCover = importBook.upsizeAmazonCover;
 
 var SUPABASE_URL = process.env.SUPABASE_URL || 'https://tqkeqjisqqvxasyzrfax.supabase.co';
 // Same publishable (anon) key already shipped to the browser in
@@ -663,9 +665,12 @@ async function fetchAmazonProduct(asin, apiKey) {
   var product = data.product_results || {};
   var ranks = (data.product_details && data.product_details.best_sellers_rank) || [];
 
+  // Niche Best Seller Rank, same isBookCategory filter as
+  // api/import-book.js's own bestRank loop (21 August 2026), so a
+  // competitor's rank can't land on a non-book department either.
   var bestRank = null;
   ranks.forEach(function (r) {
-    if (typeof r.extracted_rank === 'number' && (!bestRank || r.extracted_rank < bestRank)) bestRank = r.extracted_rank;
+    if (typeof r.extracted_rank === 'number' && isBookCategory(r) && (!bestRank || r.extracted_rank < bestRank)) bestRank = r.extracted_rank;
   });
   var storeWideRank = (ranks[0] && typeof ranks[0].extracted_rank === 'number') ? ranks[0].extracted_rank : null;
   var price = parsePrice(product.price);
@@ -674,8 +679,10 @@ async function fetchAmazonProduct(asin, apiKey) {
   // Same fallback chain as api/import-book.js's coverImage extraction
   // (thumbnails[0], then thumbnail), so a manually-added or auto-populated
   // competitor's cover art comes from the identical field Amazon actually
-  // returns, not a guess at which one SerpApi populated this time.
-  var coverImage = (product.thumbnails && product.thumbnails[0]) || product.thumbnail || null;
+  // returns, not a guess at which one SerpApi populated this time. Also
+  // upsized the same way (21 August 2026), so competitor tiles don't look
+  // sharper or blurrier than the author's own book cover.
+  var coverImage = upsizeAmazonCover((product.thumbnails && product.thumbnails[0]) || product.thumbnail || null);
 
   return {
     asin: asin,
