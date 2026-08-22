@@ -434,7 +434,7 @@
       return (
         '<div class="item">' +
           '<div class="item-icon icon-teal">' + def.icon + '</div>' +
-          '<div class="item-b"><span style="font-weight:700;color:var(--black);">' + escapeHtml(def.label) + ':</span> ' + escapeHtml(insight[def.key]) + '</div>' +
+          '<div class="item-b"><span style="font-weight:700;color:var(--black);">' + escapeHtml(def.label) + ':</span> ' + escapeHtml(addThousandsCommas(insight[def.key])) + '</div>' +
         '</div>'
       );
     }).join('');
@@ -710,7 +710,7 @@
     if (currentAuditBook) {
       switcherLabel.textContent = currentAuditBook.book_title || 'Untitled book';
       switcherCover.innerHTML = currentAuditBook.cover_image_url
-        ? '<img src="' + currentAuditBook.cover_image_url + '" alt="">'
+        ? '<img src="' + upsizeAmazonCover(currentAuditBook.cover_image_url) + '" alt="">'
         : escapeHtml((currentAuditBook.book_title || '?').slice(0, 2));
     } else {
       switcherLabel.textContent = 'Select a book';
@@ -723,7 +723,7 @@
       var scored = b.score !== null && b.score !== undefined;
       var active = currentAuditBook && currentAuditBook.id === b.id;
       var cover = b.cover_image_url
-        ? '<img src="' + b.cover_image_url + '" alt="">'
+        ? '<img src="' + upsizeAmazonCover(b.cover_image_url) + '" alt="">'
         : escapeHtml((b.book_title || '?').slice(0, 2));
       var right = scored
         ? '<span class="book-switcher-item-score">' + b.score + '</span>'
@@ -917,7 +917,7 @@
                 '<div class="num">' + b.score + '<span>&thinsp;/ 100</span></div>' +
                 '<div style="font-size:12px;font-weight:700;color:var(--teal-d);margin-top:2px;">' + badge + '</div>' +
               '</div>' +
-              (b.cover_image_url ? '<div class="score-cover"><img src="' + b.cover_image_url + '" alt=""></div>' : '') +
+              (b.cover_image_url ? '<div class="score-cover"><img src="' + upsizeAmazonCover(b.cover_image_url) + '" alt=""></div>' : '') +
             '</div>' +
             '<div class="bars">' + barsHtml + '</div>' +
             '<div style="margin-top:16px;">' + adsPillHtml + '</div>' +
@@ -1104,21 +1104,23 @@
       // if he doesn't understand them other authors won't either]. Those
       // two numbers still drive the niche-relative rank language in
       // marketAnalysisHtml below, just no longer shown as bare tiles here.
-      // Kept the "Best Seller Rank" label (John, 18 Aug 2026: authors know
-      // this term, don't replace it) but added a plain-language line
-      // distinguishing it from the overall store-wide rank Amazon shows on
-      // the listing page itself (the #616 vs #967,327 confusion), the two
-      // are different numbers, this was previously unlabelled. An earlier
-      // version of this fix relabelled the tile to "Your Category Rank",
-      // reverted same day per John's explicit correction.
+      // Renamed "Best Seller Rank" -> "Niche Best Seller Rank" (21 August
+      // 2026, per John: the old label named it the same as Amazon's own
+      // overall store-wide BSR, so authors checked their real Amazon
+      // listing, saw a totally different number by thousands, and assumed
+      // ReaderBull was wrong. The self-descriptive name is the fix, not a
+      // longer disclaimer, so the subtext line is shortened accordingly. An
+      // earlier version of this fix relabelled the tile to "Your Category
+      // Rank" instead, reverted same day per John's explicit correction,
+      // this is a different rename, not a repeat of that one.
       var categoryLabel = b.amazon_category ? (' in ' + escapeHtml(b.amazon_category)) : '';
 
       return (
         '<div style="margin-top:24px;padding-top:20px;border-top:1px solid rgba(255,255,255,.1);">' +
-          '<div class="eyebrow2" style="margin-bottom:10px;">Best Seller Rank</div>' +
+          '<div class="eyebrow2" style="margin-bottom:10px;">Niche Best Seller Rank</div>' +
           '<div style="background:rgba(255,255,255,.06);border:1px solid rgba(255,255,255,.1);border-radius:10px;padding:14px 16px;">' +
             '<div style="font-size:22px;font-weight:800;color:#fff;">' + fmtRank(r.yours) + '</div>' +
-            '<div style="font-size:11px;color:rgba(255,255,255,.55);margin-top:4px;">Best Seller Rank within your book\'s own Amazon category' + categoryLabel + ', not the overall store-wide rank Amazon shows on the listing page. A lower rank means more sales.</div>' +
+            '<div style="font-size:11px;color:rgba(255,255,255,.55);margin-top:4px;">Your rank within your book\'s own Amazon category' + categoryLabel + ', not Amazon\'s overall store-wide rank. A lower number means more sales.</div>' +
           '</div>' +
         '</div>'
       );
@@ -1130,13 +1132,26 @@
     // api/enrich-audit.js now asks the model for an array of 3-4 short
     // bullets going forward; books audited before this change still have
     // the old 2-paragraph string in audit_narrative_json until they're
-    // re-audited, so this checks the real shape rather than assuming.
+    // re-audited, so professionalAssessmentCardHtml below feeds that
+    // legacy string through narrativeChunks first so it still lands here
+    // as an array, same bulleted treatment either way.
+    // Icon rotated through PROFESSIONAL_ASSESSMENT_ICONS (21 August 2026,
+    // per John: wanted this to look "the same as the book summary where
+    // it's using icons and bulleted"), same 4 glyphs and icon-teal colour
+    // as BOOK_INSIGHT_BULLETS above, just without that block's fixed
+    // per-position labels (Potential/What's working/...), since these
+    // bullets aren't generated in fixed semantic slots the way Book
+    // Summary's are. addThousandsCommas is a second, harmless pass here
+    // for legacy text already comma-formatted once by narrativeChunks
+    // (idempotent, see that function), and the only pass at all for
+    // new-shape array bullets straight from the model.
+    var PROFESSIONAL_ASSESSMENT_ICONS = ['&#36;', '&#10003;', '&#33;', '&#8594;'];
     function professionalAssessmentBulletsHtml(bullets) {
-      return bullets.filter(Boolean).map(function (t) {
+      return bullets.filter(Boolean).map(function (t, i) {
         return (
           '<div class="item">' +
-            '<div class="item-icon icon-teal">&#10003;</div>' +
-            '<div class="item-b">' + escapeHtml(t) + '</div>' +
+            '<div class="item-icon icon-teal">' + PROFESSIONAL_ASSESSMENT_ICONS[i % PROFESSIONAL_ASSESSMENT_ICONS.length] + '</div>' +
+            '<div class="item-b">' + escapeHtml(addThousandsCommas(t)) + '</div>' +
           '</div>'
         );
       }).join('');
@@ -1149,9 +1164,15 @@
       var tags = narrative && narrative.assessmentTags;
       var assessment = narrative && narrative.professionalAssessment;
       if (!assessment) return '';
+      // Legacy string shape (pre-21-Aug audits): chunked via narrativeChunks
+      // (paragraphs, or ~3-sentence groups if it was one long paragraph)
+      // and fed through the same bulleted/iconed renderer as the new
+      // array shape, rather than the old plain-<p> narrativeHtml render,
+      // so old and new audits look the same here (21 August 2026, per
+      // John: wanted icons and bullets, "don't go out with the norm").
       var bodyHtml = (Array.isArray(assessment) && assessment.length)
         ? professionalAssessmentBulletsHtml(assessment)
-        : narrativeHtml(assessment); // legacy string shape, pre-21-Aug audits
+        : professionalAssessmentBulletsHtml(narrativeChunks(assessment));
 
       // .badge/.b-teal/.b-orange (style.css, ported 5 August 2026 from
       // MASTER-TEMPLATE.html), colour-coded the same way the reference
@@ -1225,6 +1246,39 @@
     return String(s == null ? '' : s)
       .replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;')
       .replace(/"/g, '&quot;').replace(/'/g, '&#39;');
+  }
+
+  // Retroactive display-time fix (21 August 2026, per John): books audited
+  // before the comma-formatting fix landed in the narrative prompt still
+  // have raw unformatted digits ("1231") baked into their stored
+  // audit_narrative_json text. Re-running that book's audit is the only
+  // way to change the stored text (Refresh Audit was removed), so this
+  // reformats at render time instead, fixing every book, old and new,
+  // with no data migration. Skips plausible 4-digit years (1900-2099) so
+  // "2026" in narrative text isn't mangled into "2,026". Capped at 7
+  // digits (a realistic ceiling for a rank, review count or dollar figure)
+  // so a longer ID-like number that happens to appear in narrative text,
+  // e.g. a 10-13 digit ISBN, isn't comma-mangled into nonsense. Safe to
+  // run twice on text a new audit already comma-formatted (commas break
+  // the \d{4,7} match, so an already-formatted "1,231" is left alone).
+  function addThousandsCommas(text) {
+    return String(text == null ? '' : text).replace(/\b(\d{4,7})\b/g, function (match) {
+      var num = parseInt(match, 10);
+      if (match.length === 4 && num >= 1900 && num <= 2099) return match;
+      return num.toLocaleString('en-US');
+    });
+  }
+
+  // Same fix as api/import-book.js's upsizeAmazonCover (21 August 2026,
+  // per John: covers looked "pixelated grainy"), applied at display time so
+  // it also fixes already-stored cover_image_url values on existing books,
+  // not just newly-imported ones. Swaps Amazon's own image-CDN size
+  // modifier (which can itself have multiple underscore-separated parts,
+  // e.g. "._AC_UX160_") for a much larger one; falls back to the original
+  // URL untouched if the pattern isn't found.
+  function upsizeAmazonCover(url) {
+    if (!url || typeof url !== 'string') return url || '';
+    return url.replace(/\._[A-Za-z0-9,_]+_(\.[a-z]+)$/i, '._SL1500_$1');
   }
 
   // ---------- DELETE BOOK ----------
@@ -1322,9 +1376,47 @@
     loadGrowthTracker(b);
   }
 
-  // Narrative text from the LLM may contain paragraph breaks, render each
-  // as its own <p> rather than collapsing into one escaped block.
-  function narrativeHtml(text) { var raw = String(text || '').trim(); var paragraphs = raw.split(/\n\s*\n/).map(function (p) { return p.trim(); }).filter(Boolean); if (paragraphs.length <= 1 && raw) { var sentences = raw.match(/[^.!?]+[.!?]+(\s+|$)/g) || [raw]; var chunks = []; var current = ''; var count = 0; sentences.forEach(function (s) { current += s; count++; if (count >= 3) { chunks.push(current.trim()); current = ''; count = 0; } }); if (current.trim()) chunks.push(current.trim()); paragraphs = chunks.length ? chunks : paragraphs; } return paragraphs.map(function (p) { return '<p>' + escapeHtml(p) + '</p>'; }).join(''); }
+  // Narrative text from the LLM may contain paragraph breaks, split into
+  // chunks (paragraphs if present, otherwise ~3-sentence groups) rather
+  // than collapsing into one wall of text. Pulled out of narrativeHtml as
+  // its own function (21 August 2026) so professionalAssessmentCardHtml
+  // can reuse the exact same chunking to bullet-ify legacy pre-21-Aug
+  // Professional Assessment text (still a single raw string on older
+  // books, see that function below), instead of maintaining a second copy.
+  // addThousandsCommas runs once here on the raw text before it's split,
+  // so every render that uses this (narrativeHtml and the legacy
+  // Professional Assessment path) picks up comma-formatted numbers even on
+  // audits from before that fix landed in the narrative prompt.
+  //
+  // Decimal-safe sentence split (found + fixed 21 August 2026, while
+  // building the Professional Assessment bulleting above): the sentence
+  // regex below treats any "." as a sentence end, which wrongly cut a
+  // rating like "4.8" into two fragments ("...your 4." / "8 rating from
+  // 133 reviews..."), silently losing the "4" and misplacing the "8".
+  // This bug already existed in narrativeHtml before today, it just had
+  // no live case where it visibly mangled text; feeding Professional
+  // Assessment text (which almost always mentions a star rating) through
+  // this same chunking made it a live case, so it's fixed here rather than
+  // shipped alongside a brand new bug. Decimal points between two digits
+  // are swapped for a placeholder token before splitting, then restored
+  // after, so "4.8" survives as one token instead of being read as two
+  // sentences.
+  function narrativeChunks(text) {
+    var raw = addThousandsCommas(String(text || '').trim());
+    var paragraphs = raw.split(/\n\s*\n/).map(function (p) { return p.trim(); }).filter(Boolean);
+    if (paragraphs.length <= 1 && raw) {
+      var DECIMAL_TOKEN = '@@DEC@@';
+      var protectedText = raw.replace(/(\d)\.(\d)/g, '$1' + DECIMAL_TOKEN + '$2');
+      var protectedSentences = protectedText.match(/[^.!?]+[.!?]+(\s+|$)/g) || [protectedText];
+      var sentences = protectedSentences.map(function (s) { return s.split(DECIMAL_TOKEN).join('.'); });
+      var chunks = []; var current = ''; var count = 0;
+      sentences.forEach(function (s) { current += s; count++; if (count >= 3) { chunks.push(current.trim()); current = ''; count = 0; } });
+      if (current.trim()) chunks.push(current.trim());
+      paragraphs = chunks.length ? chunks : paragraphs;
+    }
+    return paragraphs;
+  }
+  function narrativeHtml(text) { return narrativeChunks(text).map(function (p) { return '<p>' + escapeHtml(p) + '</p>'; }).join(''); }
 
   function statRow(label, value) {
     return '<div style="display:flex;justify-content:space-between;padding:10px 0;border-bottom:1px solid var(--border);font-size:14px;">' +
@@ -1352,7 +1444,7 @@
   // without either value show "Not available", never a guess. "Your Book"
   // row uses the same real fields already computed for Overview
   // (b.bestseller_rank_number, nicheStats.yourEstimatedRevenue).
-function competitorTableHtml(b) { var competitors = b.competitors_json; if (!competitors || !competitors.length) return ''; var nicheStats = (b.audit_narrative_json && b.audit_narrative_json.nicheStats) || {}; var rows = competitors.map(function (c) { return ('<tr>' + '<td>' + escapeHtml(c.title || '') + '</td>' + '<td class="tc">' + fmtBsrCell(c.bestsellerRank) + '</td>' + '<td class="tr">' + fmtRevCell(c.estimatedRevenue) + '</td>' + '<td class="tc">' + (c.reviews != null ? escapeHtml(String(c.reviews)) : 'Not available') + '</td>' + '<td class="tc"><span class="badge ' + (c.sponsored ? 'b-teal' : 'b-muted') + '">' + (c.sponsored ? 'Yes' : 'No') + '</span></td>' + '</tr>'); }).join(''); rows += ('<tr>' + '<td style="font-weight:700;color:var(--teal-d);">Your Book</td>' + '<td class="tc">' + fmtBsrCell(b.bestseller_rank_number) + '</td>' + '<td class="tr" style="color:var(--orange);">' + fmtRevCell(nicheStats.yourEstimatedRevenue) + '</td>' + '<td class="tc">' + (b.live_review_count != null ? escapeHtml(String(b.live_review_count)) : 'Not available') + '</td>' + '<td class="tc"><span class="badge b-muted">No</span></td>' + '</tr>'); return ('<div style="overflow-x:auto;">' + '<table class="dash-table">' + '<thead><tr><th>Book</th><th class="tc">Sales Rank</th><th class="tr">Est. Revenue / Mo</th><th class="tc">Reviews</th><th class="tc">Running Ads</th></tr></thead>' + '<tbody>' + rows + '</tbody>' + '</table>' + '</div>' + '<div style="font-size:11px;color:var(--muted);margin-top:10px;">Sales rank and revenue are estimated from each listing\'s live Amazon data, a lower rank means more sales. Running Ads flags whether this listing showed up as a sponsored result during this search.</div>'); }
+function competitorTableHtml(b) { var competitors = b.competitors_json; if (!competitors || !competitors.length) return ''; var nicheStats = (b.audit_narrative_json && b.audit_narrative_json.nicheStats) || {}; var rows = competitors.map(function (c) { return ('<tr>' + '<td>' + escapeHtml(c.title || '') + '</td>' + '<td class="tc">' + fmtBsrCell(c.bestsellerRank) + '</td>' + '<td class="tr">' + fmtRevCell(c.estimatedRevenue) + '</td>' + '<td class="tc">' + (c.reviews != null ? escapeHtml(String(c.reviews)) : 'Not available') + '</td>' + '<td class="tc"><span class="badge ' + (c.sponsored ? 'b-teal' : 'b-muted') + '">' + (c.sponsored ? 'Yes' : 'No') + '</span></td>' + '</tr>'); }).join(''); rows += ('<tr>' + '<td style="font-weight:700;color:var(--teal-d);">Your Book</td>' + '<td class="tc">' + fmtBsrCell(b.bestseller_rank_number) + '</td>' + '<td class="tr" style="color:var(--orange);">' + fmtRevCell(nicheStats.yourEstimatedRevenue) + '</td>' + '<td class="tc">' + (b.live_review_count != null ? escapeHtml(String(b.live_review_count)) : 'Not available') + '</td>' + '<td class="tc"><span class="badge b-muted">No</span></td>' + '</tr>'); return ('<div style="overflow-x:auto;">' + '<table class="dash-table">' + '<thead><tr><th>Book</th><th class="tc">Niche Rank</th><th class="tr">Est. Revenue / Mo</th><th class="tc">Reviews</th><th class="tc">Running Ads</th></tr></thead>' + '<tbody>' + rows + '</tbody>' + '</table>' + '</div>' + '<div style="font-size:11px;color:var(--muted);margin-top:10px;">Niche rank and revenue are estimated from each listing\'s live Amazon data, a lower rank means more sales. Running Ads flags whether this listing showed up as a sponsored result during this search.</div>'); }
 
   // Merge note (21 August 2026, main/staging reconciliation): the
   // duplicate old-header competitor-table body that used to sit here on
@@ -1408,7 +1500,7 @@ function competitorTableHtml(b) { var competitors = b.competitors_json; if (!com
       if (Array.isArray(narrative.marketAnalysis)) {
         marketAnalysisSectionsHtml = narrative.marketAnalysis.map(function (sec) {
           if (!sec || !sec.body) return '';
-          return '<div class="ma-block">' + (sec.heading ? '<div class="ma-heading">' + escapeHtml(sec.heading) + '</div>' : '') + '<div class="ma-body">' + escapeHtml(sec.body) + '</div></div>';
+          return '<div class="ma-block">' + (sec.heading ? '<div class="ma-heading">' + escapeHtml(sec.heading) + '</div>' : '') + '<div class="ma-body">' + escapeHtml(addThousandsCommas(sec.body)) + '</div></div>';
         }).join('');
       } else {
         bullets.push(narrative.marketAnalysis);
@@ -1511,7 +1603,7 @@ function competitorTableHtml(b) { var competitors = b.competitors_json; if (!com
           '<div class="hb-eyebrow">Step ' + (i + 1) + ': ' + escapeHtml(s.title) + '</div>' +
           '<div class="item" style="margin-bottom:0;">' +
             '<div class="item-icon icon-orange">&#10003;</div>' +
-            '<div class="item-b">' + escapeHtml(s.body) + '</div>' +
+            '<div class="item-b">' + escapeHtml(addThousandsCommas(s.body)) + '</div>' +
           '</div>' +
           arrowHtml +
         '</div>'
@@ -1814,7 +1906,7 @@ async function saveKeywordChange(b, newList) {
           '<div class="step step-orange">' +
             '<div class="step-num num-orange">' + (i + 1) + '</div>' +
             '<div><div class="step-t">' + escapeHtml(w.title) + '</div>' +
-            '<div class="step-b">' + escapeHtml(w.body) + '</div></div>' +
+            '<div class="step-b">' + escapeHtml(addThousandsCommas(w.body)) + '</div></div>' +
           '</div>'
         );
       }).join('');
@@ -2483,7 +2575,7 @@ async function saveKeywordChange(b, newList) {
     el.innerHTML = '<div class="browse-grid">' + libraryBooks.map(function (b) {
       var tier = b.offerType && ARC_TIER_LABEL[b.offerType] ? b.offerType : 'manuscript';
       var coverInner = b.coverImageUrl
-        ? '<img src="' + escapeHtmlLocal(b.coverImageUrl) + '" alt="" loading="lazy">'
+        ? '<img src="' + escapeHtmlLocal(upsizeAmazonCover(b.coverImageUrl)) + '" alt="" loading="lazy">'
         : '<div class="browse-cover-fallback">' + escapeHtmlLocal(arcInitials(b.title)) + '</div>';
       return '<div class="browse-card">' +
         '<div class="browse-cover">' +
@@ -2741,10 +2833,14 @@ async function saveKeywordChange(b, newList) {
         ' toward your plan limit and appear' + (extraCount === 1 ? 's' : '') + ' in the table view below.</p>'
       : '';
 
-    // ---- bar panels: Reviews / Category rank / Est. monthly revenue ----
+    // ---- bar panels: Reviews / Niche rank / Est. monthly revenue ----
+    // "Category rank" renamed "Niche rank" (21 August 2026), same
+    // consistency pass as the Overview tab's "Niche Best Seller Rank" and
+    // the "How You Compare" table's "Niche Rank" column, so this is the
+    // same metric under the same name everywhere on the dashboard.
     var metrics = [
       { key: 'reviews', label: 'Reviews', fmt: function (v) { return v.toLocaleString(); }, invert: false },
-      { key: 'rank', label: 'Category rank', fmt: function (v) { return '#' + v.toLocaleString(); }, invert: true },
+      { key: 'rank', label: 'Niche rank', fmt: function (v) { return '#' + v.toLocaleString(); }, invert: true },
       { key: 'revenue', label: 'Est. monthly revenue', fmt: function (v) { return '$' + v.toLocaleString(); }, invert: false }
     ];
     var panelsHtml = metrics.map(function (m) { return gtBarPanelSvg(m, chartedSeries); }).join('');
@@ -2771,7 +2867,7 @@ async function saveKeywordChange(b, newList) {
     var pillsHtml = tracked.map(function (tc, i) {
       var color = i === 0 ? GT_COLORS.c1 : (i === 1 ? GT_COLORS.c2 : GT_COLORS.extra);
       var coverInner = tc.cover_image_url
-        ? '<img src="' + escapeHtml(tc.cover_image_url) + '" alt="">'
+        ? '<img src="' + escapeHtml(upsizeAmazonCover(tc.cover_image_url)) + '" alt="">'
         : '<span class="gt-book-cover-placeholder" style="background:' + color + '22"><span class="gt-dot" style="background:' + color + '"></span></span>';
       return (
         '<div class="gt-book-tile">' +
@@ -2834,7 +2930,7 @@ async function saveKeywordChange(b, newList) {
 
       '<button class="gt-table-toggle" id="gt-table-toggle">View as table</button>' +
       '<table class="dash-table gt-hide" id="gt-table" style="margin-top:14px;">' +
-        '<thead><tr><th>Book</th><th class="tc">Reviews</th><th class="tc">Category rank</th><th class="tr">Est. monthly revenue</th></tr></thead>' +
+        '<thead><tr><th>Book</th><th class="tc">Reviews</th><th class="tc">Niche rank</th><th class="tr">Est. monthly revenue</th></tr></thead>' +
         '<tbody>' + tableRowsHtml + '</tbody>' +
       '</table>';
 
